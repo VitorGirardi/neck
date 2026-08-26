@@ -43,7 +43,7 @@ Ele foi criado para quem quer responder três perguntas simples:
 | **Meu Plano Neck** | Cruza RAM, disco, temporários, inicialização e Windows Update para escolher três prioridades. | Não executa nenhuma ação automaticamente. |
 | **Neck Guard** | Mostra a saúde do computador e os maiores consumidores de memória. | Diagnóstico somente leitura. |
 | **Guard contínuo** | Monitora a cada 30 segundos e alerta apenas sobre pressão persistente. | Histórico local limitado às últimas 24 horas. |
-| **Neck Adaptive** | Otimiza CPU, memória e energia enquanto um aplicativo permanece aberto em segundo plano. | Restaura o estado original automaticamente quando você volta a usá-lo. |
+| **Neck Adaptive + RAM Park** | Otimiza a família completa de um aplicativo e retira páginas ociosas da RAM física. | Mantém o aplicativo aberto e recarrega dados sob demanda. |
 | **SOS Neck** | Lista aplicativos visíveis que podem aliviar uma sobrecarga. | Solicita fechamento normal; nunca força processos. |
 | **Neck Boot** | Explica o que inicia com o Windows e quais itens opcionais merecem revisão. | Encaminha mudanças para a tela oficial do Windows. |
 | **Modo Reunião** | Verifica o computador e impede suspensão durante uma apresentação. | Temporário, reversível e sem manutenção concorrente. |
@@ -61,7 +61,7 @@ O plano pode encaminhar para SOS Neck, limpeza segura, Neck Boot, diagnóstico o
 
 ## Neck Adaptive
 
-Quando um aplicativo pesado precisa continuar aberto — como Claude, Chrome, Teams ou um editor — o Neck Adaptive reduz seu impacto enquanto ele está em segundo plano, sem encerrar janelas ou perder trabalho.
+Quando um aplicativo pesado precisa continuar aberto — como Claude, Chrome, Teams ou um editor — o Neck Adaptive reduz seu impacto enquanto ele está em segundo plano, sem encerrar janelas ou perder trabalho. A análise considera a **família inteira de processos**, inclusive filhos com nomes diferentes como `chrome`, `node` ou `msedgewebview2`.
 
 1. Abra o **SOS Neck**.
 2. Selecione o aplicativo.
@@ -72,22 +72,23 @@ O estado muda sozinho conforme o uso:
 
 - **Em uso:** CPU, memória e energia permanecem no estado original.
 - **Aguardando:** após você trocar de janela, o Neck espera 15 segundos para evitar mudanças durante um Alt+Tab rápido.
-- **Otimizado:** aplica prioridade de CPU abaixo do normal, EcoQoS e baixa prioridade de memória a todos os processos do aplicativo.
+- **Otimizado:** aplica prioridade de CPU abaixo do normal, EcoQoS, baixa prioridade de memória e RAM Park a todos os processos da família.
 - Ao retornar à janela, o Neck restaura os três controles em até 2 segundos.
 
-Subprocessos novos também são detectados. Cada valor anterior é preservado individualmente e todos os ajustes restantes são restaurados ao encerrar o Neck.
+O **RAM Park** pede ao Windows para retirar o máximo possível de páginas ociosas do working set — a parte do aplicativo que está residente na RAM física. O Neck mede a memória antes e depois e informa uma estimativa liberada. Subprocessos novos também são detectados. Cada valor anterior é preservado individualmente e todos os ajustes restantes são restaurados ao encerrar o Neck.
 
-A implementação utiliza as APIs documentadas [`SetProcessInformation`](https://learn.microsoft.com/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessinformation) e [`MEMORY_PRIORITY_INFORMATION`](https://learn.microsoft.com/windows/win32/api/processthreadsapi/ns-processthreadsapi-memory_priority_information) do Windows.
+A implementação utiliza as APIs documentadas [`SetProcessInformation`](https://learn.microsoft.com/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessinformation), [`MEMORY_PRIORITY_INFORMATION`](https://learn.microsoft.com/windows/win32/api/processthreadsapi/ns-processthreadsapi-memory_priority_information) e [`EmptyWorkingSet`](https://learn.microsoft.com/windows/win32/api/psapi/nf-psapi-emptyworkingset) do Windows.
 
 ![Neck Adaptive no SOS Neck](assets/screenshots/neck-sos.png)
 
 > [!NOTE]
-> O Neck Adaptive ajuda o Windows a priorizar o que você está usando. Baixa prioridade de memória não apaga dados: ela orienta o Windows a retirar primeiro essas páginas quando houver pressão. Ao retornar ao aplicativo, algumas informações podem precisar ser carregadas novamente.
+> O RAM Park reduz memória física residente, não a memória privada comprometida pelo aplicativo. Nenhum estado é apagado, mas o primeiro retorno pode ficar mais lento enquanto o Windows recarrega páginas da memória standby, de arquivos ou do pagefile.
 
 ## Segurança por padrão
 
 - Não usa “limpeza de RAM” artificial nem encerra processos em massa.
 - Não aplica o Neck Adaptive a componentes críticos do Windows nem ao próprio Neck.
+- Não confunde RAM estacionada com memória definitivamente liberada e apresenta o resultado como estimativa.
 - Não aplica ajustes genéricos no Registro para prometer desempenho.
 - Não apaga documentos, fotos, downloads, senhas ou dados de navegadores.
 - Não esvazia a Lixeira sem uma seleção explícita.
@@ -105,11 +106,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.2.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.3.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.2.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.3.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -169,6 +170,7 @@ SystemMonitoring.cs        Diagnóstico de memória, disco e reunião
 GuardMonitoring.cs         Monitoramento contínuo, histórico e bandeja
 SosMode.cs                 Alívio seguro de sobrecarga
 EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
+ProcessFamily.cs           Descoberta de processos-filhos e RAM real da família
 StartupAnalysis.cs         Análise somente leitura da inicialização
 PersonalPlan.cs            Motor e interface das três prioridades
 ElevatedOperations.cs      Executor administrativo com lista fechada
@@ -202,6 +204,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Instalador, preferências e checksums
 - [x] Neck Boot e Meu Plano Neck
 - [x] Neck Adaptive com foco, EcoQoS e prioridade de memória
+- [x] RAM Park e otimização por família de processos
 - [ ] Assinatura digital dos binários
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface

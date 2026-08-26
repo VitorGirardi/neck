@@ -37,6 +37,9 @@ namespace Neck
         public int EfficiencyChanges;
         public int MemoryPriorityChanges;
         public int MemoryPriorityEffective;
+        public int ProcessesParked;
+        public long WorkingSetReleasedBytes;
+        public long AvailableMemoryGainBytes;
         public int AccessErrors;
 
         public bool HasChanges { get { return ProcessesChanged > 0; } }
@@ -45,6 +48,7 @@ namespace Neck
     internal static class EfficiencyModeManager
     {
         private const uint ProcessSetInformation = 0x0200;
+        private const uint ProcessSetQuota = 0x0100;
         private const uint ProcessQueryLimitedInformation = 0x1000;
         private const uint NormalPriorityClass = 0x00000020;
         private const uint BelowNormalPriorityClass = 0x00004000;
@@ -107,6 +111,8 @@ namespace Neck
             EfficiencyModeResult result = NewResult(processName);
             if (!CanTarget(processName)) return result;
 
+            ulong availableBefore = SystemInfo.GetMemoryStatus().AvailableBytes;
+
             lock (SyncRoot)
             {
                 EfficiencyModeSession session;
@@ -121,6 +127,8 @@ namespace Neck
                 session.IsThrottled = session.Processes.Count > 0;
                 if (session.Processes.Count == 0) Sessions.Remove(processName);
             }
+            ulong availableAfter = SystemInfo.GetMemoryStatus().AvailableBytes;
+            if (availableAfter > availableBefore) result.AvailableMemoryGainBytes = (long)(availableAfter - availableBefore);
             return result;
         }
 
@@ -156,21 +164,24 @@ namespace Neck
 
         public static void RefreshAdaptiveModes()
         {
-            RefreshAdaptiveModesCore(GetForegroundProcessName(), DateTime.UtcNow);
+            int foregroundProcessId;
+            string foregroundProcessName = GetForegroundProcess(out foregroundProcessId);
+            RefreshAdaptiveModesCore(foregroundProcessName, foregroundProcessId, DateTime.UtcNow);
         }
 
         internal static void RefreshAdaptiveModesForTesting(string foregroundProcessName, DateTime utcNow)
         {
-            RefreshAdaptiveModesCore(foregroundProcessName, utcNow);
+            RefreshAdaptiveModesCore(foregroundProcessName, 0, utcNow);
         }
 
-        private static void RefreshAdaptiveModesCore(string foregroundProcessName, DateTime utcNow)
+        private static void RefreshAdaptiveModesCore(string foregroundProcessName, int foregroundProcessId, DateTime utcNow)
         {
             lock (SyncRoot)
             {
                 foreach (EfficiencyModeSession session in Sessions.Values)
                 {
-                    bool foreground = string.Equals(session.ProcessName, foregroundProcessName, StringComparison.OrdinalIgnoreCase);
+                    bool foreground = string.Equals(session.ProcessName, foregroundProcessName, StringComparison.OrdinalIgnoreCase) ||
+                                      (foregroundProcessId > 0 && ProcessFamilyInspector.IsProcessInFamily(session.ProcessName, foregroundProcessId));
                     session.IsForeground = foreground;
                     if (foreground)
                     {
@@ -217,8 +228,8 @@ namespace Neck
 
         private static void ApplyToSession(EfficiencyModeSession session, EfficiencyModeResult result)
         {
-            Process[] processes;
-            try { processes = Process.GetProcessesByName(session.ProcessName); }
+            List<Process> processes;
+            try { processes = ProcessFamilyInspector.GetProcesses(session.ProcessName); }
             catch
             {
                 result.AccessErrors++;
@@ -261,6 +272,7 @@ namespace Neck
 
                 EfficiencyModeProcessState saved = new EfficiencyModeProcessState();
                 saved.ProcessId = process.Id;
+                saved.ProcessName = process.ProcessName;
                 saved.StartTimeUtcTicks = GetStartTimeUtcTicks(process);
                 saved.OriginalPriority = priority;
                 saved.PriorityCaptured = priority != 0;
@@ -298,7 +310,9 @@ namespace Neck
                     }
                 }
 
-                if (saved.PriorityChanged || saved.PowerChanged || saved.MemoryPriorityChanged)
+                saved.WorkingSetParked = TryParkWorkingSet(process, result);
+
+                if (saved.PriorityChanged || saved.PowerChanged || saved.MemoryPriorityChanged || saved.WorkingSetParked)
                 {
                     result.ProcessesChanged++;
                     session.Processes[process.Id] = saved;
@@ -330,7 +344,7 @@ namespace Neck
                 try
                 {
                     process = Process.GetProcessById(saved.ProcessId);
-                    if (!string.Equals(process.ProcessName, session.ProcessName, StringComparison.OrdinalIgnoreCase) || !IsSameProcess(process, saved))
+                    if (!string.Equals(process.ProcessName, saved.ProcessName, StringComparison.OrdinalIgnoreCase) || !IsSameProcess(process, saved))
                     {
                         restored.Add(saved.ProcessId);
                         continue;
@@ -392,7 +406,7 @@ namespace Neck
                     else restored = false;
                 }
 
-                if (changed) result.ProcessesChanged++;
+                if (changed || saved.WorkingSetParked) result.ProcessesChanged++;
                 if (!restored) result.AccessErrors++;
                 return restored;
             }
@@ -411,7 +425,7 @@ namespace Neck
                 {
                     using (Process process = Process.GetProcessById(processId))
                     {
-                        if (process.HasExited || !string.Equals(process.ProcessName, session.ProcessName, StringComparison.OrdinalIgnoreCase) ||
+                        if (process.HasExited || !string.Equals(process.ProcessName, session.Processes[processId].ProcessName, StringComparison.OrdinalIgnoreCase) ||
                             !IsSameProcess(process, session.Processes[processId])) exited.Add(processId);
                     }
                 }
@@ -462,6 +476,32 @@ namespace Neck
             catch (EntryPointNotFoundException) { return false; }
         }
 
+        private static bool TryParkWorkingSet(Process process, EfficiencyModeResult result)
+        {
+            long before;
+            try { before = Math.Max(0, process.WorkingSet64); }
+            catch { before = 0; }
+
+            IntPtr handle = OpenProcess(ProcessSetQuota | ProcessQueryLimitedInformation, false, process.Id);
+            if (handle == IntPtr.Zero) return false;
+            bool parked;
+            try { parked = K32EmptyWorkingSet(handle); }
+            catch (EntryPointNotFoundException) { parked = false; }
+            finally { CloseHandle(handle); }
+            if (!parked) return false;
+
+            long after;
+            try
+            {
+                process.Refresh();
+                after = Math.Max(0, process.WorkingSet64);
+            }
+            catch { after = before; }
+            result.ProcessesParked++;
+            result.WorkingSetReleasedBytes += Math.Max(0, before - after);
+            return true;
+        }
+
         private static EfficiencyModeResult NewResult(string processName)
         {
             return new EfficiencyModeResult { ProcessName = processName ?? string.Empty };
@@ -480,13 +520,15 @@ namespace Neck
             return current != 0 && current == saved.StartTimeUtcTicks;
         }
 
-        private static string GetForegroundProcessName()
+        private static string GetForegroundProcess(out int foregroundProcessId)
         {
+            foregroundProcessId = 0;
             IntPtr foreground = GetForegroundWindow();
             if (foreground == IntPtr.Zero) return string.Empty;
             uint processId;
             GetWindowThreadProcessId(foreground, out processId);
             if (processId == 0) return string.Empty;
+            foregroundProcessId = (int)processId;
             try
             {
                 using (Process process = Process.GetProcessById((int)processId))
@@ -505,6 +547,9 @@ namespace Neck
             total.EfficiencyChanges += current.EfficiencyChanges;
             total.MemoryPriorityChanges += current.MemoryPriorityChanges;
             total.MemoryPriorityEffective += current.MemoryPriorityEffective;
+            total.ProcessesParked += current.ProcessesParked;
+            total.WorkingSetReleasedBytes += current.WorkingSetReleasedBytes;
+            total.AvailableMemoryGainBytes += current.AvailableMemoryGainBytes;
             total.AccessErrors += current.AccessErrors;
         }
 
@@ -542,6 +587,10 @@ namespace Neck
         private static extern bool SetProcessMemoryInformation(IntPtr processHandle, int processInformationClass,
             ref MemoryPriorityInformation processInformation, uint processInformationSize);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool K32EmptyWorkingSet(IntPtr processHandle);
+
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
@@ -565,6 +614,7 @@ namespace Neck
         private sealed class EfficiencyModeProcessState
         {
             public int ProcessId;
+            public string ProcessName;
             public long StartTimeUtcTicks;
             public uint OriginalPriority;
             public bool PriorityCaptured;
@@ -575,6 +625,7 @@ namespace Neck
             public MemoryPriorityInformation OriginalMemoryPriority;
             public bool MemoryPriorityCaptured;
             public bool MemoryPriorityChanged;
+            public bool WorkingSetParked;
         }
     }
 }

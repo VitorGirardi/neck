@@ -63,8 +63,14 @@ namespace Neck
                     catch { }
                 }
             }
-            return grouped.Values
-                .Where(item => item.VisibleWindows > 0)
+            List<SosCandidate> visible = grouped.Values.Where(item => item.VisibleWindows > 0).ToList();
+            foreach (SosCandidate candidate in visible)
+            {
+                ProcessFamilyMetrics family = ProcessFamilyInspector.GetMetrics(candidate.ProcessName);
+                if (family.ProcessCount > candidate.ProcessCount) candidate.ProcessCount = family.ProcessCount;
+                if (family.WorkingSetBytes > candidate.MemoryBytes) candidate.MemoryBytes = family.WorkingSetBytes;
+            }
+            return visible
                 .OrderByDescending(item => item.MemoryBytes)
                 .Take(12)
                 .ToList();
@@ -184,7 +190,7 @@ namespace Neck
             Label explanation = new Label
             {
                 Dock = DockStyle.Fill,
-                Text = "Aplicativos com janela aberta. O estado muda entre Em uso, Aguardando e Otimizado:",
+                Text = "Aplicativos e processos-filhos. O estado muda entre Em uso, Aguardando e Otimizado:",
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
                 TextAlign = ContentAlignment.MiddleLeft
@@ -268,9 +274,9 @@ namespace Neck
             bool active = EfficiencyModeManager.IsActive(candidate.ProcessName);
             if (!active)
             {
-                string warning = candidate.DisplayName + " continuará aberto. Quando estiver em segundo plano, o Neck reduzirá sua prioridade de CPU, ativará EcoQoS e marcará sua memória como baixa prioridade.\n\n" +
-                                 "Ao voltar para o aplicativo, CPU, memória e energia retornam automaticamente ao estado original em até 2 segundos. Ao sair novamente, a otimização retorna após 15 segundos.\n\n" +
-                                 "Isso ajuda o Windows sob pressão, mas dados já retirados da RAM podem precisar ser carregados novamente.";
+                string warning = candidate.DisplayName + " e toda a sua família de processos continuarão abertos. O Neck reduzirá CPU, ativará EcoQoS, baixará a prioridade de memória e executará o RAM Park.\n\n" +
+                                 "O RAM Park retira da memória física o máximo possível de páginas ociosas. Ao voltar para o aplicativo, CPU, memória e energia retornam ao estado original em até 2 segundos.\n\n" +
+                                 "Nenhum documento é apagado, mas o primeiro retorno pode demorar enquanto o Windows recarrega dados sob demanda.";
                 if (MessageBox.Show(warning, "Ativar Neck Adaptive em " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
                     MessageBoxIcon.Information) != DialogResult.OK) return;
             }
@@ -292,8 +298,9 @@ namespace Neck
                 }
                 else if (result.ProcessesChanged > 0)
                 {
-                    _result.Text = "Neck Adaptive ativo em " + result.ProcessesChanged + " processo(s) de " + candidate.DisplayName +
-                                   ": CPU, EcoQoS e memória baixa confirmada em " + result.MemoryPriorityEffective + " processo(s). O aplicativo continua aberto.";
+                    long released = result.AvailableMemoryGainBytes > 0 ? result.AvailableMemoryGainBytes : result.WorkingSetReleasedBytes;
+                    _result.Text = "Adaptive na família " + candidate.DisplayName + ": " + result.ProcessesChanged + " processos; RAM Park ≈ " +
+                                   MainForm.FormatBytes(released) + "; memória baixa em " + result.MemoryPriorityEffective + ".";
                     if (result.AccessErrors > 0) _result.Text += " Alguns processos protegidos não aceitaram a alteração.";
                 }
                 else

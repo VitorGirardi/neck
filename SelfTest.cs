@@ -214,6 +214,7 @@ namespace Neck
                 EfficiencyModeResult missingMode = EfficiencyModeManager.Apply("NeckProcessThatDoesNotExist");
                 if (missingMode.HasChanges || EfficiencyModeManager.IsActive("NeckProcessThatDoesNotExist"))
                     throw new InvalidOperationException("Neck Adaptive vazio permaneceu ativo.");
+                TestProcessFamilyDiscovery();
                 TestEfficiencyModeRoundTrip();
                 using (SosForm sos = new SosForm())
                 {
@@ -278,6 +279,8 @@ namespace Neck
                     throw new InvalidOperationException("Neck Adaptive não foi aplicado ao processo de teste.");
                 if (applied.MemoryPriorityEffective < 1 || EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Optimized)
                     throw new InvalidOperationException("Neck Adaptive não confirmou baixa prioridade de memória no processo de teste.");
+                if (applied.ProcessesParked < 1)
+                    throw new InvalidOperationException("RAM Park não foi aplicado ao processo de teste.");
                 DateTime transitionStart = DateTime.UtcNow;
                 EfficiencyModeManager.RefreshAdaptiveModesForTesting("NeckEcoProbe", transitionStart);
                 if (EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Foreground)
@@ -293,7 +296,8 @@ namespace Neck
                     throw new InvalidOperationException("Neck Adaptive não foi restaurado no processo de teste.");
                 Console.WriteLine("AdaptiveRoundTrip=" + applied.ProcessesChanged + "/" + restored.ProcessesChanged +
                                   "; MemoryEffective=" + applied.MemoryPriorityEffective + "; MemoryChanged=" +
-                                  applied.MemoryPriorityChanges + "/" + restored.MemoryPriorityChanges);
+                                  applied.MemoryPriorityChanges + "/" + restored.MemoryPriorityChanges +
+                                  "; Parked=" + applied.ProcessesParked + "; Released=" + applied.WorkingSetReleasedBytes);
             }
             finally
             {
@@ -307,6 +311,21 @@ namespace Neck
                 try { if (System.IO.File.Exists(probePath)) System.IO.File.Delete(probePath); }
                 catch { }
             }
+        }
+
+        private static void TestProcessFamilyDiscovery()
+        {
+            System.Collections.Generic.List<ProcessTreeEntry> entries = new System.Collections.Generic.List<ProcessTreeEntry>
+            {
+                new ProcessTreeEntry { ProcessId = 10, ParentProcessId = 1, ProcessName = "claude" },
+                new ProcessTreeEntry { ProcessId = 11, ParentProcessId = 10, ProcessName = "chrome" },
+                new ProcessTreeEntry { ProcessId = 12, ParentProcessId = 11, ProcessName = "node" },
+                new ProcessTreeEntry { ProcessId = 20, ParentProcessId = 1, ProcessName = "chrome" },
+                new ProcessTreeEntry { ProcessId = 13, ParentProcessId = 10, ProcessName = "svchost" }
+            };
+            System.Collections.Generic.HashSet<int> family = ProcessFamilyInspector.BuildFamilyIds("claude", entries);
+            if (!family.Contains(10) || !family.Contains(11) || !family.Contains(12) || family.Contains(20) || family.Contains(13))
+                throw new InvalidOperationException("A descoberta de família de processos aceitou ou rejeitou um descendente incorretamente.");
         }
     }
 }
