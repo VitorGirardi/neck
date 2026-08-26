@@ -12,6 +12,10 @@ namespace Neck
             {
                 ScanResult result = Cleaner.Analyze();
                 MemoryStatus memory = SystemInfo.GetMemoryStatus();
+                System.Diagnostics.Stopwatch healthTimer = System.Diagnostics.Stopwatch.StartNew();
+                HealthSnapshot health = SystemInfo.GetHealthSnapshot();
+                healthTimer.Stop();
+                if (health.Score < 0 || health.Score > 100) throw new InvalidOperationException("Pontuação de saúde inválida.");
                 using (MainForm form = new MainForm())
                 {
                     Console.WriteLine("MainFormSize=" + form.ClientSize.Width + "x" + form.ClientSize.Height);
@@ -50,6 +54,22 @@ namespace Neck
                     }
                     options.Close();
                 }
+                using (DiagnosticForm diagnostic = new DiagnosticForm(health))
+                {
+                    diagnostic.ShowInTaskbar = false;
+                    diagnostic.StartPosition = FormStartPosition.Manual;
+                    diagnostic.Location = new System.Drawing.Point(-32000, -32000);
+                    diagnostic.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(diagnostic.Width, diagnostic.Height))
+                    {
+                        diagnostic.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, diagnostic.Width, diagnostic.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Guard.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("GuardPreview=" + previewPath);
+                    }
+                    diagnostic.Close();
+                }
                 Console.WriteLine("SELF_TEST_OK");
                 Console.WriteLine("TempBytes=" + result.TempBytes);
                 Console.WriteLine("TempFiles=" + result.TempFiles);
@@ -57,6 +77,10 @@ namespace Neck
                 Console.WriteLine("ReportFiles=" + result.ReportFiles);
                 Console.WriteLine("AccessErrors=" + result.AccessErrors);
                 Console.WriteLine("MemoryPercent=" + memory.PercentUsed.ToString("0.0"));
+                Console.WriteLine("HealthScore=" + health.Score);
+                Console.WriteLine("HealthLevel=" + health.Level);
+                Console.WriteLine("ObservedProcessGroups=" + health.TopProcesses.Count);
+                Console.WriteLine("HealthScanMilliseconds=" + healthTimer.ElapsedMilliseconds);
                 return 0;
             }
             catch (Exception ex)

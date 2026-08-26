@@ -13,11 +13,11 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("Neck")]
-[assembly: System.Reflection.AssemblyDescription("Manutenção periódica segura para Windows")]
+[assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.2.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.2.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.3.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.3.0.0")]
 
 namespace Neck
 {
@@ -140,7 +140,11 @@ namespace Neck
         private readonly Button _runButton = new Button();
         private readonly Button _advancedButton = new Button();
         private readonly Button _driversButton = new Button();
+        private readonly Button _guardButton = new Button();
         private readonly Button _reportsButton = new Button();
+        private readonly Label _guardBadge = new Label();
+        private readonly Label _guardMessage = new Label();
+        private readonly Label _guardProcess = new Label();
         private readonly CheckBox _tempCheck = new CheckBox();
         private readonly CheckBox _reportsCheck = new CheckBox();
         private readonly CheckBox _recycleCheck = new CheckBox();
@@ -150,6 +154,8 @@ namespace Neck
         private readonly Timer _statusTimer = new Timer();
         private long _analyzedBytes;
         private bool _busy;
+        private DateTime _lastHealthScan = DateTime.MinValue;
+        private HealthSnapshot _healthSnapshot;
 
         private static readonly string DataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neck");
@@ -270,7 +276,7 @@ namespace Neck
             body.Controls.Add(summary, 0, 0);
             body.Controls.Add(BuildQuickCard(), 0, 1);
             body.Controls.Add(BuildDeepCard(), 1, 1);
-            body.Controls.Add(BuildUpdatesCard(), 0, 2);
+            body.Controls.Add(BuildGuardCard(), 0, 2);
             body.Controls.Add(BuildActivityCard(), 1, 2);
             return body;
         }
@@ -399,39 +405,50 @@ namespace Neck
             return card;
         }
 
-        private Control BuildUpdatesCard()
+        private Control BuildGuardCard()
         {
             Panel card = MakeCard(new Padding(22));
             card.Margin = new Padding(0, 0, 10, 0);
-            Label icon = new Label
-            {
-                Text = "↻",
-                Font = new Font("Segoe UI Symbol", 28f),
-                ForeColor = Theme.Cyan,
-                AutoSize = true,
-                Location = new Point(22, 20)
-            };
+            _guardBadge.Text = "ANALISANDO";
+            _guardBadge.AutoSize = false;
+            _guardBadge.Size = new Size(108, 25);
+            _guardBadge.BackColor = Theme.BlueSoft;
+            _guardBadge.ForeColor = Theme.Blue;
+            _guardBadge.TextAlign = ContentAlignment.MiddleCenter;
+            _guardBadge.Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold);
+            _guardBadge.Location = new Point(22, 17);
             Label title = new Label
             {
-                Text = "Drivers e Windows Update",
+                Text = "Neck Guard",
                 AutoSize = true,
                 Font = Theme.Heading,
                 ForeColor = Theme.Text,
-                Location = new Point(72, 24)
+                Location = new Point(22, 49)
             };
-            Label text = new Label
+            _guardMessage.Text = "Procurando sinais de sobrecarga...";
+            _guardMessage.AutoSize = false;
+            _guardMessage.Size = new Size(450, 38);
+            _guardMessage.Font = Theme.Small;
+            _guardMessage.ForeColor = Theme.Muted;
+            _guardMessage.Location = new Point(23, 77);
+            _guardProcess.Text = "Maior uso de memória: calculando";
+            _guardProcess.AutoSize = false;
+            _guardProcess.Size = new Size(450, 24);
+            _guardProcess.Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold);
+            _guardProcess.ForeColor = Theme.Text;
+            _guardProcess.Location = new Point(23, 112);
+
+            ConfigureButton(_guardButton, "Ver diagnóstico", Theme.Blue, 150);
+            ConfigureButton(_driversButton, "Drivers", Theme.NavySoft, 106);
+            ConfigureButton(_reportsButton, "Histórico", Theme.NavySoft, 112);
+            _guardButton.Location = new Point(22, 142);
+            _driversButton.Location = new Point(182, 142);
+            _reportsButton.Location = new Point(298, 142);
+            _guardButton.Click += delegate
             {
-                Text = "Veja as versões instaladas e use somente os canais oficiais da Microsoft, Intel, NVIDIA e HP.",
-                AutoSize = false,
-                Size = new Size(420, 46),
-                Font = Theme.Small,
-                ForeColor = Theme.Muted,
-                Location = new Point(73, 58)
+                HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
+                using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
             };
-            ConfigureButton(_driversButton, "Abrir central", Theme.Blue, 150);
-            ConfigureButton(_reportsButton, "Histórico", Theme.NavySoft, 120);
-            _driversButton.Location = new Point(23, 112);
-            _reportsButton.Location = new Point(183, 112);
             _driversButton.Click += delegate { using (DriverCenterForm form = new DriverCenterForm()) form.ShowDialog(this); };
             _reportsButton.Click += delegate
             {
@@ -439,9 +456,11 @@ namespace Neck
                 OpenTarget(ReportDirectory);
             };
 
-            card.Controls.Add(icon);
+            card.Controls.Add(_guardBadge);
             card.Controls.Add(title);
-            card.Controls.Add(text);
+            card.Controls.Add(_guardMessage);
+            card.Controls.Add(_guardProcess);
+            card.Controls.Add(_guardButton);
             card.Controls.Add(_driversButton);
             card.Controls.Add(_reportsButton);
             return card;
@@ -614,6 +633,42 @@ namespace Neck
                 _diskValue.ForeColor = drive.AvailableFreeSpace < 15L * 1024 * 1024 * 1024 ? Theme.Amber : Theme.Text;
             }
             catch { _diskValue.Text = "—"; }
+
+            if ((DateTime.Now - _lastHealthScan).TotalSeconds >= 10)
+            {
+                _lastHealthScan = DateTime.Now;
+                _healthSnapshot = SystemInfo.GetHealthSnapshot();
+                UpdateGuardView(_healthSnapshot);
+            }
+        }
+
+        private void UpdateGuardView(HealthSnapshot snapshot)
+        {
+            if (snapshot == null) return;
+            if (snapshot.Level == HealthLevel.Critical)
+            {
+                _guardBadge.Text = "CRÍTICO";
+                _guardBadge.BackColor = Color.FromArgb(254, 226, 226);
+                _guardBadge.ForeColor = Color.Firebrick;
+            }
+            else if (snapshot.Level == HealthLevel.Warning)
+            {
+                _guardBadge.Text = "ATENÇÃO";
+                _guardBadge.BackColor = Color.FromArgb(255, 247, 237);
+                _guardBadge.ForeColor = Theme.Amber;
+            }
+            else
+            {
+                _guardBadge.Text = "ESTÁVEL";
+                _guardBadge.BackColor = Theme.GreenSoft;
+                _guardBadge.ForeColor = Theme.Green;
+            }
+
+            _guardMessage.Text = snapshot.Summary;
+            ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
+            _guardProcess.Text = top == null
+                ? "Nenhum processo pôde ser analisado."
+                : "Maior uso: " + top.DisplayName + "  •  " + FormatBytes(top.MemoryBytes);
         }
 
         private void LoadLastRun()
@@ -828,6 +883,7 @@ namespace Neck
             _runButton.Enabled = !busy;
             _advancedButton.Enabled = !busy;
             _driversButton.Enabled = !busy;
+            _guardButton.Enabled = !busy;
             _progress.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
             _progress.MarqueeAnimationSpeed = busy ? 25 : 0;
             if (!string.IsNullOrEmpty(status)) AppendLog(status);
@@ -864,6 +920,168 @@ namespace Neck
         {
             try { Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true }); }
             catch (Exception ex) { MessageBox.Show("Não foi possível abrir:\n" + target + "\n\n" + ex.Message, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        }
+    }
+
+    internal sealed class DiagnosticForm : Form
+    {
+        private readonly HealthSnapshot _snapshot;
+
+        public DiagnosticForm(HealthSnapshot snapshot)
+        {
+            _snapshot = snapshot ?? new HealthSnapshot();
+            Text = "Diagnóstico inteligente — Neck Guard";
+            StartPosition = FormStartPosition.CenterParent;
+            Size = new Size(800, 650);
+            MinimumSize = new Size(740, 600);
+            BackColor = Theme.Background;
+            Font = Theme.Body;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+            BuildInterface();
+        }
+
+        private void BuildInterface()
+        {
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Navy };
+            header.Controls.Add(new Label
+            {
+                Text = "Neck Guard",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 22f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(28, 18)
+            });
+            header.Controls.Add(new Label
+            {
+                Text = "O que está pressionando seu computador agora",
+                AutoSize = true,
+                Font = Theme.Body,
+                ForeColor = Color.FromArgb(186, 199, 218),
+                Location = new Point(31, 65)
+            });
+
+            TableLayoutPanel body = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 20, 24, 20),
+                ColumnCount = 1,
+                RowCount = 4,
+                BackColor = Theme.Background
+            };
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+            body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+
+            RoundedPanel summary = new RoundedPanel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White,
+                OutlineColor = Theme.Border,
+                CornerRadius = 16,
+                Padding = new Padding(20),
+                Margin = new Padding(0, 0, 0, 12)
+            };
+            Color levelColor = _snapshot.Level == HealthLevel.Critical ? Color.Firebrick :
+                               _snapshot.Level == HealthLevel.Warning ? Theme.Amber : Theme.Green;
+            Label score = new Label
+            {
+                Text = _snapshot.Score.ToString(CultureInfo.CurrentCulture),
+                AutoSize = false,
+                Size = new Size(92, 72),
+                Location = new Point(18, 21),
+                Font = new Font("Segoe UI Semibold", 30f, FontStyle.Bold),
+                ForeColor = levelColor,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            summary.Controls.Add(score);
+            summary.Controls.Add(new Label
+            {
+                Text = _snapshot.Title,
+                AutoSize = true,
+                Font = Theme.Heading,
+                ForeColor = Theme.Text,
+                Location = new Point(126, 22)
+            });
+            summary.Controls.Add(new Label
+            {
+                Text = _snapshot.Summary,
+                AutoSize = false,
+                Size = new Size(565, 55),
+                Font = Theme.Body,
+                ForeColor = Theme.Muted,
+                Location = new Point(128, 54)
+            });
+
+            Label metrics = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "Memória em uso: " + _snapshot.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "%" +
+                       "     •     Disponível: " + MainForm.FormatBytes((long)_snapshot.Memory.AvailableBytes) +
+                       "     •     Disco livre: " + MainForm.FormatBytes(_snapshot.DiskFreeBytes),
+                Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
+                ForeColor = Theme.Text,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(4, 0, 0, 0)
+            };
+
+            ListView processes = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = false,
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White,
+                ForeColor = Theme.Text,
+                Font = Theme.Body,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable
+            };
+            processes.Columns.Add("Aplicativo", 390);
+            processes.Columns.Add("Processos", 110, HorizontalAlignment.Center);
+            processes.Columns.Add("Memória", 150, HorizontalAlignment.Right);
+            foreach (ResourceProcess process in _snapshot.TopProcesses)
+            {
+                ListViewItem item = new ListViewItem(process.DisplayName);
+                item.SubItems.Add(process.ProcessCount.ToString(CultureInfo.CurrentCulture));
+                item.SubItems.Add(MainForm.FormatBytes(process.MemoryBytes));
+                processes.Items.Add(item);
+            }
+
+            FlowLayoutPanel footer = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                Padding = new Padding(0, 10, 0, 0)
+            };
+            Button close = new Button { Text = "Entendi", DialogResult = DialogResult.OK };
+            close.Width = 130;
+            close.Height = 42;
+            close.BackColor = Theme.Blue;
+            close.ForeColor = Color.White;
+            close.FlatStyle = FlatStyle.Flat;
+            close.FlatAppearance.BorderSize = 0;
+            close.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+            close.Cursor = Cursors.Hand;
+            footer.Controls.Add(close);
+            footer.Controls.Add(new Label
+            {
+                Text = "Somente leitura: o Neck não encerrou nem alterou nenhum aplicativo.",
+                AutoSize = false,
+                Width = 510,
+                Height = 42,
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Theme.Muted,
+                Font = Theme.Small
+            });
+            AcceptButton = close;
+
+            body.Controls.Add(summary, 0, 0);
+            body.Controls.Add(metrics, 0, 1);
+            body.Controls.Add(processes, 0, 2);
+            body.Controls.Add(footer, 0, 3);
+            Controls.Add(body);
+            Controls.Add(header);
         }
     }
 
@@ -1416,6 +1634,32 @@ namespace Neck
         public ulong AvailableBytes;
     }
 
+    internal enum HealthLevel
+    {
+        Stable,
+        Warning,
+        Critical
+    }
+
+    internal sealed class ResourceProcess
+    {
+        public string DisplayName;
+        public int ProcessCount;
+        public long MemoryBytes;
+    }
+
+    internal sealed class HealthSnapshot
+    {
+        public int Score;
+        public HealthLevel Level;
+        public string Title = "Diagnóstico indisponível";
+        public string Summary = "Não foi possível concluir a leitura agora.";
+        public MemoryStatus Memory;
+        public long DiskFreeBytes;
+        public long DiskTotalBytes;
+        public List<ResourceProcess> TopProcesses = new List<ResourceProcess>();
+    }
+
     internal static class SystemInfo
     {
         public static MemoryStatus GetMemoryStatus()
@@ -1424,6 +1668,102 @@ namespace Neck
             data.dwLength = (uint)Marshal.SizeOf(typeof(NativeMethods.MEMORYSTATUSEX));
             if (!NativeMethods.GlobalMemoryStatusEx(ref data)) return new MemoryStatus();
             return new MemoryStatus { PercentUsed = data.dwMemoryLoad, AvailableBytes = data.ullAvailPhys };
+        }
+
+        public static HealthSnapshot GetHealthSnapshot()
+        {
+            HealthSnapshot snapshot = new HealthSnapshot();
+            snapshot.Memory = GetMemoryStatus();
+
+            try
+            {
+                string root = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
+                DriveInfo drive = new DriveInfo(root);
+                snapshot.DiskFreeBytes = drive.AvailableFreeSpace;
+                snapshot.DiskTotalBytes = drive.TotalSize;
+            }
+            catch { }
+
+            Dictionary<string, ResourceProcess> grouped = new Dictionary<string, ResourceProcess>(StringComparer.OrdinalIgnoreCase);
+            string currentName = Process.GetCurrentProcess().ProcessName;
+            foreach (Process process in Process.GetProcesses())
+            {
+                using (process)
+                {
+                    try
+                    {
+                        string name = process.ProcessName;
+                        if (string.Equals(name, currentName, StringComparison.OrdinalIgnoreCase)) continue;
+                        long memory = Math.Max(0, process.WorkingSet64);
+                        ResourceProcess item;
+                        if (!grouped.TryGetValue(name, out item))
+                        {
+                            item = new ResourceProcess { DisplayName = FriendlyProcessName(name) };
+                            grouped.Add(name, item);
+                        }
+                        item.ProcessCount++;
+                        item.MemoryBytes += memory;
+                    }
+                    catch { }
+                }
+            }
+            snapshot.TopProcesses = grouped.Values.OrderByDescending(item => item.MemoryBytes).Take(5).ToList();
+
+            bool diskCritical = snapshot.DiskTotalBytes > 0 &&
+                                (snapshot.DiskFreeBytes < 2L * 1024 * 1024 * 1024 ||
+                                 snapshot.DiskFreeBytes * 100 / snapshot.DiskTotalBytes < 5);
+            bool diskWarning = snapshot.DiskTotalBytes > 0 && snapshot.DiskFreeBytes < 15L * 1024 * 1024 * 1024;
+            if (snapshot.Memory.PercentUsed >= 90 || diskCritical)
+                snapshot.Level = HealthLevel.Critical;
+            else if (snapshot.Memory.PercentUsed >= 75 || diskWarning)
+                snapshot.Level = HealthLevel.Warning;
+            else
+                snapshot.Level = HealthLevel.Stable;
+
+            int memoryPenalty = (int)Math.Max(0, (snapshot.Memory.PercentUsed - 55) * 1.35);
+            int diskPenalty = diskCritical ? 30 : diskWarning ? 15 : 0;
+            snapshot.Score = Math.Max(10, Math.Min(100, 100 - memoryPenalty - diskPenalty));
+            ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
+
+            if (snapshot.Level == HealthLevel.Critical)
+            {
+                snapshot.Title = "Pressão alta detectada";
+                snapshot.Summary = snapshot.Memory.PercentUsed >= 90
+                    ? "A memória está quase cheia. " + TopProcessSentence(top)
+                    : "O disco do Windows está praticamente cheio e pode deixar todo o sistema lento.";
+            }
+            else if (snapshot.Level == HealthLevel.Warning)
+            {
+                snapshot.Title = "O computador merece atenção";
+                snapshot.Summary = snapshot.Memory.PercentUsed >= 75
+                    ? "O uso de memória está elevado. " + TopProcessSentence(top)
+                    : "Há pouco espaço livre no disco do Windows; uma limpeza segura pode ajudar.";
+            }
+            else
+            {
+                snapshot.Title = "Sistema estável agora";
+                snapshot.Summary = "Não encontramos pressão crítica de memória ou disco. " + TopProcessSentence(top);
+            }
+            return snapshot;
+        }
+
+        private static string TopProcessSentence(ResourceProcess process)
+        {
+            return process == null
+                ? "Nenhum aplicativo pôde ser comparado neste momento."
+                : process.DisplayName + " é o maior consumidor de memória agora.";
+        }
+
+        private static string FriendlyProcessName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "Processo desconhecido";
+            if (string.Equals(name, "msedge", StringComparison.OrdinalIgnoreCase)) return "Microsoft Edge";
+            if (string.Equals(name, "chrome", StringComparison.OrdinalIgnoreCase)) return "Google Chrome";
+            if (string.Equals(name, "firefox", StringComparison.OrdinalIgnoreCase)) return "Mozilla Firefox";
+            if (string.Equals(name, "explorer", StringComparison.OrdinalIgnoreCase)) return "Explorador do Windows";
+            if (string.Equals(name, "Teams", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "ms-teams", StringComparison.OrdinalIgnoreCase)) return "Microsoft Teams";
+            if (string.Equals(name, "Code", StringComparison.OrdinalIgnoreCase)) return "Visual Studio Code";
+            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(name.Replace('_', ' '));
         }
     }
 

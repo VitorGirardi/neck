@@ -2,6 +2,10 @@
 
 Utilitário de manutenção periódica para Windows. Ele analisa antes de apagar, trabalha apenas com locais conhecidos e usa as ferramentas nativas do Windows para manutenção do sistema.
 
+## Neck Guard (v0.3)
+
+O diagnóstico inteligente observa o uso de memória, o espaço livre no disco do Windows e os grupos de processos que mais consomem RAM. Ele classifica o momento como estável, atenção ou crítico e explica a causa em linguagem simples. Nesta primeira versão o Guard é estritamente somente leitura: nenhum aplicativo é encerrado ou alterado.
+
 O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Proteções adotadas
@@ -15,6 +19,7 @@ O projeto ainda está em fase inicial. Revise o relatório apresentado pelo apli
 
 ## Experiência guiada
 
+- **Neck Guard:** apresenta uma pontuação de saúde e identifica os maiores consumidores de memória.
 - **Limpeza rápida:** remove somente temporários seguros e relatórios antigos.
 - **Manutenção completa:** mantém as opções técnicas em uma tela separada e explicada.
 - **Drivers e Windows Update:** mostra versões instaladas e abre apenas fontes oficiais.
