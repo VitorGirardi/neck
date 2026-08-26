@@ -1,0 +1,20 @@
+# Build and test outputs
+dist/
+test-output/
+bin/
+obj/
+
+# IDE and local files
+.vs/
+.vscode/
+*.user
+*.suo
+*.cache
+
+# Local maintenance reports and settings
+Relatorios/
+ultima-manutencao.txt
+
+# Windows
+Thumbs.db
+Desktop.ini
