@@ -293,7 +293,7 @@ namespace Neck
                 else if (result.ProcessesChanged > 0)
                 {
                     _result.Text = "Neck Adaptive ativo em " + result.ProcessesChanged + " processo(s) de " + candidate.DisplayName +
-                                   ": CPU, EcoQoS e " + result.MemoryPriorityChanges + " ajuste(s) de memória. O aplicativo continua aberto.";
+                                   ": CPU, EcoQoS e memória baixa confirmada em " + result.MemoryPriorityEffective + " processo(s). O aplicativo continua aberto.";
                     if (result.AccessErrors > 0) _result.Text += " Alguns processos protegidos não aceitaram a alteração.";
                 }
                 else

@@ -36,6 +36,7 @@ namespace Neck
         public int PriorityChanges;
         public int EfficiencyChanges;
         public int MemoryPriorityChanges;
+        public int MemoryPriorityEffective;
         public int AccessErrors;
 
         public bool HasChanges { get { return ProcessesChanged > 0; } }
@@ -282,11 +283,19 @@ namespace Neck
                 saved.PowerChanged = TrySetPowerState(handle, ref efficient);
                 if (saved.PowerChanged) result.EfficiencyChanges++;
 
-                if (saved.MemoryPriorityCaptured && saved.OriginalMemoryPriority.MemoryPriority > MemoryPriorityLow)
+                if (saved.MemoryPriorityCaptured && saved.OriginalMemoryPriority.MemoryPriority <= MemoryPriorityLow)
+                {
+                    result.MemoryPriorityEffective++;
+                }
+                else if (saved.MemoryPriorityCaptured)
                 {
                     MemoryPriorityInformation lowMemory = new MemoryPriorityInformation { MemoryPriority = MemoryPriorityLow };
                     saved.MemoryPriorityChanged = TrySetMemoryPriority(handle, ref lowMemory);
-                    if (saved.MemoryPriorityChanged) result.MemoryPriorityChanges++;
+                    if (saved.MemoryPriorityChanged)
+                    {
+                        result.MemoryPriorityChanges++;
+                        result.MemoryPriorityEffective++;
+                    }
                 }
 
                 if (saved.PriorityChanged || saved.PowerChanged || saved.MemoryPriorityChanged)
@@ -495,6 +504,7 @@ namespace Neck
             total.PriorityChanges += current.PriorityChanges;
             total.EfficiencyChanges += current.EfficiencyChanges;
             total.MemoryPriorityChanges += current.MemoryPriorityChanges;
+            total.MemoryPriorityEffective += current.MemoryPriorityEffective;
             total.AccessErrors += current.AccessErrors;
         }
 

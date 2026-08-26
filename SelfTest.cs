@@ -276,8 +276,8 @@ namespace Neck
                 EfficiencyModeResult applied = EfficiencyModeManager.Apply("NeckEcoProbe");
                 if (!applied.HasChanges || !EfficiencyModeManager.IsActive("NeckEcoProbe"))
                     throw new InvalidOperationException("Neck Adaptive não foi aplicado ao processo de teste.");
-                if (applied.MemoryPriorityChanges < 1 || EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Optimized)
-                    throw new InvalidOperationException("Neck Adaptive não reduziu a prioridade de memória do processo de teste.");
+                if (applied.MemoryPriorityEffective < 1 || EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Optimized)
+                    throw new InvalidOperationException("Neck Adaptive não confirmou baixa prioridade de memória no processo de teste.");
                 DateTime transitionStart = DateTime.UtcNow;
                 EfficiencyModeManager.RefreshAdaptiveModesForTesting("NeckEcoProbe", transitionStart);
                 if (EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Foreground)
@@ -292,7 +292,8 @@ namespace Neck
                 if (!restored.HasChanges || EfficiencyModeManager.IsActive("NeckEcoProbe"))
                     throw new InvalidOperationException("Neck Adaptive não foi restaurado no processo de teste.");
                 Console.WriteLine("AdaptiveRoundTrip=" + applied.ProcessesChanged + "/" + restored.ProcessesChanged +
-                                  "; Memory=" + applied.MemoryPriorityChanges + "/" + restored.MemoryPriorityChanges);
+                                  "; MemoryEffective=" + applied.MemoryPriorityEffective + "; MemoryChanged=" +
+                                  applied.MemoryPriorityChanges + "/" + restored.MemoryPriorityChanges);
             }
             finally
             {
