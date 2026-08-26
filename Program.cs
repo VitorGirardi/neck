@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.7.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.7.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.8.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.8.0.0")]
 
 namespace Neck
 {
@@ -29,6 +29,13 @@ namespace Neck
             if (ElevatedOperations.IsElevatedInvocation(args))
             {
                 Environment.ExitCode = ElevatedOperations.ExecuteElevatedInvocation(args);
+                return;
+            }
+
+            if (args != null && args.Any(item => string.Equals(item, "--remove-startup", StringComparison.OrdinalIgnoreCase)))
+            {
+                try { StartupManager.SetEnabled(false); }
+                catch { Environment.ExitCode = 1; }
                 return;
             }
 
@@ -139,6 +146,7 @@ namespace Neck
         private readonly Button _guardButton = new Button();
         private readonly Button _meetingButton = new Button();
         private readonly Button _reportsButton = new Button();
+        private readonly Button _settingsButton = new Button();
         private readonly Label _guardBadge = new Label();
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
@@ -156,6 +164,9 @@ namespace Neck
         private readonly GuardHistoryStore _guardHistory = new GuardHistoryStore();
         private readonly GuardPressureDetector _guardDetector = new GuardPressureDetector();
         private GuardSettings _guardSettings;
+        private ToolStripMenuItem _startupMenuItem;
+        private ToolStripMenuItem _notificationsMenuItem;
+        private ToolStripMenuItem _fullscreenMenuItem;
         private List<GuardSample> _guardSamples = new List<GuardSample>();
         private long _analyzedBytes;
         private bool _busy;
@@ -176,7 +187,7 @@ namespace Neck
         private static readonly string ReportDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Neck", "Relatorios");
 
-        public MainForm(bool startHidden = false)
+        public MainForm(bool startHidden = false, bool suppressOnboarding = false)
         {
             Text = "Neck";
             StartPosition = FormStartPosition.CenterScreen;
@@ -203,7 +214,14 @@ namespace Neck
             _guardMonitorTimer.Tick += delegate { CaptureGuardSample(); };
             _guardMonitorTimer.Start();
 
-            if (!startHidden) Shown += async delegate { await AnalyzeAsync(false); };
+            if (!startHidden)
+            {
+                Shown += async delegate
+                {
+                    if (!suppressOnboarding && !_guardSettings.OnboardingCompleted) ShowPreferences(true);
+                    await AnalyzeAsync(false);
+                };
+            }
             Shown += delegate { CaptureGuardSample(); };
             if (startHidden)
             {
@@ -285,11 +303,21 @@ namespace Neck
             _recommendation.BackColor = Theme.NavySoft;
             _recommendation.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _recommendation.Location = new Point(ClientSize.Width - 292, 31);
-            header.Resize += delegate { _recommendation.Left = header.ClientSize.Width - _recommendation.Width - 32; };
+            ConfigureButton(_settingsButton, "Preferências", Theme.NavySoft, 126);
+            _settingsButton.Height = 44;
+            _settingsButton.Location = new Point(ClientSize.Width - 430, 31);
+            _settingsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _settingsButton.Click += delegate { ShowPreferences(false); };
+            header.Resize += delegate
+            {
+                _recommendation.Left = header.ClientSize.Width - _recommendation.Width - 32;
+                _settingsButton.Left = _recommendation.Left - _settingsButton.Width - 12;
+            };
 
             header.Controls.Add(mark);
             header.Controls.Add(title);
             header.Controls.Add(subtitle);
+            header.Controls.Add(_settingsButton);
             header.Controls.Add(_recommendation);
             return header;
         }
@@ -542,30 +570,31 @@ namespace Neck
             });
             menu.Items.Add("Modo Reunião", null, delegate { ShowFromTray(); ToggleMeetingMode(); });
             bool changingStartup = false;
-            ToolStripMenuItem startup = new ToolStripMenuItem("Iniciar com o Windows") { CheckOnClick = true, Checked = StartupManager.IsEnabled() };
-            startup.CheckedChanged += delegate
+            _startupMenuItem = new ToolStripMenuItem("Iniciar com o Windows") { CheckOnClick = true, Checked = StartupManager.IsEnabled() };
+            _startupMenuItem.CheckedChanged += delegate
             {
                 if (changingStartup) return;
                 try
                 {
-                    StartupManager.SetEnabled(startup.Checked);
-                    if (startup.Checked) _backgroundCheck.Checked = true;
+                    StartupManager.SetEnabled(_startupMenuItem.Checked);
+                    if (_startupMenuItem.Checked) _backgroundCheck.Checked = true;
                 }
                 catch (Exception ex)
                 {
                     changingStartup = true;
-                    startup.Checked = !startup.Checked;
+                    _startupMenuItem.Checked = !_startupMenuItem.Checked;
                     changingStartup = false;
                     MessageBox.Show("Não foi possível alterar a inicialização do Neck.\n\n" + ex.Message, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             };
-            menu.Items.Add(startup);
-            ToolStripMenuItem notifications = new ToolStripMenuItem("Exibir notificações") { CheckOnClick = true, Checked = _guardSettings.Notifications };
-            notifications.CheckedChanged += delegate { _guardSettings.Notifications = notifications.Checked; _guardSettings.Save(); };
-            menu.Items.Add(notifications);
-            ToolStripMenuItem fullscreen = new ToolStripMenuItem("Silenciar em tela cheia") { CheckOnClick = true, Checked = _guardSettings.SilenceFullscreen };
-            fullscreen.CheckedChanged += delegate { _guardSettings.SilenceFullscreen = fullscreen.Checked; _guardSettings.Save(); };
-            menu.Items.Add(fullscreen);
+            menu.Items.Add(_startupMenuItem);
+            _notificationsMenuItem = new ToolStripMenuItem("Exibir notificações") { CheckOnClick = true, Checked = _guardSettings.Notifications };
+            _notificationsMenuItem.CheckedChanged += delegate { _guardSettings.Notifications = _notificationsMenuItem.Checked; _guardSettings.Save(); };
+            menu.Items.Add(_notificationsMenuItem);
+            _fullscreenMenuItem = new ToolStripMenuItem("Silenciar em tela cheia") { CheckOnClick = true, Checked = _guardSettings.SilenceFullscreen };
+            _fullscreenMenuItem.CheckedChanged += delegate { _guardSettings.SilenceFullscreen = _fullscreenMenuItem.Checked; _guardSettings.Save(); };
+            menu.Items.Add(_fullscreenMenuItem);
+            menu.Items.Add("Preferências", null, delegate { ShowFromTray(); ShowPreferences(false); });
             menu.Items.Add("Silenciar alertas por 2 horas", null, delegate
             {
                 _guardSettings.SilentUntilUtc = DateTime.UtcNow.AddHours(2);
@@ -598,6 +627,20 @@ namespace Neck
             if (_closing || IsDisposed || _busy) return;
             using (SosForm form = new SosForm()) form.ShowDialog(this);
             UpdateSystemStatus();
+        }
+
+        private void ShowPreferences(bool firstRun)
+        {
+            if (_closing || IsDisposed) return;
+            using (PreferencesForm form = new PreferencesForm(_guardSettings, firstRun))
+            {
+                if (form.ShowDialog(this) != DialogResult.OK) return;
+            }
+
+            _backgroundCheck.Checked = _guardSettings.ContinueInTray;
+            if (_startupMenuItem != null) _startupMenuItem.Checked = StartupManager.IsEnabled();
+            if (_notificationsMenuItem != null) _notificationsMenuItem.Checked = _guardSettings.Notifications;
+            if (_fullscreenMenuItem != null) _fullscreenMenuItem.Checked = _guardSettings.SilenceFullscreen;
         }
 
         private void HandleMainFormClosing(object sender, FormClosingEventArgs e)
@@ -1195,6 +1238,7 @@ namespace Neck
             _runButton.Enabled = !busy && !_meetingActive;
             _advancedButton.Enabled = !busy && !_meetingActive;
             _driversButton.Enabled = !busy;
+            _settingsButton.Enabled = !busy;
             _guardButton.Enabled = !busy;
             _meetingButton.Enabled = !busy;
             _progress.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;

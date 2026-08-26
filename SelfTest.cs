@@ -22,7 +22,7 @@ namespace Neck
                 if (ElevatedOperations.ParseTasks("health,comando-invalido").Length != 0) throw new InvalidOperationException("Plano elevado inválido foi aceito.");
                 string startupCommand = StartupManager.BuildCommand(@"C:\Program Files\Neck\Neck.exe");
                 if (startupCommand != "\"C:\\Program Files\\Neck\\Neck.exe\" --background") throw new InvalidOperationException("Comando de inicialização inválido.");
-                using (MainForm form = new MainForm())
+                using (MainForm form = new MainForm(false, true))
                 {
                     Console.WriteLine("MainFormSize=" + form.ClientSize.Width + "x" + form.ClientSize.Height);
                     form.ShowInTaskbar = false;
@@ -43,6 +43,24 @@ namespace Neck
                         Console.WriteLine("UIPreview=" + previewPath);
                     }
                     form.ForceCloseForTesting();
+                }
+                if (!UpdateChecker.RepositoryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("O verificador de atualizações não aponta para HTTPS.");
+                using (PreferencesForm preferences = new PreferencesForm(GuardSettings.Load(), false))
+                {
+                    preferences.ShowInTaskbar = false;
+                    preferences.StartPosition = FormStartPosition.Manual;
+                    preferences.Location = new System.Drawing.Point(-32000, -32000);
+                    preferences.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(preferences.Width, preferences.Height))
+                    {
+                        preferences.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, preferences.Width, preferences.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Preferences.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("PreferencesPreview=" + previewPath);
+                    }
+                    preferences.Close();
                 }
                 using (MaintenanceOptionsForm options = new MaintenanceOptionsForm(true, true, false, true, false, true))
                 {

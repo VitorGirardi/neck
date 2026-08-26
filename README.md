@@ -28,6 +28,12 @@ O Neck inicia como usuário comum: Guard, histórico, diagnóstico, SOS, Modo Re
 
 No menu da bandeja, **Iniciar com o Windows** é opcional. Quando habilitado, o Neck abre oculto com `--background`, sem UAC, e a configuração pode ser desfeita pelo mesmo menu.
 
+## Instalação e confiança (v0.8)
+
+O primeiro uso agora apresenta as escolhas de inicialização, bandeja e notificações em linguagem simples. A Central de Preferências permite revisar tudo depois e inclui uma verificação manual de versão no repositório oficial. O Neck não baixa nem executa atualizações silenciosamente e não armazena credenciais do GitHub.
+
+O `Neck Setup` instala o aplicativo em Arquivos de Programas, cria atalhos opcionais e oferece desinstalação normal pelo Windows. Ao remover o Neck, a entrada opcional de inicialização automática também é apagada. Cada executável publicado acompanha um arquivo `.sha256` para conferência de integridade.
+
 O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Proteções adotadas
@@ -58,6 +64,8 @@ Uma análise a cada 30 dias é suficiente para a maioria dos computadores. A ver
 ## Compilação
 
 Execute `build.ps1` no PowerShell. O resultado é criado em `dist\Neck.exe`. O compilador do .NET Framework 4.8 que acompanha o Windows é utilizado, sem dependências de terceiros.
+
+Para gerar o instalador, instale o Inno Setup 6 e execute `build-installer.ps1`. Serão criados `dist\Neck-Setup-0.8.0.exe` e os checksums SHA-256 do instalador e do executável portátil.
 
 Para executar os autotestes de análise e gerar uma versão de verificação visual, use `test.ps1`. Os arquivos de teste são criados em `test-output` e não são versionados.
 

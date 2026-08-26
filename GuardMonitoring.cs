@@ -228,6 +228,7 @@ namespace Neck
         public bool ContinueInTray;
         public bool Notifications = true;
         public bool SilenceFullscreen = true;
+        public bool OnboardingCompleted;
         public DateTime SilentUntilUtc = DateTime.MinValue;
 
         public static GuardSettings Load()
@@ -245,6 +246,7 @@ namespace Neck
                     if (key == "ContinueInTray") bool.TryParse(value, out settings.ContinueInTray);
                     else if (key == "Notifications") bool.TryParse(value, out settings.Notifications);
                     else if (key == "SilenceFullscreen") bool.TryParse(value, out settings.SilenceFullscreen);
+                    else if (key == "OnboardingCompleted") bool.TryParse(value, out settings.OnboardingCompleted);
                     else if (key == "SilentUntilUtc") DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out settings.SilentUntilUtc);
                 }
             }
@@ -263,6 +265,7 @@ namespace Neck
                     "ContinueInTray=" + ContinueInTray,
                     "Notifications=" + Notifications,
                     "SilenceFullscreen=" + SilenceFullscreen,
+                    "OnboardingCompleted=" + OnboardingCompleted,
                     "SilentUntilUtc=" + SilentUntilUtc.ToString("O", CultureInfo.InvariantCulture)
                 }, new UTF8Encoding(false));
             }

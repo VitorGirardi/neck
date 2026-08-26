@@ -25,9 +25,21 @@ jobs:
         shell: pwsh
         run: ./build.ps1
 
-      - name: Upload executable
+      - name: Install Inno Setup
+        shell: pwsh
+        run: winget install --id JRSoftware.InnoSetup --exact --silent --disable-interactivity --accept-package-agreements --accept-source-agreements
+
+      - name: Build installer and checksums
+        shell: pwsh
+        run: ./build-installer.ps1
+
+      - name: Upload Windows package
         uses: actions/upload-artifact@v7.0.1
         with:
           name: neck-windows
-          path: dist/Neck.exe
+          path: |
+            dist/Neck.exe
+            dist/Neck.exe.sha256
+            dist/Neck-Setup-0.8.0.exe
+            dist/Neck-Setup-0.8.0.exe.sha256
           if-no-files-found: error
