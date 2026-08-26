@@ -9,6 +9,40 @@ using System.Windows.Forms;
 
 namespace Neck
 {
+    internal static class StartupManager
+    {
+        private const string ValueName = "Neck";
+        private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+
+        internal static string BuildCommand(string executablePath)
+        {
+            return "\"" + executablePath + "\" --background";
+        }
+
+        public static bool IsEnabled()
+        {
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKeyPath, false))
+                {
+                    string value = key == null ? null : key.GetValue(ValueName) as string;
+                    return string.Equals(value, BuildCommand(Application.ExecutablePath), StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch { return false; }
+        }
+
+        public static void SetEnabled(bool enabled)
+        {
+            using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunKeyPath))
+            {
+                if (key == null) throw new InvalidOperationException("O Windows não permitiu abrir as configurações de inicialização.");
+                if (enabled) key.SetValue(ValueName, BuildCommand(Application.ExecutablePath), Microsoft.Win32.RegistryValueKind.String);
+                else key.DeleteValue(ValueName, false);
+            }
+        }
+    }
+
     internal sealed class GuardSample
     {
         public DateTime TimestampUtc;

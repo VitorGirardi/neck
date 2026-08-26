@@ -6,6 +6,10 @@ New-Item -ItemType Directory -Path $testDirectory -Force | Out-Null
 $artifactDirectory = Join-Path $PSScriptRoot 'build-artifacts'
 $iconPath = Join-Path $artifactDirectory 'neck.ico'
 & (Join-Path $PSScriptRoot 'generate-icon.ps1') -OutputPath $iconPath
+$manifestPath = Join-Path $PSScriptRoot 'app.manifest'
+if ((Get-Content -LiteralPath $manifestPath -Raw) -notmatch 'requestedExecutionLevel level="asInvoker"') {
+    throw 'O manifesto voltou a exigir elevação na inicialização.'
+}
 
 $common = @(
     '/nologo'
@@ -17,6 +21,7 @@ $common = @(
     '/reference:System.Drawing.dll'
     '/reference:System.Windows.Forms.dll'
     "/win32icon:$iconPath"
+    "/win32manifest:$manifestPath"
 )
 $applicationSources = Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.cs' |
     Where-Object { $_.Name -ne 'SelfTest.cs' } |

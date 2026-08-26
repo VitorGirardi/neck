@@ -22,6 +22,12 @@ Durante uma manutenção ativa, fechar a janela oferece continuar a tarefa na ba
 
 O SOS apresenta somente aplicativos com janela visível, ordenados pelo consumo aproximado de memória. Com confirmação explícita, ele pode enviar um pedido normal de fechamento — equivalente ao botão `X` — e aguarda o próprio aplicativo responder. Processos críticos do Windows e encerramento forçado são excluídos por projeto. O SOS também oferece limpeza segura de temporários antigos e acesso ao Gerenciador de Tarefas.
 
+## Privilégios sob demanda (v0.7)
+
+O Neck inicia como usuário comum: Guard, histórico, diagnóstico, SOS, Modo Reunião e limpeza rápida não provocam UAC. Somente DISM, SFC, otimização da unidade e criação de ponto de restauração abrem um executor isolado com permissão administrativa. O executor aceita uma lista fechada de tarefas e grava o resultado apenas na pasta local de trabalhos do Neck.
+
+No menu da bandeja, **Iniciar com o Windows** é opcional. Quando habilitado, o Neck abre oculto com `--background`, sem UAC, e a configuração pode ser desfeita pelo mesmo menu.
+
 O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Proteções adotadas
@@ -39,6 +45,7 @@ O projeto ainda está em fase inicial. Revise o relatório apresentado pelo apli
 - **Modo Reunião:** executa uma checagem prévia e mantém computador e tela acordados por 30, 60 ou 120 minutos.
 - **Guard contínuo:** pode continuar na bandeja, mantém histórico local de 24 horas e alerta apenas sobre problemas persistentes.
 - **SOS Neck:** reúne ações imediatas e confirmadas para aliviar uma sobrecarga sem forçar processos.
+- **Privilégios sob demanda:** mantém o Guard comum e solicita administrador somente para ferramentas do Windows que realmente precisam.
 - **Limpeza rápida:** remove somente temporários seguros e relatórios antigos.
 - **Manutenção completa:** mantém as opções técnicas em uma tela separada e explicada.
 - **Drivers e Windows Update:** mostra versões instaladas e abre apenas fontes oficiais.

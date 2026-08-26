@@ -18,6 +18,10 @@ namespace Neck
                 if (health.Score < 0 || health.Score > 100) throw new InvalidOperationException("Pontuação de saúde inválida.");
                 MeetingPreflight meeting = SystemInfo.GetMeetingPreflight();
                 if (meeting.Checks.Count < 6) throw new InvalidOperationException("Checklist de reunião incompleto.");
+                if (ElevatedOperations.ParseTasks("health,drives").Length != 2) throw new InvalidOperationException("Plano elevado válido foi recusado.");
+                if (ElevatedOperations.ParseTasks("health,comando-invalido").Length != 0) throw new InvalidOperationException("Plano elevado inválido foi aceito.");
+                string startupCommand = StartupManager.BuildCommand(@"C:\Program Files\Neck\Neck.exe");
+                if (startupCommand != "\"C:\\Program Files\\Neck\\Neck.exe\" --background") throw new InvalidOperationException("Comando de inicialização inválido.");
                 using (MainForm form = new MainForm())
                 {
                     Console.WriteLine("MainFormSize=" + form.ClientSize.Width + "x" + form.ClientSize.Height);
@@ -151,6 +155,7 @@ namespace Neck
                 Console.WriteLine("MeetingChecks=" + meeting.Checks.Count);
                 Console.WriteLine("SyntheticGuardAlert=" + syntheticAlert.Kind);
                 Console.WriteLine("SosVisibleCandidates=" + sosCandidates.Count);
+                Console.WriteLine("SelfTestIsAdministrator=" + SecurityHelper.IsAdministrator());
                 return 0;
             }
             catch (Exception ex)

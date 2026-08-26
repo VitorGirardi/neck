@@ -16,45 +16,41 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.6.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.6.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.7.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.7.0.0")]
 
 namespace Neck
 {
     internal static class Program
     {
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-
-#if !NOELEVATION
-            if (!SecurityHelper.IsAdministrator())
+            if (ElevatedOperations.IsElevatedInvocation(args))
             {
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = Application.ExecutablePath,
-                        UseShellExecute = true,
-                        Verb = "runas",
-                        WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath) ?? Environment.CurrentDirectory
-                    });
-                }
-                catch
-                {
-                    MessageBox.Show(
-                        "A manutenção do Windows precisa de permissão de administrador. Nenhuma alteração foi feita.",
-                        "Neck",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
-                }
+                Environment.ExitCode = ElevatedOperations.ExecuteElevatedInvocation(args);
                 return;
             }
-#endif
 
-            Application.Run(new MainForm());
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            bool startHidden = args != null && args.Any(item => string.Equals(item, "--background", StringComparison.OrdinalIgnoreCase));
+            bool firstInstance;
+            using (System.Threading.Mutex singleInstance = new System.Threading.Mutex(true, @"Local\Neck.SingleInstance", out firstInstance))
+            {
+                if (!firstInstance)
+                {
+                    IntPtr existing = NativeMethods.FindWindow(null, "Neck");
+                    if (existing != IntPtr.Zero)
+                    {
+                        NativeMethods.ShowWindow(existing, NativeMethods.SW_RESTORE);
+                        NativeMethods.SetForegroundWindow(existing);
+                    }
+                    return;
+                }
+                Application.Run(new MainForm(startHidden));
+                GC.KeepAlive(singleInstance);
+            }
         }
     }
 
@@ -180,7 +176,7 @@ namespace Neck
         private static readonly string ReportDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Neck", "Relatorios");
 
-        public MainForm()
+        public MainForm(bool startHidden = false)
         {
             Text = "Neck";
             StartPosition = FormStartPosition.CenterScreen;
@@ -207,8 +203,18 @@ namespace Neck
             _guardMonitorTimer.Tick += delegate { CaptureGuardSample(); };
             _guardMonitorTimer.Start();
 
-            Shown += async delegate { await AnalyzeAsync(false); };
+            if (!startHidden) Shown += async delegate { await AnalyzeAsync(false); };
             Shown += delegate { CaptureGuardSample(); };
+            if (startHidden)
+            {
+                ShowInTaskbar = false;
+                WindowState = FormWindowState.Minimized;
+                Shown += delegate
+                {
+                    Hide();
+                    ShowInTaskbar = true;
+                };
+            }
             FormClosing += HandleMainFormClosing;
             FormClosed += delegate
             {
@@ -535,6 +541,25 @@ namespace Neck
                 using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
             });
             menu.Items.Add("Modo Reunião", null, delegate { ShowFromTray(); ToggleMeetingMode(); });
+            bool changingStartup = false;
+            ToolStripMenuItem startup = new ToolStripMenuItem("Iniciar com o Windows") { CheckOnClick = true, Checked = StartupManager.IsEnabled() };
+            startup.CheckedChanged += delegate
+            {
+                if (changingStartup) return;
+                try
+                {
+                    StartupManager.SetEnabled(startup.Checked);
+                    if (startup.Checked) _backgroundCheck.Checked = true;
+                }
+                catch (Exception ex)
+                {
+                    changingStartup = true;
+                    startup.Checked = !startup.Checked;
+                    changingStartup = false;
+                    MessageBox.Show("Não foi possível alterar a inicialização do Neck.\n\n" + ex.Message, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            };
+            menu.Items.Add(startup);
             ToolStripMenuItem notifications = new ToolStripMenuItem("Exibir notificações") { CheckOnClick = true, Checked = _guardSettings.Notifications };
             notifications.CheckedChanged += delegate { _guardSettings.Notifications = notifications.Checked; _guardSettings.Save(); };
             menu.Items.Add(notifications);
@@ -1039,6 +1064,8 @@ namespace Neck
             string warning = "Serão executadas estas tarefas:\n\n• " + string.Join("\n• ", selected) +
                              "\n\nDocumentos, fotos, senhas e arquivos pessoais não serão tocados.";
             if (_recycleCheck.Checked) warning += "\n\nAtenção: o conteúdo da Lixeira será apagado definitivamente.";
+            if (_componentsCheck.Checked || _healthCheck.Checked || _drivesCheck.Checked)
+                warning += "\n\nO Windows solicitará permissão de administrador somente para as tarefas de sistema.";
 
             if (MessageBox.Show(warning, "Confirmar manutenção", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK)
                 return;
@@ -1085,52 +1112,19 @@ namespace Neck
                     report.AppendLine(line);
                 }
 
-                if (_componentsCheck.Checked)
+                List<string> elevatedTasks = new List<string>();
+                if (_componentsCheck.Checked) elevatedTasks.Add("components");
+                if (_healthCheck.Checked) elevatedTasks.Add("health");
+                if (_drivesCheck.Checked) elevatedTasks.Add("drives");
+                if (elevatedTasks.Count > 0)
                 {
-                    AppendLog("Executando limpeza de componentes do Windows (DISM)...");
-                    ProcessResult result = await Task.Run(delegate
-                    {
-                        return ProcessRunner.Run("dism.exe", "/Online /Cleanup-Image /StartComponentCleanup /NoRestart", 45 * 60 * 1000);
-                    });
-                    string line = "DISM Component Cleanup: " + (result.ExitCode == 0 ? "concluído" : "código " + result.ExitCode) + ".";
-                    AppendLog(line);
-                    report.AppendLine(line);
-                    report.AppendLine(result.Output);
-                }
-
-                if (_healthCheck.Checked)
-                {
-                    AppendLog("Verificando a imagem do Windows...");
-                    ProcessResult dism = await Task.Run(delegate
-                    {
-                        return ProcessRunner.Run("dism.exe", "/Online /Cleanup-Image /ScanHealth /NoRestart", 45 * 60 * 1000);
-                    });
-                    AppendLog("DISM ScanHealth: " + (dism.ExitCode == 0 ? "concluído" : "código " + dism.ExitCode) + ".");
-                    report.AppendLine("DISM ScanHealth — código " + dism.ExitCode);
-                    report.AppendLine(dism.Output);
-
-                    AppendLog("Verificando arquivos protegidos do Windows...");
-                    ProcessResult sfc = await Task.Run(delegate
-                    {
-                        return ProcessRunner.Run("sfc.exe", "/verifyonly", 45 * 60 * 1000);
-                    });
-                    AppendLog("SFC VerifyOnly: " + (sfc.ExitCode == 0 ? "nenhuma violação detectada" : "código " + sfc.ExitCode) + ".");
-                    report.AppendLine("SFC VerifyOnly — código " + sfc.ExitCode);
-                    report.AppendLine(sfc.Output);
-                }
-
-                if (_drivesCheck.Checked)
-                {
-                    string systemDrive = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
-                    AppendLog("Otimizando " + systemDrive + " com a ferramenta nativa do Windows...");
-                    ProcessResult result = await Task.Run(delegate
-                    {
-                        return ProcessRunner.Run("defrag.exe", systemDrive + " /O /H /U /V", 60 * 60 * 1000);
-                    });
-                    string line = "Otimização da unidade: " + (result.ExitCode == 0 ? "concluída" : "código " + result.ExitCode) + ".";
-                    AppendLog(line);
-                    report.AppendLine(line);
-                    report.AppendLine(result.Output);
+                    AppendLog("Solicitando permissão para as tarefas de sistema...");
+                    ElevatedTaskResult elevated = await ElevatedOperations.RunAsync(elevatedTasks);
+                    if (elevated.Cancelled) throw new InvalidOperationException("A permissão de administrador foi cancelada. As tarefas comuns já concluídas não foram desfeitas.");
+                    report.AppendLine("TAREFAS ADMINISTRATIVAS");
+                    report.AppendLine(elevated.Output);
+                    if (elevated.ExitCode != 0) throw new InvalidOperationException("Uma tarefa administrativa retornou o código " + elevated.ExitCode + ". Consulte os detalhes no relatório.");
+                    AppendLog("Tarefas administrativas concluídas.");
                 }
 
                 Directory.CreateDirectory(DataDirectory);
@@ -1157,6 +1151,17 @@ namespace Neck
             catch (Exception ex)
             {
                 AppendLog("A manutenção foi interrompida: " + ex.Message);
+                try
+                {
+                    Directory.CreateDirectory(ReportDirectory);
+                    report.AppendLine(new string('-', 64));
+                    report.AppendLine("MANUTENÇÃO INTERROMPIDA");
+                    report.AppendLine(ex.Message);
+                    string partialReport = Path.Combine(ReportDirectory, "manutencao-interrompida-" + DateTime.Now.ToString("yyyy-MM-dd-HHmmss") + ".txt");
+                    File.WriteAllText(partialReport, report.ToString(), new UTF8Encoding(true));
+                    AppendLog("Relatório parcial salvo em: " + partialReport);
+                }
+                catch { }
                 string failure = "A manutenção foi interrompida. Abra o Neck para consultar os detalhes. " + ex.Message;
                 if (Visible)
                     MessageBox.Show(failure, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1888,17 +1893,14 @@ namespace Neck
         private async Task CreateRestorePointAsync()
         {
             _restoreButton.Enabled = false;
-            _restoreButton.Text = "Criando...";
+            _restoreButton.Text = "Aguardando permissão...";
             try
             {
-                string script = "Checkpoint-Computer -Description 'Neck - antes dos drivers' -RestorePointType MODIFY_SETTINGS";
-                ProcessResult result = await Task.Run(delegate
-                {
-                    return ProcessRunner.Run(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
-                        "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + script + "\"", 180000);
-                });
+                ElevatedTaskResult result = await ElevatedOperations.RunAsync(new[] { "restorepoint" });
                 if (_closing || IsDisposed) return;
-                MessageBox.Show(result.ExitCode == 0 ? "Ponto de restauração criado." : "O Windows não criou o ponto de restauração. A Proteção do Sistema pode estar desativada.\n\n" + result.Output,
+                MessageBox.Show(result.ExitCode == 0 ? "Ponto de restauração criado." :
+                    result.Cancelled ? "A permissão de administrador foi cancelada. Nenhuma alteração foi feita." :
+                    "O Windows não criou o ponto de restauração. A Proteção do Sistema pode estar desativada.\n\n" + result.Output,
                     "Neck", MessageBoxButtons.OK, result.ExitCode == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             }
             finally
