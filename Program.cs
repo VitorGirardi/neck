@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.4.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.4.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.5.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.5.0.0")]
 
 namespace Neck
 {
@@ -222,11 +222,11 @@ namespace Neck
                 if (_closing) return;
                 try
                 {
-                    string turboBefore = TurboModeManager.ActiveDisplayName;
+                    string focusBefore = FocusModeManager.ActiveDisplayName;
                     EfficiencyModeManager.RefreshAdaptiveModes();
-                    TurboModeManager.Refresh();
-                    if (!string.IsNullOrWhiteSpace(turboBefore) && string.IsNullOrWhiteSpace(TurboModeManager.ActiveDisplayName))
-                        _trayIcon.ShowBalloonTip(3000, "Neck Turbo concluído", "O tempo terminou e as prioridades originais foram restauradas.", ToolTipIcon.Info);
+                    FocusModeManager.Refresh();
+                    if (!string.IsNullOrWhiteSpace(focusBefore) && string.IsNullOrWhiteSpace(FocusModeManager.ActiveDisplayName))
+                        _trayIcon.ShowBalloonTip(3000, "Aceleração concluída", "O tempo terminou e o aplicativo voltou ao funcionamento normal.", ToolTipIcon.Info);
                 }
                 catch { }
             };
@@ -258,7 +258,7 @@ namespace Neck
                 _statusTimer.Stop();
                 _guardMonitorTimer.Stop();
                 _adaptiveTimer.Stop();
-                TurboModeManager.Stop();
+                FocusModeManager.Stop();
                 EfficiencyModeManager.RestoreAll();
                 _trayIcon.Visible = false;
                 _trayIcon.Icon = null;
@@ -547,14 +547,14 @@ namespace Neck
             _backgroundCheck.ForeColor = Theme.Muted;
             _backgroundCheck.Cursor = Cursors.Hand;
 
-            ConfigureButton(_meetingButton, "Modo reunião", Theme.Blue, 140);
-            ConfigureButton(_guardButton, "SOS Neck", Color.FromArgb(185, 28, 28), 112);
+            ConfigureButton(_guardButton, "Acelerar app", Theme.Blue, 145);
+            ConfigureButton(_meetingButton, "Reunião", Theme.NavySoft, 105);
             ConfigureButton(_driversButton, "Drivers", Theme.NavySoft, 82);
             ConfigureButton(_reportsButton, "Histórico", Theme.NavySoft, 96);
-            _meetingButton.Location = new Point(22, 142);
-            _guardButton.Location = new Point(172, 142);
-            _driversButton.Location = new Point(294, 142);
-            _reportsButton.Location = new Point(386, 142);
+            _guardButton.Location = new Point(22, 142);
+            _meetingButton.Location = new Point(177, 142);
+            _driversButton.Location = new Point(292, 142);
+            _reportsButton.Location = new Point(384, 142);
             _meetingButton.Click += delegate { ToggleMeetingMode(); };
             _guardButton.Click += delegate
             {
@@ -596,28 +596,29 @@ namespace Neck
             menu.Items.Add(status);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
-            menu.Items.Add("SOS Neck", null, delegate { ShowFromTray(); OpenSos(); });
-            menu.Items.Add("Encerrar Neck Turbo", null, delegate
+            menu.Items.Add("Acelerar aplicativo", null, delegate { ShowFromTray(); OpenSos(); });
+            menu.Items.Add("Parar aceleração", null, delegate
             {
-                if (!TurboModeManager.IsActive)
+                if (!FocusModeManager.IsActive)
                 {
-                    _trayIcon.ShowBalloonTip(2500, "Neck Turbo", "Nenhum aplicativo está com Turbo ativo.", ToolTipIcon.Info);
+                    _trayIcon.ShowBalloonTip(2500, "Acelerar", "Nenhum aplicativo está sendo acelerado.", ToolTipIcon.Info);
                     return;
                 }
-                string displayName = TurboModeManager.ActiveDisplayName;
-                TurboModeResult result = TurboModeManager.Stop();
-                _trayIcon.ShowBalloonTip(3000, "Neck Turbo encerrado", displayName + " voltou à prioridade original em " + result.ProcessesChanged + " processo(s).", ToolTipIcon.Info);
+                string displayName = FocusModeManager.ActiveDisplayName;
+                FocusModeManager.Stop();
+                _trayIcon.ShowBalloonTip(3000, "Aceleração encerrada", displayName + " voltou ao funcionamento normal.", ToolTipIcon.Info);
                 UpdateGuardView(_healthSnapshot);
             });
-            menu.Items.Add("Desativar todo o Neck Adaptive", null, async delegate
+            menu.Items.Add("Parar reduções em segundo plano", null, async delegate
             {
+                if (FocusModeManager.IsActive) FocusModeManager.Stop();
                 if (EfficiencyModeManager.ActiveCount == 0)
                 {
-                    _trayIcon.ShowBalloonTip(2500, "Neck Adaptive", "Nenhum aplicativo está sob otimização adaptativa.", ToolTipIcon.Info);
+                    _trayIcon.ShowBalloonTip(2500, "Segundo plano", "Nenhum aplicativo está usando menos recursos.", ToolTipIcon.Info);
                     return;
                 }
                 EfficiencyModeResult result = await Task.Run(delegate { return EfficiencyModeManager.RestoreAll(); });
-                _trayIcon.ShowBalloonTip(3000, "Neck Adaptive", "Configurações originais restauradas em " + result.ProcessesChanged + " processo(s).", ToolTipIcon.Info);
+                _trayIcon.ShowBalloonTip(3000, "Segundo plano", "Configurações originais restauradas em " + result.ProcessesChanged + " processo(s).", ToolTipIcon.Info);
             });
             menu.Items.Add("Abrir diagnóstico", null, delegate
             {
@@ -865,7 +866,7 @@ namespace Neck
             if (alert.Kind == _lastAlertKind && DateTime.UtcNow - _lastAlertUtc < TimeSpan.FromMinutes(30)) return;
             _lastAlertKind = alert.Kind;
             _lastAlertUtc = DateTime.UtcNow;
-            _trayIcon.ShowBalloonTip(6000, alert.Title, alert.Message + " Clique para abrir o SOS Neck.",
+            _trayIcon.ShowBalloonTip(6000, alert.Title, alert.Message + " Clique para escolher um aplicativo para acelerar.",
                 alert.Kind == GuardAlertKind.LowDisk || alert.Kind == GuardAlertKind.CpuPressure ? ToolTipIcon.Warning : ToolTipIcon.Info);
         }
 
@@ -1080,13 +1081,13 @@ namespace Neck
                 _guardBadge.ForeColor = Theme.Green;
             }
 
-            string turbo = TurboModeManager.IsActive
-                ? " Turbo: " + TurboModeManager.ActiveDisplayName + " por mais " + Math.Max(1, (int)Math.Ceiling(TurboModeManager.Remaining.TotalMinutes)) + " min."
+            string turbo = FocusModeManager.IsActive
+                ? " Acelerando " + FocusModeManager.ActiveDisplayName + " por mais " + Math.Max(1, (int)Math.Ceiling(FocusModeManager.Remaining.TotalMinutes)) + " min."
                 : string.Empty;
             _guardMessage.Text = snapshot.Summary + turbo;
             ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
             string adaptive = EfficiencyModeManager.ActiveCount > 0
-                ? "  •  Adaptive: " + EfficiencyModeManager.ActiveCount + " app(s)"
+                ? "  •  Economizando: " + EfficiencyModeManager.ActiveCount + " app(s)"
                 : string.Empty;
             _guardProcess.Text = (top == null
                 ? "Nenhum processo pôde ser analisado."

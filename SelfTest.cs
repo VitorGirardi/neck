@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -232,6 +233,7 @@ namespace Neck
                 TestProcessFamilyDiscovery();
                 TestEfficiencyModeRoundTrip();
                 TestTurboModeRoundTrip();
+                TestFocusModeRoundTrip();
                 using (SosForm sos = new SosForm())
                 {
                     sos.ShowInTaskbar = false;
@@ -247,6 +249,29 @@ namespace Neck
                         Console.WriteLine("SosPreview=" + previewPath);
                     }
                     sos.Close();
+                }
+                SosCandidate advancedCandidate = sosCandidates.FirstOrDefault() ?? new SosCandidate
+                {
+                    ProcessName = "NeckAdvancedPreview",
+                    DisplayName = "Aplicativo de exemplo",
+                    ProcessCount = 1,
+                    MemoryBytes = 512L * 1024 * 1024
+                };
+                using (AdvancedAppOptionsForm advancedApp = new AdvancedAppOptionsForm(advancedCandidate))
+                {
+                    advancedApp.ShowInTaskbar = false;
+                    advancedApp.StartPosition = FormStartPosition.Manual;
+                    advancedApp.Location = new System.Drawing.Point(-32000, -32000);
+                    advancedApp.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(advancedApp.Width, advancedApp.Height))
+                    {
+                        advancedApp.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, advancedApp.Width, advancedApp.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.AppOptions.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("AppOptionsPreview=" + previewPath);
+                    }
+                    advancedApp.Close();
                 }
                 Console.WriteLine("SELF_TEST_OK");
                 Console.WriteLine("TempBytes=" + result.TempBytes);
@@ -364,6 +389,55 @@ namespace Neck
             finally
             {
                 TurboModeManager.Stop();
+                if (probe != null)
+                {
+                    try { if (!probe.HasExited) probe.Kill(); }
+                    catch { }
+                    probe.Dispose();
+                }
+                try { if (System.IO.File.Exists(probePath)) System.IO.File.Delete(probePath); }
+                catch { }
+            }
+        }
+
+        private static void TestFocusModeRoundTrip()
+        {
+            string probePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NeckFocusProbe.exe");
+            System.Diagnostics.Process probe = null;
+            try
+            {
+                System.IO.File.Copy(Application.ExecutablePath, probePath, true);
+                probe = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = probePath,
+                    Arguments = "--efficiency-helper",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                Thread.Sleep(500);
+                probe.Refresh();
+                System.Diagnostics.ProcessPriorityClass originalPriority = probe.PriorityClass;
+                FocusModeManager.Start("NeckFocusProbe", "Teste Acelerar", 60);
+                if (!FocusModeManager.IsActive || !EfficiencyModeManager.IsActive("NeckFocusProbe"))
+                    throw new InvalidOperationException("O modo Acelerar não combinou Turbo e Adaptive.");
+                DateTime now = DateTime.UtcNow;
+                EfficiencyModeManager.RefreshAdaptiveModesForTesting("NeckFocusProbe", now);
+                TurboModeManager.RefreshForTesting("NeckFocusProbe", now);
+                probe.Refresh();
+                if (probe.PriorityClass != System.Diagnostics.ProcessPriorityClass.AboveNormal ||
+                    FocusModeManager.GetStateLabel("NeckFocusProbe") != "Mais rápido agora")
+                    throw new InvalidOperationException("O modo Acelerar não priorizou o aplicativo em uso.");
+                FocusModeManager.Stop();
+                probe.Refresh();
+                if (FocusModeManager.IsActive || EfficiencyModeManager.IsActive("NeckFocusProbe") ||
+                    probe.PriorityClass != originalPriority)
+                    throw new InvalidOperationException("O modo Acelerar não restaurou todos os controles.");
+                Console.WriteLine("FocusModeRoundTrip=OK");
+            }
+            finally
+            {
+                FocusModeManager.Stop();
+                EfficiencyModeManager.Restore("NeckFocusProbe");
                 if (probe != null)
                 {
                     try { if (!probe.HasExited) probe.Kill(); }

@@ -70,19 +70,14 @@ namespace Neck
                 if (family.ProcessCount > candidate.ProcessCount) candidate.ProcessCount = family.ProcessCount;
                 if (family.WorkingSetBytes > candidate.MemoryBytes) candidate.MemoryBytes = family.WorkingSetBytes;
             }
-            return visible
-                .OrderByDescending(item => item.MemoryBytes)
-                .Take(12)
-                .ToList();
+            return visible.OrderByDescending(item => item.MemoryBytes).Take(12).ToList();
         }
 
         public static SosCloseResult RequestGracefulClose(string processName)
         {
             SosCloseResult result = new SosCloseResult();
             if (IsProtectedProcessName(processName) ||
-                string.Equals(processName, Process.GetCurrentProcess().ProcessName, StringComparison.OrdinalIgnoreCase))
-                return result;
-
+                string.Equals(processName, Process.GetCurrentProcess().ProcessName, StringComparison.OrdinalIgnoreCase)) return result;
             foreach (Process process in Process.GetProcessesByName(processName))
             {
                 using (process)
@@ -101,23 +96,20 @@ namespace Neck
     internal sealed class SosForm : Form
     {
         private readonly ListView _applications = new ListView();
-        private readonly Label _result = new Label();
         private readonly Label _memory = new Label();
-        private readonly Button _turbo = new Button();
-        private readonly Button _lightMode = new Button();
-        private readonly Button _closeApplication = new Button();
-        private readonly Button _clean = new Button();
-        private readonly Button _taskManager = new Button();
+        private readonly Label _result = new Label();
+        private readonly Button _focus = new Button();
+        private readonly Button _advanced = new Button();
         private List<SosCandidate> _candidates = new List<SosCandidate>();
         private bool _closing;
         private bool _busy;
 
         public SosForm()
         {
-            Text = "SOS Neck — Adaptive + Turbo";
+            Text = "Acelerar aplicativo — Neck";
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(880, 700);
-            MinimumSize = new Size(800, 640);
+            Size = new Size(820, 680);
+            MinimumSize = new Size(760, 620);
             BackColor = Theme.Background;
             Font = Theme.Body;
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
@@ -127,7 +119,7 @@ namespace Neck
                 if (_busy)
                 {
                     e.Cancel = true;
-                    MessageBox.Show("A ação do SOS ainda está terminando. Aguarde alguns segundos.", "SOS Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Aguarde só mais alguns segundos para o Neck terminar.", "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
                 _closing = true;
@@ -137,49 +129,48 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 118, BackColor = Theme.Navy };
-            Label badge = new Label
-            {
-                Text = "SOS",
-                AutoSize = false,
-                Size = new Size(70, 31),
-                BackColor = Color.FromArgb(127, 29, 29),
-                ForeColor = Color.White,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
-                Location = new Point(30, 22)
-            };
-            header.Controls.Add(badge);
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 120, BackColor = Theme.Navy };
             header.Controls.Add(new Label
             {
-                Text = "Neck Adaptive + Turbo — potência sob controle",
-                AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
+                Text = "ACELERAR",
+                AutoSize = false,
+                Size = new Size(92, 31),
+                BackColor = Theme.Blue,
                 ForeColor = Color.White,
-                Location = new Point(118, 19)
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
+                Location = new Point(30, 22)
             });
             header.Controls.Add(new Label
             {
-                Text = "Desacelera o que está ocioso e dá prioridade temporária ao aplicativo que precisa responder.",
+                Text = "Qual aplicativo precisa ficar mais rápido?",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 20f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(138, 20)
+            });
+            header.Controls.Add(new Label
+            {
+                Text = "Escolha um aplicativo. O Neck cuida do resto automaticamente.",
                 AutoSize = true,
                 Font = Theme.Body,
                 ForeColor = Color.FromArgb(186, 199, 218),
-                Location = new Point(32, 72)
+                Location = new Point(32, 74)
             });
 
             TableLayoutPanel body = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(24, 20, 24, 20),
+                Padding = new Padding(26, 20, 26, 18),
                 ColumnCount = 1,
                 RowCount = 5,
                 BackColor = Theme.Background
             };
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 80));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
 
             _memory.Dock = DockStyle.Fill;
             _memory.BackColor = Color.White;
@@ -188,12 +179,12 @@ namespace Neck
             _memory.TextAlign = ContentAlignment.MiddleLeft;
             _memory.Padding = new Padding(18, 0, 10, 0);
 
-            Label explanation = new Label
+            Label instruction = new Label
             {
                 Dock = DockStyle.Fill,
-                Text = "Escolha a família inteira do aplicativo. Turbo acelera o foco; Adaptive alivia o segundo plano:",
-                Font = Theme.Small,
-                ForeColor = Theme.Muted,
+                Text = "1. Selecione o aplicativo",
+                Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
+                ForeColor = Theme.Text,
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
@@ -201,49 +192,48 @@ namespace Neck
             _applications.View = View.Details;
             _applications.FullRowSelect = true;
             _applications.MultiSelect = false;
+            _applications.HideSelection = false;
             _applications.BorderStyle = BorderStyle.FixedSingle;
             _applications.BackColor = Color.White;
             _applications.ForeColor = Theme.Text;
-            _applications.Font = Theme.Body;
+            _applications.Font = new Font("Segoe UI", 10.5f);
             _applications.HeaderStyle = ColumnHeaderStyle.Nonclickable;
-            _applications.Columns.Add("Aplicativo", 330);
-            _applications.Columns.Add("Processos", 100, HorizontalAlignment.Center);
-            _applications.Columns.Add("Memória", 145, HorizontalAlignment.Right);
-            _applications.Columns.Add("Modo", 100, HorizontalAlignment.Center);
+            _applications.Columns.Add("Aplicativo", 365);
+            _applications.Columns.Add("Uso de memória", 155, HorizontalAlignment.Right);
+            _applications.Columns.Add("Situação", 205);
             _applications.SelectedIndexChanged += delegate { UpdateSelectionState(); };
+            _applications.DoubleClick += async delegate { await ToggleFocusAsync(); };
 
             _result.Dock = DockStyle.Fill;
-            _result.Text = "Selecione uma tarefa: Turbo prioriza o foco; Adaptive reduz a pressão em segundo plano.";
+            _result.BackColor = Color.White;
+            _result.Text = "Selecione um aplicativo acima. Nenhum arquivo ou janela será fechado.";
             _result.Font = Theme.Small;
             _result.ForeColor = Theme.Muted;
             _result.TextAlign = ContentAlignment.MiddleLeft;
+            _result.Padding = new Padding(16, 0, 10, 0);
 
-            FlowLayoutPanel footer = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0, 12, 0, 0) };
-            ConfigureButton(_turbo, "Turbo 60 min", Theme.Blue, 128);
-            ConfigureButton(_lightMode, "Ativar Adaptive", Theme.Green, 138);
-            ConfigureButton(_closeApplication, "Pedir fechamento", Color.FromArgb(185, 28, 28), 132);
-            ConfigureButton(_clean, "Limpeza segura", Theme.NavySoft, 118);
-            ConfigureButton(_taskManager, "Gerenciador", Theme.NavySoft, 122);
-            Button close = new Button();
-            ConfigureButton(close, "Fechar", Theme.NavySoft, 90);
-            _lightMode.Enabled = false;
-            _turbo.Enabled = false;
-            _closeApplication.Enabled = false;
-            _turbo.Click += delegate { ToggleTurbo(); };
-            _lightMode.Click += async delegate { await ToggleLightModeAsync(); };
-            _closeApplication.Click += async delegate { await CloseSelectedAsync(); };
-            _clean.Click += async delegate { await CleanAsync(); };
-            _taskManager.Click += delegate { MainForm.OpenTarget("taskmgr.exe"); };
-            close.Click += delegate { Close(); };
-            footer.Controls.Add(_turbo);
-            footer.Controls.Add(_lightMode);
-            footer.Controls.Add(_closeApplication);
-            footer.Controls.Add(_clean);
-            footer.Controls.Add(_taskManager);
-            footer.Controls.Add(close);
+            FlowLayoutPanel footer = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Padding = new Padding(0, 12, 0, 0)
+            };
+            ConfigureButton(_focus, "Acelerar por 1 hora", Theme.Blue, 260);
+            ConfigureButton(_advanced, "Mais opções", Theme.NavySoft, 150);
+            Button back = new Button();
+            ConfigureButton(back, "Voltar", Color.FromArgb(100, 116, 139), 110);
+            _focus.Enabled = false;
+            _advanced.Enabled = false;
+            _focus.Click += async delegate { await ToggleFocusAsync(); };
+            _advanced.Click += delegate { ShowAdvancedOptions(); };
+            back.Click += delegate { Close(); };
+            footer.Controls.Add(_focus);
+            footer.Controls.Add(_advanced);
+            footer.Controls.Add(back);
 
             body.Controls.Add(_memory, 0, 0);
-            body.Controls.Add(explanation, 0, 1);
+            body.Controls.Add(instruction, 0, 1);
             body.Controls.Add(_applications, 0, 2);
             body.Controls.Add(_result, 0, 3);
             body.Controls.Add(footer, 0, 4);
@@ -254,168 +244,97 @@ namespace Neck
         private void RefreshSnapshot()
         {
             if (_closing || IsDisposed) return;
+            string selectedName = _applications.SelectedItems.Count == 1
+                ? ((_applications.SelectedItems[0].Tag as SosCandidate) ?? new SosCandidate()).ProcessName
+                : FocusModeManager.ActiveProcessName;
             MemoryStatus status = SystemInfo.GetMemoryStatus();
-            _memory.Text = "RAM em uso: " + status.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "%     •     Disponível: " + MainForm.FormatBytes((long)status.AvailableBytes);
+            _memory.Text = status.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% da memória em uso     •     " +
+                           MainForm.FormatBytes((long)status.AvailableBytes) + " disponíveis";
             _memory.ForeColor = status.PercentUsed >= 90 ? Color.Firebrick : status.PercentUsed >= 75 ? Theme.Amber : Theme.Green;
+
             _candidates = SosInspector.GetCandidates();
             _applications.Items.Clear();
             foreach (SosCandidate candidate in _candidates)
             {
                 ListViewItem item = new ListViewItem(candidate.DisplayName) { Tag = candidate };
-                item.SubItems.Add(candidate.ProcessCount.ToString(CultureInfo.CurrentCulture));
                 item.SubItems.Add(MainForm.FormatBytes(candidate.MemoryBytes));
-                string turboState = TurboModeManager.GetStateLabel(candidate.ProcessName);
-                item.SubItems.Add(string.IsNullOrWhiteSpace(turboState) ? EfficiencyModeManager.GetStateLabel(candidate.ProcessName) : turboState);
+                string state = FocusModeManager.IsTarget(candidate.ProcessName)
+                    ? FocusModeManager.GetStateLabel(candidate.ProcessName)
+                    : EfficiencyModeManager.IsActive(candidate.ProcessName) ? "Usando menos recursos" : "Disponível";
+                item.SubItems.Add(state);
                 _applications.Items.Add(item);
             }
+            SelectProcess(selectedName);
             UpdateSelectionState();
         }
 
-        private async Task ToggleLightModeAsync()
+        private async Task ToggleFocusAsync()
         {
             if (_busy || _applications.SelectedItems.Count != 1) return;
             SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
             if (candidate == null) return;
 
-            bool active = EfficiencyModeManager.IsActive(candidate.ProcessName);
-            if (!active)
+            if (FocusModeManager.IsTarget(candidate.ProcessName))
             {
-                string warning = candidate.DisplayName + " e toda a sua família de processos continuarão abertos. O Neck reduzirá CPU, ativará EcoQoS, baixará a prioridade de memória e executará o RAM Park.\n\n" +
-                                 "O RAM Park retira da memória física o máximo possível de páginas ociosas. Ao voltar para o aplicativo, CPU, memória e energia retornam ao estado original em até 2 segundos.\n\n" +
-                                 "Nenhum documento é apagado, mas o primeiro retorno pode demorar enquanto o Windows recarrega dados sob demanda.";
-                if (MessageBox.Show(warning, "Ativar Neck Adaptive em " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
-                    MessageBoxIcon.Information) != DialogResult.OK) return;
-            }
-
-            SetBusy(true, active ? "Desativando o Neck Adaptive..." : "Ativando otimização adaptativa...");
-            try
-            {
-                EfficiencyModeResult result = await Task.Run(delegate
+                SetBusy(true, "Parando a aceleração e restaurando as configurações...");
+                try
                 {
-                    return active ? EfficiencyModeManager.Restore(candidate.ProcessName) : EfficiencyModeManager.Apply(candidate.ProcessName);
-                });
-                if (_closing || IsDisposed) return;
-
-                if (active)
-                {
-                    _result.Text = result.ProcessesChanged > 0
-                        ? candidate.DisplayName + " voltou ao modo normal em " + result.ProcessesChanged + " processo(s)."
-                        : "O Neck Adaptive foi desativado para " + candidate.DisplayName + "; os processos anteriores já não estavam disponíveis.";
+                    await Task.Run(delegate { FocusModeManager.Stop(); });
+                    if (!_closing && !IsDisposed) _result.Text = candidate.DisplayName + " voltou ao funcionamento normal.";
                 }
-                else if (result.ProcessesChanged > 0)
+                finally
                 {
-                    long released = result.AvailableMemoryGainBytes > 0 ? result.AvailableMemoryGainBytes : result.WorkingSetReleasedBytes;
-                    _result.Text = "Adaptive na família " + candidate.DisplayName + ": " + result.ProcessesChanged + " processos; RAM Park ≈ " +
-                                   MainForm.FormatBytes(released) + "; memória baixa em " + result.MemoryPriorityEffective + ".";
-                    if (result.AccessErrors > 0) _result.Text += " Alguns processos protegidos não aceitaram a alteração.";
+                    if (!_closing && !IsDisposed)
+                    {
+                        SetBusy(false, null);
+                        RefreshSnapshot();
+                        SelectProcess(candidate.ProcessName);
+                    }
                 }
-                else
-                {
-                    _result.Text = "O Windows não permitiu otimizar " + candidate.DisplayName + ". Nenhuma configuração adaptativa foi deixada ativa.";
-                }
-
-                RefreshSnapshot();
-                SelectProcess(candidate.ProcessName);
-            }
-            catch (Exception ex)
-            {
-                if (!_closing && !IsDisposed) _result.Text = "Não foi possível alterar o Neck Adaptive: " + ex.Message;
-            }
-            finally
-            {
-                if (!_closing && !IsDisposed) SetBusy(false, null);
-            }
-        }
-
-        private void ToggleTurbo()
-        {
-            if (_busy || _applications.SelectedItems.Count != 1) return;
-            SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
-            if (candidate == null) return;
-
-            if (TurboModeManager.IsTarget(candidate.ProcessName))
-            {
-                TurboModeResult stopped = TurboModeManager.Stop();
-                _result.Text = "Neck Turbo encerrado para " + candidate.DisplayName + "; prioridade original restaurada em " +
-                               stopped.ProcessesChanged + " processo(s).";
-                RefreshSnapshot();
-                SelectProcess(candidate.ProcessName);
                 return;
             }
 
-            string replacing = TurboModeManager.IsActive
-                ? " O Turbo atual em " + TurboModeManager.ActiveDisplayName + " será encerrado."
+            string replacing = FocusModeManager.IsActive
+                ? " A aceleração atual de " + FocusModeManager.ActiveDisplayName + " será substituída."
                 : string.Empty;
-            string warning = "O Neck Turbo ficará preparado por 60 minutos para " + candidate.DisplayName + "." + replacing + "\n\n" +
-                             "Quando essa janela estiver em primeiro plano, a família do aplicativo receberá prioridade Acima do normal. " +
-                             "Ao trocar de janela, ao expirar ou ao fechar o Neck, a prioridade original será restaurada automaticamente.\n\n" +
-                             "O Turbo não usa prioridade Alta/Tempo real e não altera o plano de energia do Windows.";
-            if (MessageBox.Show(warning, "Ativar Neck Turbo em " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
+            string explanation = candidate.DisplayName + " ficará mais rápido quando você estiver usando a janela." + replacing + "\n\n" +
+                                 "Quando ele ficar em segundo plano, o Neck reduzirá seu consumo. Depois de uma hora, tudo volta ao normal automaticamente.\n\n" +
+                                 "Nenhuma janela, documento ou arquivo será fechado.";
+            if (MessageBox.Show(explanation, "Acelerar " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK) return;
 
-            TurboModeManager.Start(candidate.ProcessName, candidate.DisplayName, 60);
-            _result.Text = "Turbo preparado para " + candidate.DisplayName + ". Feche esta tela e volte ao aplicativo: a aceleração entra quando ele recebe o foco.";
-            RefreshSnapshot();
-            SelectProcess(candidate.ProcessName);
+            SetBusy(true, "Preparando " + candidate.DisplayName + "...");
+            try
+            {
+                await Task.Run(delegate { FocusModeManager.Start(candidate.ProcessName, candidate.DisplayName, 60); });
+                if (_closing || IsDisposed) return;
+                _result.Text = FocusModeManager.IsTarget(candidate.ProcessName)
+                    ? candidate.DisplayName + " está pronto. Volte ao aplicativo e use normalmente; o Neck cuidará do desempenho."
+                    : "O Windows não permitiu preparar esse aplicativo agora.";
+            }
+            catch (Exception ex)
+            {
+                if (!_closing && !IsDisposed) _result.Text = "Não foi possível preparar o aplicativo: " + ex.Message;
+            }
+            finally
+            {
+                if (!_closing && !IsDisposed)
+                {
+                    SetBusy(false, null);
+                    RefreshSnapshot();
+                    SelectProcess(candidate.ProcessName);
+                }
+            }
         }
 
-        private async Task CloseSelectedAsync()
+        private void ShowAdvancedOptions()
         {
             if (_busy || _applications.SelectedItems.Count != 1) return;
             SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
             if (candidate == null) return;
-            string warning = "O Neck enviará um pedido normal de fechamento para " + candidate.DisplayName + ".\n\n" +
-                             "O aplicativo poderá perguntar se deseja salvar. Se ele não aceitar o pedido, o Neck não forçará o encerramento.\n\nSalve seu trabalho antes de continuar.";
-            if (MessageBox.Show(warning, "Fechar " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
-
-            ulong before = SystemInfo.GetMemoryStatus().AvailableBytes;
-            SetBusy(true, "Enviando pedido normal de fechamento...");
-            try
-            {
-                SosCloseResult closeResult = await Task.Run(delegate { return SosInspector.RequestGracefulClose(candidate.ProcessName); });
-                await Task.Delay(2200);
-                if (_closing || IsDisposed) return;
-                ulong after = SystemInfo.GetMemoryStatus().AvailableBytes;
-                long difference = (long)after - (long)before;
-                _result.Text = closeResult.RequestsSent == 0
-                    ? candidate.DisplayName + " não aceitou um pedido automático. Use o próprio aplicativo ou o Gerenciador de Tarefas."
-                    : "Pedido enviado para " + closeResult.RequestsSent + " janela(s). Variação disponível: " + (difference >= 0 ? "+" : "−") + MainForm.FormatBytes(Math.Abs(difference)) + ".";
-                RefreshSnapshot();
-            }
-            catch (Exception ex)
-            {
-                if (!_closing && !IsDisposed) _result.Text = "Não foi possível enviar o pedido: " + ex.Message;
-            }
-            finally
-            {
-                if (!_closing && !IsDisposed) SetBusy(false, null);
-            }
-        }
-
-        private async Task CleanAsync()
-        {
-            if (_busy) return;
-            if (MessageBox.Show("Remover temporários antigos e relatórios de erro seguros? Documentos, downloads, senhas e Lixeira não serão tocados.",
-                "Limpeza segura do SOS", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
-            SetBusy(true, "Executando limpeza segura...");
-            try
-            {
-                DeleteResult temp = await Task.Run(delegate { return Cleaner.CleanTemp(); });
-                DeleteResult reports = await Task.Run(delegate { return Cleaner.CleanReports(); });
-                if (_closing || IsDisposed) return;
-                long total = temp.BytesDeleted + reports.BytesDeleted;
-                _result.Text = "Limpeza concluída: " + MainForm.FormatBytes(total) + " liberados; " +
-                               (temp.FilesDeleted + reports.FilesDeleted) + " arquivos removidos.";
-                RefreshSnapshot();
-            }
-            catch (Exception ex)
-            {
-                if (!_closing && !IsDisposed) _result.Text = "A limpeza segura não foi concluída: " + ex.Message;
-            }
-            finally
-            {
-                if (!_closing && !IsDisposed) SetBusy(false, null);
-            }
+            using (AdvancedAppOptionsForm form = new AdvancedAppOptionsForm(candidate)) form.ShowDialog(this);
+            RefreshSnapshot();
+            SelectProcess(candidate.ProcessName);
         }
 
         private void SetBusy(bool busy, string message)
@@ -423,38 +342,24 @@ namespace Neck
             if (_closing || IsDisposed) return;
             _busy = busy;
             UpdateSelectionState();
-            _clean.Enabled = !busy;
-            _taskManager.Enabled = !busy;
             if (!string.IsNullOrWhiteSpace(message)) _result.Text = message;
             Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
         }
 
         private void UpdateSelectionState()
         {
-            bool selected = !_busy && _applications.SelectedIndices.Count == 1;
-            _closeApplication.Enabled = selected;
-            _lightMode.Enabled = selected;
-            _turbo.Enabled = selected;
-            if (!selected)
-            {
-                _turbo.Text = "Turbo 60 min";
-                _turbo.BackColor = Theme.Blue;
-                _lightMode.Text = "Ativar Adaptive";
-                _lightMode.BackColor = Theme.Green;
-                return;
-            }
-
-            SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
-            bool active = candidate != null && EfficiencyModeManager.IsActive(candidate.ProcessName);
-            bool turbo = candidate != null && TurboModeManager.IsTarget(candidate.ProcessName);
-            _turbo.Text = turbo ? "Encerrar Turbo" : "Turbo 60 min";
-            _turbo.BackColor = turbo ? Theme.Amber : Theme.Blue;
-            _lightMode.Text = active ? "Desativar Adaptive" : "Ativar Adaptive";
-            _lightMode.BackColor = active ? Theme.Amber : Theme.Green;
+            bool selected = !_busy && _applications.SelectedItems.Count == 1;
+            _focus.Enabled = selected;
+            _advanced.Enabled = selected;
+            SosCandidate candidate = selected ? _applications.SelectedItems[0].Tag as SosCandidate : null;
+            bool active = candidate != null && FocusModeManager.IsTarget(candidate.ProcessName);
+            _focus.Text = active ? "Parar aceleração" : "Acelerar por 1 hora";
+            _focus.BackColor = active ? Theme.Amber : Theme.Blue;
         }
 
         private void SelectProcess(string processName)
         {
+            if (string.IsNullOrWhiteSpace(processName)) return;
             foreach (ListViewItem item in _applications.Items)
             {
                 SosCandidate candidate = item.Tag as SosCandidate;
@@ -470,13 +375,167 @@ namespace Neck
         {
             button.Text = text;
             button.Width = width;
-            button.Height = 42;
+            button.Height = 44;
+            button.BackColor = color;
+            button.ForeColor = Color.White;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0;
+            button.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+            button.Margin = new Padding(0, 0, 12, 0);
+            button.Cursor = Cursors.Hand;
+        }
+    }
+
+    internal sealed class AdvancedAppOptionsForm : Form
+    {
+        private readonly SosCandidate _candidate;
+        private readonly Button _adaptive = new Button();
+        private readonly Label _status = new Label();
+        private bool _busy;
+
+        public AdvancedAppOptionsForm(SosCandidate candidate)
+        {
+            _candidate = candidate;
+            Text = "Mais opções — " + candidate.DisplayName;
+            StartPosition = FormStartPosition.CenterParent;
+            Size = new Size(620, 430);
+            MinimumSize = new Size(580, 400);
+            BackColor = Theme.Background;
+            Font = Theme.Body;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+            BuildInterface();
+            UpdateState();
+            FormClosing += delegate(object sender, FormClosingEventArgs e)
+            {
+                if (!_busy) return;
+                e.Cancel = true;
+                MessageBox.Show("Aguarde o Neck terminar esta ação.", "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+        }
+
+        private void BuildInterface()
+        {
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Navy };
+            header.Controls.Add(new Label { Text = "Controles avançados", AutoSize = true, Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold), ForeColor = Color.White, Location = new Point(28, 18) });
+            header.Controls.Add(new Label { Text = _candidate.DisplayName + " • opções para usuários experientes", AutoSize = true, Font = Theme.Body, ForeColor = Color.FromArgb(186, 199, 218), Location = new Point(30, 61) });
+
+            Panel body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(28), BackColor = Theme.Background };
+            Label explanation = new Label
+            {
+                Text = "Aqui ficam ações que normalmente não são necessárias. O modo Acelerar já alterna sozinho entre desempenho e economia.",
+                AutoSize = false,
+                Size = new Size(540, 54),
+                Location = new Point(28, 24),
+                Font = Theme.Body,
+                ForeColor = Theme.Muted
+            };
+            _status.AutoSize = false;
+            _status.Size = new Size(540, 48);
+            _status.Location = new Point(28, 82);
+            _status.BackColor = Color.White;
+            _status.Padding = new Padding(14, 0, 8, 0);
+            _status.TextAlign = ContentAlignment.MiddleLeft;
+            _status.ForeColor = Theme.Text;
+
+            ConfigureButton(_adaptive, "Reduzir em segundo plano", Theme.Green, 220);
+            _adaptive.Location = new Point(28, 150);
+            Button closeApp = new Button();
+            ConfigureButton(closeApp, "Pedir para fechar", Color.FromArgb(185, 28, 28), 160);
+            closeApp.Location = new Point(260, 150);
+            Button manager = new Button();
+            ConfigureButton(manager, "Gerenciador de Tarefas", Theme.NavySoft, 220);
+            manager.Location = new Point(28, 210);
+            Button back = new Button();
+            ConfigureButton(back, "Voltar", Color.FromArgb(100, 116, 139), 120);
+            back.Location = new Point(260, 210);
+
+            _adaptive.Click += async delegate { await ToggleAdaptiveAsync(); };
+            closeApp.Click += async delegate { await RequestCloseAsync(); };
+            manager.Click += delegate { MainForm.OpenTarget("taskmgr.exe"); };
+            back.Click += delegate { Close(); };
+            body.Controls.Add(explanation);
+            body.Controls.Add(_status);
+            body.Controls.Add(_adaptive);
+            body.Controls.Add(closeApp);
+            body.Controls.Add(manager);
+            body.Controls.Add(back);
+            Controls.Add(body);
+            Controls.Add(header);
+        }
+
+        private async Task ToggleAdaptiveAsync()
+        {
+            if (_busy || FocusModeManager.IsTarget(_candidate.ProcessName)) return;
+            bool active = EfficiencyModeManager.IsActive(_candidate.ProcessName);
+            if (!active && MessageBox.Show(
+                    _candidate.DisplayName + " continuará aberto, mas usará menos CPU e memória quando estiver em segundo plano.",
+                    "Reduzir consumo de " + _candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
+                    MessageBoxIcon.Information) != DialogResult.OK) return;
+            SetBusy(true, active ? "Restaurando..." : "Reduzindo consumo...");
+            try
+            {
+                await Task.Run(delegate
+                {
+                    if (active) EfficiencyModeManager.Restore(_candidate.ProcessName);
+                    else EfficiencyModeManager.Apply(_candidate.ProcessName);
+                });
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    SetBusy(false, null);
+                    UpdateState();
+                }
+            }
+        }
+
+        private async Task RequestCloseAsync()
+        {
+            if (_busy) return;
+            if (MessageBox.Show("O Neck pedirá que " + _candidate.DisplayName + " feche normalmente. Salve seu trabalho antes de continuar.",
+                "Fechar " + _candidate.DisplayName + "?", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+            SetBusy(true, "Enviando pedido de fechamento...");
+            try
+            {
+                SosCloseResult result = await Task.Run(delegate { return SosInspector.RequestGracefulClose(_candidate.ProcessName); });
+                if (!IsDisposed) _status.Text = result.RequestsSent > 0
+                    ? "Pedido enviado. O aplicativo pode solicitar que você salve o trabalho."
+                    : "O aplicativo não aceitou o pedido. Nada foi forçado.";
+            }
+            finally { if (!IsDisposed) SetBusy(false, null); }
+        }
+
+        private void UpdateState()
+        {
+            bool focus = FocusModeManager.IsTarget(_candidate.ProcessName);
+            bool adaptive = EfficiencyModeManager.IsActive(_candidate.ProcessName);
+            _adaptive.Enabled = !_busy && !focus;
+            _adaptive.Text = adaptive && !focus ? "Parar redução" : "Reduzir em segundo plano";
+            _adaptive.BackColor = adaptive && !focus ? Theme.Amber : Theme.Green;
+            _status.Text = focus
+                ? "O modo Acelerar está cuidando automaticamente deste aplicativo."
+                : adaptive ? "O aplicativo está usando menos recursos em segundo plano." : "Nenhuma opção avançada está ativa.";
+        }
+
+        private void SetBusy(bool busy, string message)
+        {
+            _busy = busy;
+            _adaptive.Enabled = !busy && !FocusModeManager.IsTarget(_candidate.ProcessName);
+            if (!string.IsNullOrWhiteSpace(message)) _status.Text = message;
+            Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
+        }
+
+        private static void ConfigureButton(Button button, string text, Color color, int width)
+        {
+            button.Text = text;
+            button.Width = width;
+            button.Height = 44;
             button.BackColor = color;
             button.ForeColor = Color.White;
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = 0;
             button.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
-            button.Margin = new Padding(0, 0, 10, 0);
             button.Cursor = Cursors.Hand;
         }
     }

@@ -101,7 +101,7 @@ namespace Neck
                 {
                     Kind = GuardAlertKind.CpuPressure,
                     Title = "CPU sob pressão",
-                    Message = "A CPU permanece acima de 90%. Ative o Neck Turbo no aplicativo que precisa responder melhor."
+                    Message = "A CPU permanece acima de 90%. Escolha o aplicativo mais importante e use Acelerar por 1 hora."
                 };
             }
 

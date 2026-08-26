@@ -74,7 +74,7 @@ namespace Neck
                     Priority = priority,
                     Title = "Aliviar a memória antes de continuar",
                     Reason = "A RAM está em " + health.Memory.PercentUsed.ToString("0") + "% e " + processText + " lidera o consumo. Revise os aplicativos abertos antes de limpar arquivos.",
-                    ButtonText = "Abrir SOS Neck",
+                    ButtonText = "Acelerar aplicativo",
                     Kind = PlanActionKind.Sos
                 });
             }
