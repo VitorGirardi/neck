@@ -104,7 +104,7 @@ namespace Neck
                 if (syntheticPlan.Actions.Count != 3) throw new InvalidOperationException("O plano não retornou exatamente três prioridades.");
                 if (syntheticPlan.Actions[0].Kind != PlanActionKind.Sos) throw new InvalidOperationException("A pressão crítica de memória não recebeu prioridade.");
                 PersonalPlan currentPlan = PersonalPlanAnalyzer.Build();
-                using (PersonalPlanForm planForm = new PersonalPlanForm(currentPlan))
+                using (PersonalPlanForm planForm = new PersonalPlanForm(syntheticPlan))
                 {
                     planForm.ShowInTaskbar = false;
                     planForm.StartPosition = FormStartPosition.Manual;

@@ -1,86 +1,184 @@
-# Neck
+<p align="center">
+  <img src="assets/neck-icon.svg" width="112" alt="Ícone do Neck">
+</p>
 
-Utilitário de manutenção periódica para Windows. Ele analisa antes de apagar, trabalha apenas com locais conhecidos e usa as ferramentas nativas do Windows para manutenção do sistema.
+<h1 align="center">Neck</h1>
 
-## Neck Guard (v0.3)
+<p align="center">
+  <strong>Cuide do Windows sem complicação.</strong><br>
+  Diagnóstico claro, manutenção segura e prioridades personalizadas para computadores lentos ou sobrecarregados.
+</p>
 
-O diagnóstico inteligente observa o uso de memória, o espaço livre no disco do Windows e os grupos de processos que mais consomem RAM. Ele classifica o momento como estável, atenção ou crítico e explica a causa em linguagem simples. Nesta primeira versão o Guard é estritamente somente leitura: nenhum aplicativo é encerrado ou alterado.
+<p align="center">
+  <a href="https://github.com/VitorGirardi/neck/actions/workflows/build.yml"><img src="https://github.com/VitorGirardi/neck/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="https://github.com/VitorGirardi/neck/releases/latest"><img src="https://img.shields.io/github/v/release/VitorGirardi/neck?display_name=tag&sort=semver" alt="Última versão"></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white" alt="Windows 10 e 11">
+  <img src="https://img.shields.io/badge/.NET%20Framework-4.8-512BD4" alt=".NET Framework 4.8">
+</p>
 
-## Modo Reunião (v0.4)
+<p align="center">
+  <a href="https://github.com/VitorGirardi/neck/releases/latest"><strong>Baixar a versão mais recente</strong></a>
+  ·
+  <a href="#instalação">Como instalar</a>
+  ·
+  <a href="#segurança-por-padrão">Proteções</a>
+</p>
 
-Antes de uma apresentação, o Neck verifica RAM, disco, reinicialização pendente, rede, energia e aplicativos pesados. Durante o período escolhido, ele impede que o computador ou a tela entrem em suspensão e pausa as próprias rotinas de manutenção. A proteção é temporária e totalmente reversível.
+![Tela principal do Neck](assets/screenshots/neck-dashboard.png)
 
-## Guard contínuo (v0.5)
+## Por que o Neck existe?
 
-O monitoramento na bandeja é opcional e mede o computador a cada 30 segundos. O Neck mantém somente as últimas 24 horas em `%LOCALAPPDATA%\Neck`, exibe alertas após pressão persistente — nunca por um pico isolado — e reconhece crescimento anormal do maior consumidor de memória. As notificações podem ser silenciadas por duas horas e são evitadas quando outro aplicativo está em tela cheia.
+Quando um computador começa a travar, é comum encontrar ferramentas que prometem “liberar RAM”, aplicam alterações obscuras no Registro ou apagam arquivos sem explicar o impacto. O Neck segue outro caminho: **mede primeiro, explica a causa e mantém a decisão com você**.
 
-Nenhuma métrica é enviada pela internet. O histórico contém horário, uso geral de RAM e disco e o nome/consumo agregado do processo mais pesado.
+Ele foi criado para quem quer responder três perguntas simples:
 
-Durante uma manutenção ativa, fechar a janela oferece continuar a tarefa na bandeja. O Neck impede apenas o encerramento completo até a ferramenta do Windows terminar e envia uma notificação com o resultado.
+1. O que está deixando meu computador lento agora?
+2. O que posso fazer sem arriscar meus arquivos ou o Windows?
+3. Qual ação devo executar primeiro?
 
-## SOS Neck (v0.6)
+## Principais recursos
 
-O SOS apresenta somente aplicativos com janela visível, ordenados pelo consumo aproximado de memória. Com confirmação explícita, ele pode enviar um pedido normal de fechamento — equivalente ao botão `X` — e aguarda o próprio aplicativo responder. Processos críticos do Windows e encerramento forçado são excluídos por projeto. O SOS também oferece limpeza segura de temporários antigos e acesso ao Gerenciador de Tarefas.
+| Recurso | O que faz | Proteção principal |
+| --- | --- | --- |
+| **Meu Plano Neck** | Cruza RAM, disco, temporários, inicialização e Windows Update para escolher três prioridades. | Não executa nenhuma ação automaticamente. |
+| **Neck Guard** | Mostra a saúde do computador e os maiores consumidores de memória. | Diagnóstico somente leitura. |
+| **Guard contínuo** | Monitora a cada 30 segundos e alerta apenas sobre pressão persistente. | Histórico local limitado às últimas 24 horas. |
+| **SOS Neck** | Lista aplicativos visíveis que podem aliviar uma sobrecarga. | Solicita fechamento normal; nunca força processos. |
+| **Neck Boot** | Explica o que inicia com o Windows e quais itens opcionais merecem revisão. | Encaminha mudanças para a tela oficial do Windows. |
+| **Modo Reunião** | Verifica o computador e impede suspensão durante uma apresentação. | Temporário, reversível e sem manutenção concorrente. |
+| **Limpeza segura** | Remove temporários antigos e relatórios de erro conhecidos. | Preserva arquivos recentes, documentos, downloads e navegadores. |
+| **Manutenção completa** | Reúne DISM, SFC e otimização da unidade. | Solicita administrador somente para a tarefa escolhida. |
+| **Drivers e atualizações** | Mostra versões instaladas e abre fontes oficiais. | Não instala drivers silenciosamente. |
 
-## Privilégios sob demanda (v0.7)
+## Meu Plano Neck
 
-O Neck inicia como usuário comum: Guard, histórico, diagnóstico, SOS, Modo Reunião e limpeza rápida não provocam UAC. Somente DISM, SFC, otimização da unidade e criação de ponto de restauração abrem um executor isolado com permissão administrativa. O executor aceita uma lista fechada de tarefas e grava o resultado apenas na pasta local de trabalhos do Neck.
+Em vez de apresentar dezenas de métricas, o plano personalizado transforma o diagnóstico em três próximos passos. Cada recomendação informa o motivo, a urgência e o destino da ação.
 
-No menu da bandeja, **Iniciar com o Windows** é opcional. Quando habilitado, o Neck abre oculto com `--background`, sem UAC, e a configuração pode ser desfeita pelo mesmo menu.
+![Meu Plano Neck com três prioridades](assets/screenshots/neck-plan.png)
 
-## Instalação e confiança (v0.8)
+O plano pode encaminhar para SOS Neck, limpeza segura, Neck Boot, diagnóstico ou Windows Update. Confirmações e proteções continuam valendo em todas as etapas.
 
-O primeiro uso agora apresenta as escolhas de inicialização, bandeja e notificações em linguagem simples. A Central de Preferências permite revisar tudo depois e inclui uma verificação manual de versão no repositório oficial. O Neck não baixa nem executa atualizações silenciosamente e não armazena credenciais do GitHub.
+## Segurança por padrão
 
-O `Neck Setup` instala o aplicativo em Arquivos de Programas, cria atalhos opcionais e oferece desinstalação normal pelo Windows. Ao remover o Neck, a entrada opcional de inicialização automática também é apagada. Cada executável publicado acompanha um arquivo `.sha256` para conferência de integridade.
-
-## Neck Boot (v0.9)
-
-O Neck Boot reúne os aplicativos encontrados nos locais comuns de inicialização do Windows e explica quais parecem pertencer ao sistema, à segurança, ao hardware ou ao uso opcional. Ele combina a classificação com a memória observada naquele momento para indicar impacto baixo, médio, alto ou incerto, sem prometer ganhos artificiais.
-
-O Neck Boot é somente leitura: não apaga entradas nem altera o Registro. Quando você decide revisar um item, ele abre a página oficial **Aplicativos de Inicialização** do Windows, onde a mudança continua explícita e reversível.
-
-## Meu Plano Neck (v1.0)
-
-O Meu Plano Neck cruza o estado atual da memória e do disco, o maior consumidor de RAM, a quantidade segura disponível para limpeza, aplicativos opcionais na inicialização e reinicializações pendentes. Em vez de exibir uma lista interminável, ele escolhe exatamente três prioridades e explica por que cada uma entrou no plano.
-
-As ações continuam confirmadas e reversíveis: o plano pode encaminhar para SOS Neck, limpeza segura, Neck Boot, diagnóstico ou Windows Update, mas nunca fecha aplicativos, limpa arquivos, reinicia o computador ou altera a inicialização sozinho.
-
-O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
-
-## Proteções adotadas
-
-- Não modifica o Registro para prometer desempenho.
+- Não usa “limpeza de RAM” artificial nem encerra processos em massa.
+- Não aplica ajustes genéricos no Registro para prometer desempenho.
 - Não apaga documentos, fotos, downloads, senhas ou dados de navegadores.
-- Temporários recentes são preservados; arquivos em uso são ignorados.
-- Lixeira só é esvaziada se a opção for marcada explicitamente.
-- Drivers são consultados e encaminhados para os canais oficiais da Microsoft, Intel, NVIDIA e HP.
-- Toda execução gera um relatório em `Documentos\Neck\Relatorios`.
+- Não esvazia a Lixeira sem uma seleção explícita.
+- Não baixa nem executa atualizações do Neck silenciosamente.
+- Não armazena tokens ou credenciais do GitHub.
+- Não reinicia o computador automaticamente.
+- Não instala drivers automaticamente; utiliza Windows Update e páginas oficiais.
+- Mantém uma lista fechada de tarefas administrativas permitidas.
+- Salva relatórios de manutenção em `Documentos\Neck\Relatorios`.
 
-## Experiência guiada
+O Neck normalmente é executado como usuário comum. A janela do UAC aparece somente quando você escolhe uma operação do Windows que realmente exige privilégios elevados, como DISM, SFC, otimização da unidade ou criação de ponto de restauração.
 
-- **Neck Guard:** apresenta uma pontuação de saúde e identifica os maiores consumidores de memória.
-- **Modo Reunião:** executa uma checagem prévia e mantém computador e tela acordados por 30, 60 ou 120 minutos.
-- **Guard contínuo:** pode continuar na bandeja, mantém histórico local de 24 horas e alerta apenas sobre problemas persistentes.
-- **SOS Neck:** reúne ações imediatas e confirmadas para aliviar uma sobrecarga sem forçar processos.
-- **Privilégios sob demanda:** mantém o Guard comum e solicita administrador somente para ferramentas do Windows que realmente precisam.
-- **Neck Boot:** explica os programas que acompanham o Windows e encaminha qualquer alteração para a tela oficial do sistema.
-- **Meu Plano Neck:** cruza os diagnósticos e apresenta somente as três ações mais úteis para o momento atual.
-- **Limpeza rápida:** remove somente temporários seguros e relatórios antigos.
-- **Manutenção completa:** mantém as opções técnicas em uma tela separada e explicada.
-- **Drivers e Windows Update:** mostra versões instaladas e abre apenas fontes oficiais.
-- **Atividade e histórico:** explica o que está acontecendo e salva os relatórios localmente.
+## Instalação
 
-## Frequência sugerida
+### Instalador recomendado
 
-Uma análise a cada 30 dias é suficiente para a maioria dos computadores. A verificação de integridade pode ser usada quando houver falhas, travamentos ou corrupção do Windows.
+1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
+2. Baixe `Neck-Setup-1.0.0.exe` e o arquivo correspondente `.sha256`.
+3. Opcionalmente, confira a integridade no PowerShell:
+
+```powershell
+Get-FileHash .\Neck-Setup-1.0.0.exe -Algorithm SHA256
+```
+
+4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
+
+### Versão portátil
+
+Baixe `Neck.exe` na mesma release e execute-o diretamente. Nenhuma instalação é necessária. As preferências e o histórico continuam armazenados no perfil local do Windows.
+
+> [!IMPORTANT]
+> Os binários ainda não possuem assinatura digital. Até que o projeto tenha um certificado de assinatura de código, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+
+## Privacidade
+
+O Neck não possui telemetria e não envia métricas do computador para servidores externos.
+
+Dados mantidos localmente:
+
+- Preferências e histórico do Guard: `%LOCALAPPDATA%\Neck`
+- Relatórios de manutenção: `Documentos\Neck\Relatorios`
+- Histórico do Guard: somente as últimas 24 horas
+
+A internet é utilizada apenas quando você solicita uma verificação de versão ou abre uma fonte oficial, como GitHub, Windows Update ou a página de um fabricante.
+
+## Requisitos
+
+- Windows 10 ou Windows 11 de 64 bits
+- .NET Framework 4.8
+- Aproximadamente 10 MB de espaço para instalação
+- Permissão de administrador somente para operações avançadas selecionadas
 
 ## Compilação
 
-Execute `build.ps1` no PowerShell. O resultado é criado em `dist\Neck.exe`. O compilador do .NET Framework 4.8 que acompanha o Windows é utilizado, sem dependências de terceiros.
+O projeto utiliza o compilador C# do .NET Framework disponível no Windows e não depende de pacotes externos para gerar o aplicativo.
 
-Para gerar o instalador, instale o Inno Setup 6 e execute `build-installer.ps1`. Serão criados `dist\Neck-Setup-1.0.0.exe` e os checksums SHA-256 do instalador e do executável portátil.
+```powershell
+git clone https://github.com/VitorGirardi/neck.git
+cd neck
+.\test.ps1
+.\build.ps1
+```
 
-Para executar os autotestes de análise e gerar uma versão de verificação visual, use `test.ps1`. Os arquivos de teste são criados em `test-output` e não são versionados.
+Saída principal: `dist\Neck.exe`.
 
-Cada envio e pull request para a branch `main` também executa os autotestes e compila o programa no GitHub Actions. O executável resultante fica disponível como artefato da execução do workflow.
+Para gerar o instalador, instale o [Inno Setup 6](https://jrsoftware.org/isinfo.php) e execute:
+
+```powershell
+.\build-installer.ps1
+```
+
+O comando produz o instalador, o executável portátil e os respectivos checksums SHA-256. Cada push e pull request para `main` também executa os autotestes, compila o aplicativo e gera os artefatos no GitHub Actions.
+
+## Estrutura do projeto
+
+```text
+Program.cs                 Interface principal e manutenção segura
+SystemMonitoring.cs        Diagnóstico de memória, disco e reunião
+GuardMonitoring.cs         Monitoramento contínuo, histórico e bandeja
+SosMode.cs                 Alívio seguro de sobrecarga
+StartupAnalysis.cs         Análise somente leitura da inicialização
+PersonalPlan.cs            Motor e interface das três prioridades
+ElevatedOperations.cs      Executor administrativo com lista fechada
+PreferencesAndUpdates.cs   Preferências e consulta manual de versão
+SelfTest.cs                Testes funcionais e verificações visuais
+installer/Neck.iss         Definição do instalador para Windows
+```
+
+## Como contribuir
+
+Relatos de bugs, ideias e pull requests são bem-vindos.
+
+- Antes de abrir uma issue, verifique se o problema já foi relatado.
+- Explique a versão do Windows, a versão do Neck e como reproduzir o comportamento.
+- Mudanças que apagam dados, encerram processos à força ou enfraquecem as confirmações de segurança não serão aceitas.
+- Execute `.\test.ps1` antes de enviar um pull request.
+
+Use as [issues do GitHub](https://github.com/VitorGirardi/neck/issues) para bugs e sugestões. Para uma vulnerabilidade que não deve ser divulgada publicamente, utilize o recurso **Report a vulnerability** na aba Security do repositório quando ele estiver disponível.
+
+## Limites honestos
+
+O Neck ajuda a diagnosticar e reduzir sobrecarga, mas não substitui backup, antivírus, suporte técnico ou uma atualização de hardware. Ele não consegue transformar falta física de RAM em memória adicional e não promete acelerar todos os computadores.
+
+Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware. Leia cada recomendação e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
+
+## Roadmap
+
+- [x] Diagnóstico inteligente e histórico local
+- [x] Modo Reunião e monitoramento na bandeja
+- [x] SOS Neck e privilégios sob demanda
+- [x] Instalador, preferências e checksums
+- [x] Neck Boot e Meu Plano Neck
+- [ ] Assinatura digital dos binários
+- [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
+- [ ] Internacionalização da interface
+
+---
+
+<p align="center">
+  Feito com cuidado para tornar a manutenção do Windows mais compreensível, segura e auditável.
+</p>

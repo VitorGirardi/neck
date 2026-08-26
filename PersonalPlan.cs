@@ -277,7 +277,7 @@ namespace Neck
             };
             Label urgency = new Label
             {
-                Text = action.Priority >= 85 ? "FAÇA PRIMEIRO" : action.Priority >= 60 ? "PRÓXIMO PASSO" : "PREVENTIVO",
+                Text = index == 1 ? "FAÇA PRIMEIRO" : action.Priority >= 60 ? "PRÓXIMO PASSO" : "PREVENTIVO",
                 AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold),
                 ForeColor = accent,
