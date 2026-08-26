@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.5.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.5.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.5.1.0")]
 
 namespace Neck
 {
@@ -170,7 +170,6 @@ namespace Neck
         private bool _closing;
         private bool _allowExit;
         private bool _maintenanceRunning;
-        private bool _trayHintShown;
         private DateTime _lastHistoryCompactUtc = DateTime.UtcNow;
         private DateTime _lastAlertUtc = DateTime.MinValue;
         private GuardAlertKind _lastAlertKind = GuardAlertKind.None;
@@ -572,26 +571,44 @@ namespace Neck
 
         private void HandleMainFormClosing(object sender, FormClosingEventArgs e)
         {
-            if (_maintenanceRunning)
+            if (_maintenanceRunning && e.CloseReason == CloseReason.UserClosing)
             {
                 e.Cancel = true;
-                MessageBox.Show("A manutenção do Windows ainda está em andamento. Aguarde a conclusão antes de fechar o Neck.", "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (_allowExit)
+                {
+                    _allowExit = false;
+                    MessageBox.Show("A manutenção ainda está em andamento e não pode ser encerrada com segurança. Deixe o Neck na bandeja até a conclusão.", "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                bool hide = _backgroundCheck.Checked;
+                if (!hide)
+                {
+                    hide = MessageBox.Show(
+                        "Uma tarefa do Windows ainda está em andamento. Deseja ocultar o Neck e deixar a manutenção continuar em segundo plano?",
+                        "Continuar manutenção em segundo plano",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Information) == DialogResult.Yes;
+                }
+                if (hide) HideToTray("A manutenção continua em segundo plano. O Neck avisará quando terminar.");
                 return;
             }
             if (!_allowExit && e.CloseReason == CloseReason.UserClosing && _backgroundCheck.Checked)
             {
                 e.Cancel = true;
-                Hide();
-                if (!_trayHintShown)
-                {
-                    _trayHintShown = true;
-                    _trayIcon.ShowBalloonTip(3000, "Neck continua cuidando", "O monitoramento ficou ativo na bandeja. Clique duas vezes no ícone para voltar.", ToolTipIcon.Info);
-                }
+                HideToTray("O monitoramento ficou ativo na bandeja. Clique duas vezes no ícone para voltar.");
                 return;
             }
             _closing = true;
             _statusTimer.Stop();
             _guardMonitorTimer.Stop();
+        }
+
+        private void HideToTray(string message)
+        {
+            Hide();
+            _trayIcon.Visible = true;
+            _trayIcon.ShowBalloonTip(3500, "Neck continua trabalhando", message, ToolTipIcon.Info);
         }
 
         private void ShowFromTray()
@@ -1125,17 +1142,20 @@ namespace Neck
                 LoadLastRun();
                 UpdateSystemStatus();
 
-                MessageBox.Show(
-                    "Manutenção concluída.\n\nEspaço liberado diretamente: " + FormatBytes(freed) + "\nUm relatório detalhado foi salvo em Documentos.",
-                    "Neck",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                string completion = "Manutenção concluída. Espaço liberado: " + FormatBytes(freed) + ". O relatório foi salvo em Documentos.";
+                if (Visible)
+                    MessageBox.Show(completion, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                else
+                    _trayIcon.ShowBalloonTip(6000, "Manutenção concluída", completion, ToolTipIcon.Info);
             }
             catch (Exception ex)
             {
                 AppendLog("A manutenção foi interrompida: " + ex.Message);
-                MessageBox.Show("A manutenção foi interrompida. Consulte o relatório na tela.\n\n" + ex.Message,
-                    "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                string failure = "A manutenção foi interrompida. Abra o Neck para consultar os detalhes. " + ex.Message;
+                if (Visible)
+                    MessageBox.Show(failure, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                else
+                    _trayIcon.ShowBalloonTip(6000, "Manutenção interrompida", failure, ToolTipIcon.Error);
             }
             finally
             {

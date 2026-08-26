@@ -16,6 +16,8 @@ O monitoramento na bandeja é opcional e mede o computador a cada 30 segundos. O
 
 Nenhuma métrica é enviada pela internet. O histórico contém horário, uso geral de RAM e disco e o nome/consumo agregado do processo mais pesado.
 
+Durante uma manutenção ativa, fechar a janela oferece continuar a tarefa na bandeja. O Neck impede apenas o encerramento completo até a ferramenta do Windows terminar e envia uma notificação com o resultado.
+
 O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Proteções adotadas
