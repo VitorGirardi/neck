@@ -15,8 +15,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Manutenção periódica segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Mestre PC Care")]
 [assembly: System.Reflection.AssemblyProduct("Mestre PC Care")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.1.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.1.0.0")]
 
 namespace MestrePCCare
 {
@@ -753,7 +753,7 @@ namespace MestrePCCare
         {
             Button button = new Button
             {
-                Width = 330,
+                Width = 300,
                 Height = 66,
                 Text = title + Environment.NewLine + subtitle,
                 TextAlign = ContentAlignment.MiddleLeft,
