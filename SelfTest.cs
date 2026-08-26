@@ -46,6 +46,9 @@ namespace Neck
                 }
                 if (!UpdateChecker.RepositoryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("O verificador de atualizações não aponta para HTTPS.");
+                string parsedStartupPath = StartupAnalyzer.ExtractExecutablePath("\"C:\\Program Files\\Aplicativo\\app.exe\" --background");
+                if (parsedStartupPath != @"C:\Program Files\Aplicativo\app.exe")
+                    throw new InvalidOperationException("O comando de inicialização não foi interpretado com segurança.");
                 using (PreferencesForm preferences = new PreferencesForm(GuardSettings.Load(), false))
                 {
                     preferences.ShowInTaskbar = false;
@@ -61,6 +64,23 @@ namespace Neck
                         Console.WriteLine("PreferencesPreview=" + previewPath);
                     }
                     preferences.Close();
+                }
+                System.Collections.Generic.List<StartupEntry> startupEntries = StartupAnalyzer.Analyze();
+                using (StartupAppsForm startup = new StartupAppsForm(startupEntries))
+                {
+                    startup.ShowInTaskbar = false;
+                    startup.StartPosition = FormStartPosition.Manual;
+                    startup.Location = new System.Drawing.Point(-32000, -32000);
+                    startup.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(startup.Width, startup.Height))
+                    {
+                        startup.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, startup.Width, startup.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Boot.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BootPreview=" + previewPath);
+                    }
+                    startup.Close();
                 }
                 using (MaintenanceOptionsForm options = new MaintenanceOptionsForm(true, true, false, true, false, true))
                 {
@@ -173,6 +193,7 @@ namespace Neck
                 Console.WriteLine("MeetingChecks=" + meeting.Checks.Count);
                 Console.WriteLine("SyntheticGuardAlert=" + syntheticAlert.Kind);
                 Console.WriteLine("SosVisibleCandidates=" + sosCandidates.Count);
+                Console.WriteLine("StartupEntries=" + startupEntries.Count);
                 Console.WriteLine("SelfTestIsAdministrator=" + SecurityHelper.IsAdministrator());
                 return 0;
             }

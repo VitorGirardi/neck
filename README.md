@@ -34,6 +34,12 @@ O primeiro uso agora apresenta as escolhas de inicialização, bandeja e notific
 
 O `Neck Setup` instala o aplicativo em Arquivos de Programas, cria atalhos opcionais e oferece desinstalação normal pelo Windows. Ao remover o Neck, a entrada opcional de inicialização automática também é apagada. Cada executável publicado acompanha um arquivo `.sha256` para conferência de integridade.
 
+## Neck Boot (v0.9)
+
+O Neck Boot reúne os aplicativos encontrados nos locais comuns de inicialização do Windows e explica quais parecem pertencer ao sistema, à segurança, ao hardware ou ao uso opcional. Ele combina a classificação com a memória observada naquele momento para indicar impacto baixo, médio, alto ou incerto, sem prometer ganhos artificiais.
+
+O Neck Boot é somente leitura: não apaga entradas nem altera o Registro. Quando você decide revisar um item, ele abre a página oficial **Aplicativos de Inicialização** do Windows, onde a mudança continua explícita e reversível.
+
 O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Proteções adotadas
@@ -52,6 +58,7 @@ O projeto ainda está em fase inicial. Revise o relatório apresentado pelo apli
 - **Guard contínuo:** pode continuar na bandeja, mantém histórico local de 24 horas e alerta apenas sobre problemas persistentes.
 - **SOS Neck:** reúne ações imediatas e confirmadas para aliviar uma sobrecarga sem forçar processos.
 - **Privilégios sob demanda:** mantém o Guard comum e solicita administrador somente para ferramentas do Windows que realmente precisam.
+- **Neck Boot:** explica os programas que acompanham o Windows e encaminha qualquer alteração para a tela oficial do sistema.
 - **Limpeza rápida:** remove somente temporários seguros e relatórios antigos.
 - **Manutenção completa:** mantém as opções técnicas em uma tela separada e explicada.
 - **Drivers e Windows Update:** mostra versões instaladas e abre apenas fontes oficiais.
@@ -65,7 +72,7 @@ Uma análise a cada 30 dias é suficiente para a maioria dos computadores. A ver
 
 Execute `build.ps1` no PowerShell. O resultado é criado em `dist\Neck.exe`. O compilador do .NET Framework 4.8 que acompanha o Windows é utilizado, sem dependências de terceiros.
 
-Para gerar o instalador, instale o Inno Setup 6 e execute `build-installer.ps1`. Serão criados `dist\Neck-Setup-0.8.0.exe` e os checksums SHA-256 do instalador e do executável portátil.
+Para gerar o instalador, instale o Inno Setup 6 e execute `build-installer.ps1`. Serão criados `dist\Neck-Setup-0.9.0.exe` e os checksums SHA-256 do instalador e do executável portátil.
 
 Para executar os autotestes de análise e gerar uma versão de verificação visual, use `test.ps1`. Os arquivos de teste são criados em `test-output` e não são versionados.
 

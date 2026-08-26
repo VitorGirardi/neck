@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.8.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.8.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.9.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.9.0.0")]
 
 namespace Neck
 {
@@ -142,6 +142,7 @@ namespace Neck
         private readonly Button _analyzeButton = new Button();
         private readonly Button _runButton = new Button();
         private readonly Button _advancedButton = new Button();
+        private readonly Button _bootButton = new Button();
         private readonly Button _driversButton = new Button();
         private readonly Button _guardButton = new Button();
         private readonly Button _meetingButton = new Button();
@@ -463,12 +464,19 @@ namespace Neck
             ConfigureButton(_advancedButton, "Escolher tarefas", Theme.Green, 190);
             _advancedButton.Location = new Point(24, 202);
             _advancedButton.Click += async delegate { await ShowAdvancedAndRunAsync(); };
+            ConfigureButton(_bootButton, "Neck Boot", Theme.NavySoft, 132);
+            _bootButton.Location = new Point(224, 202);
+            _bootButton.Click += delegate
+            {
+                using (StartupAppsForm form = new StartupAppsForm()) form.ShowDialog(this);
+            };
 
             card.Controls.Add(badge);
             card.Controls.Add(title);
             card.Controls.Add(description);
             card.Controls.Add(included);
             card.Controls.Add(_advancedButton);
+            card.Controls.Add(_bootButton);
             return card;
         }
 
@@ -999,6 +1007,7 @@ namespace Neck
             _analyzeButton.Enabled = false;
             _runButton.Enabled = false;
             _advancedButton.Enabled = false;
+            _bootButton.Enabled = false;
             UpdateMeetingDisplay();
             AppendLog("MODO REUNIÃO — ativo até " + _meetingEndsAt.ToString("HH:mm") + ". Suspensão e tela apagada foram bloqueadas.");
         }
@@ -1027,6 +1036,7 @@ namespace Neck
             _analyzeButton.Enabled = !_busy;
             _runButton.Enabled = !_busy;
             _advancedButton.Enabled = !_busy;
+            _bootButton.Enabled = !_busy;
             _recommendation.BackColor = Theme.NavySoft;
             LoadLastRun();
             UpdateGuardView(_healthSnapshot);
@@ -1237,6 +1247,7 @@ namespace Neck
             _analyzeButton.Enabled = !busy && !_meetingActive;
             _runButton.Enabled = !busy && !_meetingActive;
             _advancedButton.Enabled = !busy && !_meetingActive;
+            _bootButton.Enabled = !busy && !_meetingActive;
             _driversButton.Enabled = !busy;
             _settingsButton.Enabled = !busy;
             _guardButton.Enabled = !busy;

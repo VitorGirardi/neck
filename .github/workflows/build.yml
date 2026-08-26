@@ -40,6 +40,6 @@ jobs:
           path: |
             dist/Neck.exe
             dist/Neck.exe.sha256
-            dist/Neck-Setup-0.8.0.exe
-            dist/Neck-Setup-0.8.0.exe.sha256
+            dist/Neck-Setup-0.9.0.exe
+            dist/Neck-Setup-0.9.0.exe.sha256
           if-no-files-found: error
