@@ -345,6 +345,8 @@ namespace Neck
                     CreateNoWindow = true
                 });
                 Thread.Sleep(500);
+                probe.Refresh();
+                System.Diagnostics.ProcessPriorityClass originalPriority = probe.PriorityClass;
                 TurboModeManager.Start("NeckTurboProbe", "Teste Turbo", 60);
                 TurboModeManager.RefreshForTesting("NeckTurboProbe", DateTime.UtcNow);
                 probe.Refresh();
@@ -353,7 +355,7 @@ namespace Neck
                     throw new InvalidOperationException("Neck Turbo não acelerou o processo de teste em primeiro plano.");
                 TurboModeManager.RefreshForTesting("OutroProcesso", DateTime.UtcNow.AddSeconds(2));
                 probe.Refresh();
-                if (TurboModeManager.IsForeground || probe.PriorityClass != System.Diagnostics.ProcessPriorityClass.Normal)
+                if (TurboModeManager.IsForeground || probe.PriorityClass != originalPriority)
                     throw new InvalidOperationException("Neck Turbo não restaurou a prioridade ao perder o foco.");
                 TurboModeResult stopped = TurboModeManager.Stop();
                 if (TurboModeManager.IsActive) throw new InvalidOperationException("Neck Turbo permaneceu ativo após ser encerrado.");
