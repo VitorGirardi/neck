@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.4.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.4.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.5.0.0")]
 
 namespace Neck
 {
@@ -146,6 +146,7 @@ namespace Neck
         private readonly Label _guardBadge = new Label();
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
+        private readonly CheckBox _backgroundCheck = new CheckBox();
         private readonly CheckBox _tempCheck = new CheckBox();
         private readonly CheckBox _reportsCheck = new CheckBox();
         private readonly CheckBox _recycleCheck = new CheckBox();
@@ -153,12 +154,26 @@ namespace Neck
         private readonly CheckBox _healthCheck = new CheckBox();
         private readonly CheckBox _drivesCheck = new CheckBox();
         private readonly Timer _statusTimer = new Timer();
+        private readonly Timer _guardMonitorTimer = new Timer();
+        private readonly NotifyIcon _trayIcon = new NotifyIcon();
+        private Icon _trayStableIcon;
+        private readonly GuardHistoryStore _guardHistory = new GuardHistoryStore();
+        private readonly GuardPressureDetector _guardDetector = new GuardPressureDetector();
+        private GuardSettings _guardSettings;
+        private List<GuardSample> _guardSamples = new List<GuardSample>();
         private long _analyzedBytes;
         private bool _busy;
         private DateTime _lastHealthScan = DateTime.MinValue;
         private HealthSnapshot _healthSnapshot;
         private bool _meetingActive;
         private DateTime _meetingEndsAt;
+        private bool _closing;
+        private bool _allowExit;
+        private bool _maintenanceRunning;
+        private bool _trayHintShown;
+        private DateTime _lastHistoryCompactUtc = DateTime.UtcNow;
+        private DateTime _lastAlertUtc = DateTime.MinValue;
+        private GuardAlertKind _lastAlertKind = GuardAlertKind.None;
 
         private static readonly string DataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neck");
@@ -182,17 +197,29 @@ namespace Neck
             _drivesCheck.Checked = true;
 
             BuildInterface();
+            InitializeGuardMonitoring();
             UpdateSystemStatus();
             LoadLastRun();
 
             _statusTimer.Interval = 3000;
             _statusTimer.Tick += delegate { if (!_busy) UpdateSystemStatus(); };
             _statusTimer.Start();
+            _guardMonitorTimer.Interval = 30000;
+            _guardMonitorTimer.Tick += delegate { CaptureGuardSample(); };
+            _guardMonitorTimer.Start();
 
             Shown += async delegate { await AnalyzeAsync(false); };
+            Shown += delegate { CaptureGuardSample(); };
+            FormClosing += HandleMainFormClosing;
             FormClosed += delegate
             {
                 if (_meetingActive) NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
+                _statusTimer.Stop();
+                _guardMonitorTimer.Stop();
+                _trayIcon.Visible = false;
+                _trayIcon.Icon = null;
+                _trayIcon.Dispose();
+                if (_trayStableIcon != null) _trayStableIcon.Dispose();
             };
         }
 
@@ -440,10 +467,17 @@ namespace Neck
             _guardMessage.Location = new Point(23, 77);
             _guardProcess.Text = "Maior uso de memória: calculando";
             _guardProcess.AutoSize = false;
-            _guardProcess.Size = new Size(450, 24);
+            _guardProcess.Size = new Size(285, 24);
             _guardProcess.Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold);
             _guardProcess.ForeColor = Theme.Text;
             _guardProcess.Location = new Point(23, 112);
+            _backgroundCheck.Text = "Continuar na bandeja";
+            _backgroundCheck.AutoSize = false;
+            _backgroundCheck.Size = new Size(172, 26);
+            _backgroundCheck.Location = new Point(318, 108);
+            _backgroundCheck.Font = Theme.Small;
+            _backgroundCheck.ForeColor = Theme.Muted;
+            _backgroundCheck.Cursor = Cursors.Hand;
 
             ConfigureButton(_meetingButton, "Modo reunião", Theme.Blue, 140);
             ConfigureButton(_guardButton, "Diagnóstico", Theme.NavySoft, 112);
@@ -462,19 +496,173 @@ namespace Neck
             _driversButton.Click += delegate { using (DriverCenterForm form = new DriverCenterForm()) form.ShowDialog(this); };
             _reportsButton.Click += delegate
             {
-                Directory.CreateDirectory(ReportDirectory);
-                OpenTarget(ReportDirectory);
+                using (GuardHistoryForm form = new GuardHistoryForm(_guardSamples.ToList(), ReportDirectory)) form.ShowDialog(this);
             };
 
             card.Controls.Add(_guardBadge);
             card.Controls.Add(title);
             card.Controls.Add(_guardMessage);
             card.Controls.Add(_guardProcess);
+            card.Controls.Add(_backgroundCheck);
             card.Controls.Add(_meetingButton);
             card.Controls.Add(_guardButton);
             card.Controls.Add(_driversButton);
             card.Controls.Add(_reportsButton);
             return card;
+        }
+
+        private void InitializeGuardMonitoring()
+        {
+            _guardSettings = GuardSettings.Load();
+            _guardSamples = _guardHistory.LoadLast24Hours();
+            _guardHistory.Compact(_guardSamples);
+            _backgroundCheck.Checked = _guardSettings.ContinueInTray;
+            _backgroundCheck.CheckedChanged += delegate
+            {
+                _guardSettings.ContinueInTray = _backgroundCheck.Checked;
+                _guardSettings.Save();
+            };
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            ToolStripMenuItem status = new ToolStripMenuItem("Neck Guard iniciando...") { Enabled = false };
+            status.Name = "status";
+            menu.Items.Add(status);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
+            menu.Items.Add("Abrir diagnóstico", null, delegate
+            {
+                ShowFromTray();
+                HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
+                using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
+            });
+            menu.Items.Add("Modo Reunião", null, delegate { ShowFromTray(); ToggleMeetingMode(); });
+            ToolStripMenuItem notifications = new ToolStripMenuItem("Exibir notificações") { CheckOnClick = true, Checked = _guardSettings.Notifications };
+            notifications.CheckedChanged += delegate { _guardSettings.Notifications = notifications.Checked; _guardSettings.Save(); };
+            menu.Items.Add(notifications);
+            ToolStripMenuItem fullscreen = new ToolStripMenuItem("Silenciar em tela cheia") { CheckOnClick = true, Checked = _guardSettings.SilenceFullscreen };
+            fullscreen.CheckedChanged += delegate { _guardSettings.SilenceFullscreen = fullscreen.Checked; _guardSettings.Save(); };
+            menu.Items.Add(fullscreen);
+            menu.Items.Add("Silenciar alertas por 2 horas", null, delegate
+            {
+                _guardSettings.SilentUntilUtc = DateTime.UtcNow.AddHours(2);
+                _guardSettings.Save();
+                _trayIcon.ShowBalloonTip(2500, "Neck Guard", "Alertas silenciados por duas horas.", ToolTipIcon.Info);
+            });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Sair do Neck", null, delegate
+            {
+                _allowExit = true;
+                ShowFromTray();
+                Close();
+            });
+
+            _trayStableIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? (Icon)SystemIcons.Application.Clone();
+            _trayIcon.Icon = _trayStableIcon;
+            _trayIcon.Text = "Neck Guard";
+            _trayIcon.Visible = true;
+            _trayIcon.ContextMenuStrip = menu;
+            _trayIcon.DoubleClick += delegate { ShowFromTray(); };
+            _trayIcon.BalloonTipClicked += delegate
+            {
+                ShowFromTray();
+                HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
+                using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
+            };
+        }
+
+        private void HandleMainFormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (_maintenanceRunning)
+            {
+                e.Cancel = true;
+                MessageBox.Show("A manutenção do Windows ainda está em andamento. Aguarde a conclusão antes de fechar o Neck.", "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (!_allowExit && e.CloseReason == CloseReason.UserClosing && _backgroundCheck.Checked)
+            {
+                e.Cancel = true;
+                Hide();
+                if (!_trayHintShown)
+                {
+                    _trayHintShown = true;
+                    _trayIcon.ShowBalloonTip(3000, "Neck continua cuidando", "O monitoramento ficou ativo na bandeja. Clique duas vezes no ícone para voltar.", ToolTipIcon.Info);
+                }
+                return;
+            }
+            _closing = true;
+            _statusTimer.Stop();
+            _guardMonitorTimer.Stop();
+        }
+
+        private void ShowFromTray()
+        {
+            if (_closing || IsDisposed) return;
+            Show();
+            WindowState = FormWindowState.Normal;
+            Activate();
+        }
+
+        private void CaptureGuardSample()
+        {
+            if (_closing || IsDisposed || _busy) return;
+            try
+            {
+                HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
+                _healthSnapshot = snapshot;
+                UpdateGuardView(snapshot);
+                GuardSample sample = GuardSample.FromSnapshot(snapshot);
+                _guardSamples.Add(sample);
+                _guardSamples.RemoveAll(item => item.TimestampUtc < DateTime.UtcNow.AddHours(-24));
+                _guardHistory.Append(sample);
+                if (DateTime.UtcNow - _lastHistoryCompactUtc >= TimeSpan.FromHours(1))
+                {
+                    _guardHistory.Compact(_guardSamples);
+                    _lastHistoryCompactUtc = DateTime.UtcNow;
+                }
+                UpdateTrayState(snapshot);
+                ShowGuardAlertIfNeeded(_guardDetector.Evaluate(_guardSamples));
+            }
+            catch { }
+        }
+
+        private void UpdateTrayState(HealthSnapshot snapshot)
+        {
+            if (snapshot == null || _trayIcon.ContextMenuStrip == null) return;
+            if (_meetingActive)
+            {
+                _trayIcon.Icon = _trayStableIcon;
+                _trayIcon.Text = "Neck Guard — Modo Reunião protegido";
+                ToolStripItem protectedStatus = _trayIcon.ContextMenuStrip.Items["status"];
+                if (protectedStatus != null) protectedStatus.Text = "Modo Reunião • protegido até " + _meetingEndsAt.ToString("HH:mm");
+                return;
+            }
+            string state = snapshot.Level == HealthLevel.Critical ? "Crítico" : snapshot.Level == HealthLevel.Warning ? "Atenção" : "Estável";
+            _trayIcon.Icon = snapshot.Level == HealthLevel.Critical ? SystemIcons.Error :
+                             snapshot.Level == HealthLevel.Warning ? SystemIcons.Warning :
+                             _trayStableIcon;
+            string text = "Neck Guard — " + state + " — RAM " + snapshot.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "%";
+            _trayIcon.Text = text.Length > 63 ? text.Substring(0, 63) : text;
+            ToolStripItem status = _trayIcon.ContextMenuStrip.Items["status"];
+            if (status != null) status.Text = state + " • RAM " + snapshot.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "%";
+        }
+
+        private void ShowGuardAlertIfNeeded(GuardAlert alert)
+        {
+            if (alert == null || alert.Kind == GuardAlertKind.None || !_guardSettings.Notifications || _meetingActive) return;
+            if (_guardSettings.SilentUntilUtc > DateTime.UtcNow) return;
+            if (_guardSettings.SilenceFullscreen && SystemInfo.IsForegroundWindowFullScreen()) return;
+            if (DateTime.UtcNow - _lastAlertUtc < TimeSpan.FromMinutes(10)) return;
+            if (alert.Kind == _lastAlertKind && DateTime.UtcNow - _lastAlertUtc < TimeSpan.FromMinutes(30)) return;
+            _lastAlertKind = alert.Kind;
+            _lastAlertUtc = DateTime.UtcNow;
+            _trayIcon.ShowBalloonTip(6000, alert.Title, alert.Message + " Clique para abrir o diagnóstico.",
+                alert.Kind == GuardAlertKind.LowDisk ? ToolTipIcon.Warning : ToolTipIcon.Info);
+        }
+
+        internal void ForceCloseForTesting()
+        {
+            _allowExit = true;
+            Close();
         }
 
         private Control BuildActivityCard()
@@ -787,6 +975,7 @@ namespace Neck
             try
             {
                 ScanResult result = await Task.Run(delegate { return Cleaner.Analyze(); });
+                if (_closing || IsDisposed) return;
                 _analyzedBytes = result.TotalBytes;
                 _analysisValue.Text = FormatBytes(result.TotalBytes);
                 _analysisValue.ForeColor = result.TotalBytes > 512L * 1024 * 1024 ? Theme.Green : Theme.Text;
@@ -800,11 +989,12 @@ namespace Neck
             }
             catch (Exception ex)
             {
+                if (_closing || IsDisposed) return;
                 AppendLog("Falha na análise: " + ex.Message);
             }
             finally
             {
-                SetBusy(false, null);
+                if (!_closing && !IsDisposed) SetBusy(false, null);
             }
         }
 
@@ -831,6 +1021,7 @@ namespace Neck
                 return;
 
             SetBusy(true, "Executando manutenção...");
+            _maintenanceRunning = true;
             _log.Clear();
             AppendLog("MANUTENÇÃO — " + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
             StringBuilder report = new StringBuilder();
@@ -948,6 +1139,7 @@ namespace Neck
             }
             finally
             {
+                _maintenanceRunning = false;
                 SetBusy(false, null);
             }
         }
@@ -966,6 +1158,7 @@ namespace Neck
 
         private void SetBusy(bool busy, string status)
         {
+            if (_closing || IsDisposed || Disposing) return;
             _busy = busy;
             _analyzeButton.Enabled = !busy && !_meetingActive;
             _runButton.Enabled = !busy && !_meetingActive;
@@ -981,14 +1174,24 @@ namespace Neck
 
         private void AppendLog(string line)
         {
+            if (_closing || IsDisposed || Disposing || _log.IsDisposed) return;
             if (InvokeRequired)
             {
-                BeginInvoke(new Action<string>(AppendLog), line);
+                try
+                {
+                    if (IsHandleCreated) BeginInvoke(new Action<string>(AppendLog), line);
+                }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
                 return;
             }
-            _log.AppendText("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + line + Environment.NewLine);
-            _log.SelectionStart = _log.TextLength;
-            _log.ScrollToCaret();
+            try
+            {
+                _log.AppendText("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + line + Environment.NewLine);
+                _log.SelectionStart = _log.TextLength;
+                _log.ScrollToCaret();
+            }
+            catch (ObjectDisposedException) { }
         }
 
         internal static string FormatBytes(long bytes)
@@ -1537,6 +1740,7 @@ namespace Neck
     {
         private readonly RichTextBox _versions = new RichTextBox();
         private readonly Button _restoreButton = new Button();
+        private bool _closing;
 
         public DriverCenterForm()
         {
@@ -1549,6 +1753,7 @@ namespace Neck
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
             BuildInterface();
             Shown += async delegate { await LoadVersionsAsync(); };
+            FormClosing += delegate { _closing = true; };
         }
 
         private void BuildInterface()
@@ -1650,6 +1855,7 @@ namespace Neck
                 return ProcessRunner.Run(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
                     "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + command.Replace("\"", "\\\"") + "\"", 120000);
             });
+            if (_closing || IsDisposed || _versions.IsDisposed) return;
             _versions.Text = string.IsNullOrWhiteSpace(result.Output) ? "Não foi possível consultar as versões instaladas." : result.Output.Trim();
         }
 
@@ -1665,13 +1871,17 @@ namespace Neck
                     return ProcessRunner.Run(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
                         "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + script + "\"", 180000);
                 });
+                if (_closing || IsDisposed) return;
                 MessageBox.Show(result.ExitCode == 0 ? "Ponto de restauração criado." : "O Windows não criou o ponto de restauração. A Proteção do Sistema pode estar desativada.\n\n" + result.Output,
                     "Neck", MessageBoxButtons.OK, result.ExitCode == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             }
             finally
             {
-                _restoreButton.Enabled = true;
-                _restoreButton.Text = "Criar ponto de restauração";
+                if (!_closing && !IsDisposed && !_restoreButton.IsDisposed)
+                {
+                    _restoreButton.Enabled = true;
+                    _restoreButton.Text = "Criar ponto de restauração";
+                }
             }
         }
 
@@ -1896,289 +2106,4 @@ namespace Neck
         }
     }
 
-    internal struct MemoryStatus
-    {
-        public double PercentUsed;
-        public ulong AvailableBytes;
-    }
-
-    internal enum HealthLevel
-    {
-        Stable,
-        Warning,
-        Critical
-    }
-
-    internal sealed class ResourceProcess
-    {
-        public string DisplayName;
-        public int ProcessCount;
-        public long MemoryBytes;
-    }
-
-    internal sealed class HealthSnapshot
-    {
-        public int Score;
-        public HealthLevel Level;
-        public string Title = "Diagnóstico indisponível";
-        public string Summary = "Não foi possível concluir a leitura agora.";
-        public MemoryStatus Memory;
-        public long DiskFreeBytes;
-        public long DiskTotalBytes;
-        public List<ResourceProcess> TopProcesses = new List<ResourceProcess>();
-    }
-
-    internal enum MeetingCheckStatus
-    {
-        Ready,
-        Warning,
-        Risk
-    }
-
-    internal sealed class MeetingCheck
-    {
-        public MeetingCheckStatus Status;
-        public string Title;
-        public string Message;
-    }
-
-    internal sealed class MeetingPreflight
-    {
-        public HealthSnapshot Health = new HealthSnapshot();
-        public List<MeetingCheck> Checks = new List<MeetingCheck>();
-    }
-
-    internal static class SystemInfo
-    {
-        public static MemoryStatus GetMemoryStatus()
-        {
-            NativeMethods.MEMORYSTATUSEX data = new NativeMethods.MEMORYSTATUSEX();
-            data.dwLength = (uint)Marshal.SizeOf(typeof(NativeMethods.MEMORYSTATUSEX));
-            if (!NativeMethods.GlobalMemoryStatusEx(ref data)) return new MemoryStatus();
-            return new MemoryStatus { PercentUsed = data.dwMemoryLoad, AvailableBytes = data.ullAvailPhys };
-        }
-
-        public static HealthSnapshot GetHealthSnapshot()
-        {
-            HealthSnapshot snapshot = new HealthSnapshot();
-            snapshot.Memory = GetMemoryStatus();
-
-            try
-            {
-                string root = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
-                DriveInfo drive = new DriveInfo(root);
-                snapshot.DiskFreeBytes = drive.AvailableFreeSpace;
-                snapshot.DiskTotalBytes = drive.TotalSize;
-            }
-            catch { }
-
-            Dictionary<string, ResourceProcess> grouped = new Dictionary<string, ResourceProcess>(StringComparer.OrdinalIgnoreCase);
-            string currentName = Process.GetCurrentProcess().ProcessName;
-            foreach (Process process in Process.GetProcesses())
-            {
-                using (process)
-                {
-                    try
-                    {
-                        string name = process.ProcessName;
-                        if (string.Equals(name, currentName, StringComparison.OrdinalIgnoreCase)) continue;
-                        long memory = Math.Max(0, process.WorkingSet64);
-                        ResourceProcess item;
-                        if (!grouped.TryGetValue(name, out item))
-                        {
-                            item = new ResourceProcess { DisplayName = FriendlyProcessName(name) };
-                            grouped.Add(name, item);
-                        }
-                        item.ProcessCount++;
-                        item.MemoryBytes += memory;
-                    }
-                    catch { }
-                }
-            }
-            snapshot.TopProcesses = grouped.Values.OrderByDescending(item => item.MemoryBytes).Take(5).ToList();
-
-            bool diskCritical = snapshot.DiskTotalBytes > 0 &&
-                                (snapshot.DiskFreeBytes < 2L * 1024 * 1024 * 1024 ||
-                                 snapshot.DiskFreeBytes * 100 / snapshot.DiskTotalBytes < 5);
-            bool diskWarning = snapshot.DiskTotalBytes > 0 && snapshot.DiskFreeBytes < 15L * 1024 * 1024 * 1024;
-            if (snapshot.Memory.PercentUsed >= 90 || diskCritical)
-                snapshot.Level = HealthLevel.Critical;
-            else if (snapshot.Memory.PercentUsed >= 75 || diskWarning)
-                snapshot.Level = HealthLevel.Warning;
-            else
-                snapshot.Level = HealthLevel.Stable;
-
-            int memoryPenalty = (int)Math.Max(0, (snapshot.Memory.PercentUsed - 55) * 1.35);
-            int diskPenalty = diskCritical ? 30 : diskWarning ? 15 : 0;
-            snapshot.Score = Math.Max(10, Math.Min(100, 100 - memoryPenalty - diskPenalty));
-            ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
-
-            if (snapshot.Level == HealthLevel.Critical)
-            {
-                snapshot.Title = "Pressão alta detectada";
-                snapshot.Summary = snapshot.Memory.PercentUsed >= 90
-                    ? "A memória está quase cheia. " + TopProcessSentence(top)
-                    : "O disco do Windows está praticamente cheio e pode deixar todo o sistema lento.";
-            }
-            else if (snapshot.Level == HealthLevel.Warning)
-            {
-                snapshot.Title = "O computador merece atenção";
-                snapshot.Summary = snapshot.Memory.PercentUsed >= 75
-                    ? "O uso de memória está elevado. " + TopProcessSentence(top)
-                    : "Há pouco espaço livre no disco do Windows; uma limpeza segura pode ajudar.";
-            }
-            else
-            {
-                snapshot.Title = "Sistema estável agora";
-                snapshot.Summary = "Não encontramos pressão crítica de memória ou disco. " + TopProcessSentence(top);
-            }
-            return snapshot;
-        }
-
-        public static MeetingPreflight GetMeetingPreflight()
-        {
-            MeetingPreflight preflight = new MeetingPreflight();
-            preflight.Health = GetHealthSnapshot();
-            HealthSnapshot health = preflight.Health;
-
-            preflight.Checks.Add(new MeetingCheck
-            {
-                Status = health.Memory.PercentUsed >= 90 ? MeetingCheckStatus.Risk :
-                         health.Memory.PercentUsed >= 75 ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
-                Title = "Memória RAM",
-                Message = health.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% em uso; " +
-                          MainForm.FormatBytes((long)health.Memory.AvailableBytes) + " disponíveis."
-            });
-
-            bool diskRisk = health.DiskTotalBytes > 0 &&
-                            (health.DiskFreeBytes < 2L * 1024 * 1024 * 1024 || health.DiskFreeBytes * 100 / health.DiskTotalBytes < 5);
-            bool diskWarning = health.DiskTotalBytes > 0 && health.DiskFreeBytes < 15L * 1024 * 1024 * 1024;
-            preflight.Checks.Add(new MeetingCheck
-            {
-                Status = diskRisk ? MeetingCheckStatus.Risk : diskWarning ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
-                Title = "Disco do Windows",
-                Message = MainForm.FormatBytes(health.DiskFreeBytes) + " livres para arquivos e memória virtual."
-            });
-
-            bool restartPending = IsRestartPending();
-            preflight.Checks.Add(new MeetingCheck
-            {
-                Status = restartPending ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
-                Title = "Reinicialização",
-                Message = restartPending ? "O Windows indica uma reinicialização pendente." : "Nenhuma reinicialização pendente foi detectada."
-            });
-
-            bool networkAvailable = false;
-            try { networkAvailable = System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable(); }
-            catch { }
-            preflight.Checks.Add(new MeetingCheck
-            {
-                Status = networkAvailable ? MeetingCheckStatus.Ready : MeetingCheckStatus.Warning,
-                Title = "Rede",
-                Message = networkAvailable ? "Uma conexão de rede ativa foi detectada." : "Nenhuma conexão de rede ativa foi detectada."
-            });
-
-            PowerStatus power = SystemInformation.PowerStatus;
-            bool onBattery = power.PowerLineStatus == PowerLineStatus.Offline;
-            string powerMessage;
-            if (onBattery)
-            {
-                int battery = power.BatteryLifePercent >= 0 && power.BatteryLifePercent <= 1
-                    ? (int)Math.Round(power.BatteryLifePercent * 100) : 0;
-                powerMessage = "Usando bateria" + (battery > 0 ? " com " + battery + "% de carga." : ".");
-            }
-            else if (power.PowerLineStatus == PowerLineStatus.Online)
-                powerMessage = "O computador está conectado à energia.";
-            else
-                powerMessage = "Estado de energia não aplicável ou não informado.";
-            preflight.Checks.Add(new MeetingCheck
-            {
-                Status = onBattery ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
-                Title = "Energia",
-                Message = powerMessage
-            });
-
-            ResourceProcess top = health.TopProcesses.FirstOrDefault();
-            bool heavy = top != null && top.MemoryBytes >= 3L * 1024 * 1024 * 1024;
-            preflight.Checks.Add(new MeetingCheck
-            {
-                Status = heavy ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
-                Title = "Aplicativos pesados",
-                Message = top == null ? "Nenhum aplicativo pôde ser comparado." :
-                          top.DisplayName + " lidera o uso com aproximadamente " + MainForm.FormatBytes(top.MemoryBytes) + "."
-            });
-            return preflight;
-        }
-
-        private static bool IsRestartPending()
-        {
-            try
-            {
-                using (Microsoft.Win32.RegistryKey cbs = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"))
-                    if (cbs != null) return true;
-                using (Microsoft.Win32.RegistryKey update = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"))
-                    if (update != null) return true;
-                using (Microsoft.Win32.RegistryKey session = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    @"SYSTEM\CurrentControlSet\Control\Session Manager"))
-                    if (session != null && session.GetValue("PendingFileRenameOperations") != null) return true;
-            }
-            catch { }
-            return false;
-        }
-
-        private static string TopProcessSentence(ResourceProcess process)
-        {
-            return process == null
-                ? "Nenhum aplicativo pôde ser comparado neste momento."
-                : process.DisplayName + " é o maior consumidor de memória agora.";
-        }
-
-        private static string FriendlyProcessName(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name)) return "Processo desconhecido";
-            if (string.Equals(name, "msedge", StringComparison.OrdinalIgnoreCase)) return "Microsoft Edge";
-            if (string.Equals(name, "chrome", StringComparison.OrdinalIgnoreCase)) return "Google Chrome";
-            if (string.Equals(name, "firefox", StringComparison.OrdinalIgnoreCase)) return "Mozilla Firefox";
-            if (string.Equals(name, "explorer", StringComparison.OrdinalIgnoreCase)) return "Explorador do Windows";
-            if (string.Equals(name, "Teams", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "ms-teams", StringComparison.OrdinalIgnoreCase)) return "Microsoft Teams";
-            if (string.Equals(name, "Code", StringComparison.OrdinalIgnoreCase)) return "Visual Studio Code";
-            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(name.Replace('_', ' '));
-        }
-    }
-
-    internal static class NativeMethods
-    {
-        public const uint SHERB_NOCONFIRMATION = 0x00000001;
-        public const uint SHERB_NOPROGRESSUI = 0x00000002;
-        public const uint SHERB_NOSOUND = 0x00000004;
-        public const uint ES_CONTINUOUS = 0x80000000;
-        public const uint ES_SYSTEM_REQUIRED = 0x00000001;
-        public const uint ES_DISPLAY_REQUIRED = 0x00000002;
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-        public struct MEMORYSTATUSEX
-        {
-            public uint dwLength;
-            public uint dwMemoryLoad;
-            public ulong ullTotalPhys;
-            public ulong ullAvailPhys;
-            public ulong ullTotalPageFile;
-            public ulong ullAvailPageFile;
-            public ulong ullTotalVirtual;
-            public ulong ullAvailVirtual;
-            public ulong ullAvailExtendedVirtual;
-        }
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern uint SetThreadExecutionState(uint esFlags);
-
-        [DllImport("Shell32.dll", CharSet = CharSet.Unicode)]
-        public static extern int SHEmptyRecycleBin(IntPtr hwnd, string pszRootPath, uint dwFlags);
-    }
 }

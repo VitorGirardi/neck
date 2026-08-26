@@ -38,7 +38,7 @@ namespace Neck
                         preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
                         Console.WriteLine("UIPreview=" + previewPath);
                     }
-                    form.Close();
+                    form.ForceCloseForTesting();
                 }
                 using (MaintenanceOptionsForm options = new MaintenanceOptionsForm(true, true, false, true, false, true))
                 {
@@ -89,6 +89,37 @@ namespace Neck
                     }
                     meetingForm.Close();
                 }
+                System.Collections.Generic.List<GuardSample> synthetic = new System.Collections.Generic.List<GuardSample>();
+                for (int i = 0; i < 6; i++)
+                {
+                    synthetic.Add(new GuardSample
+                    {
+                        TimestampUtc = DateTime.UtcNow.AddSeconds(-30 * (5 - i)),
+                        MemoryPercent = 90,
+                        AvailableBytes = 1024L * 1024 * 1024,
+                        DiskFreeBytes = 100L * 1024 * 1024 * 1024,
+                        TopProcess = "Aplicativo de teste",
+                        TopProcessBytes = 4L * 1024 * 1024 * 1024
+                    });
+                }
+                GuardAlert syntheticAlert = new GuardPressureDetector().Evaluate(synthetic);
+                if (syntheticAlert.Kind != GuardAlertKind.MemoryPressure) throw new InvalidOperationException("Pressão persistente não detectada.");
+                using (GuardHistoryForm history = new GuardHistoryForm(synthetic, System.IO.Path.GetTempPath()))
+                {
+                    history.ShowInTaskbar = false;
+                    history.StartPosition = FormStartPosition.Manual;
+                    history.Location = new System.Drawing.Point(-32000, -32000);
+                    history.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(history.Width, history.Height))
+                    {
+                        history.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, history.Width, history.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.History.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("HistoryPreview=" + previewPath);
+                    }
+                    history.Close();
+                }
                 Console.WriteLine("SELF_TEST_OK");
                 Console.WriteLine("TempBytes=" + result.TempBytes);
                 Console.WriteLine("TempFiles=" + result.TempFiles);
@@ -101,6 +132,7 @@ namespace Neck
                 Console.WriteLine("ObservedProcessGroups=" + health.TopProcesses.Count);
                 Console.WriteLine("HealthScanMilliseconds=" + healthTimer.ElapsedMilliseconds);
                 Console.WriteLine("MeetingChecks=" + meeting.Checks.Count);
+                Console.WriteLine("SyntheticGuardAlert=" + syntheticAlert.Kind);
                 return 0;
             }
             catch (Exception ex)

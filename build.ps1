@@ -32,8 +32,12 @@ $arguments = @(
     '/reference:System.Core.dll'
     '/reference:System.Drawing.dll'
     '/reference:System.Windows.Forms.dll'
-    (Join-Path $PSScriptRoot 'Program.cs')
 )
+$sourceFiles = Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.cs' |
+    Where-Object { $_.Name -ne 'SelfTest.cs' } |
+    Sort-Object Name |
+    ForEach-Object { $_.FullName }
+$arguments += $sourceFiles
 
 & $compiler $arguments
 if ($LASTEXITCODE -ne 0) {

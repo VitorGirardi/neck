@@ -10,6 +10,12 @@ O diagnóstico inteligente observa o uso de memória, o espaço livre no disco d
 
 Antes de uma apresentação, o Neck verifica RAM, disco, reinicialização pendente, rede, energia e aplicativos pesados. Durante o período escolhido, ele impede que o computador ou a tela entrem em suspensão e pausa as próprias rotinas de manutenção. A proteção é temporária e totalmente reversível.
 
+## Guard contínuo (v0.5)
+
+O monitoramento na bandeja é opcional e mede o computador a cada 30 segundos. O Neck mantém somente as últimas 24 horas em `%LOCALAPPDATA%\Neck`, exibe alertas após pressão persistente — nunca por um pico isolado — e reconhece crescimento anormal do maior consumidor de memória. As notificações podem ser silenciadas por duas horas e são evitadas quando outro aplicativo está em tela cheia.
+
+Nenhuma métrica é enviada pela internet. O histórico contém horário, uso geral de RAM e disco e o nome/consumo agregado do processo mais pesado.
+
 O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Proteções adotadas
@@ -25,6 +31,7 @@ O projeto ainda está em fase inicial. Revise o relatório apresentado pelo apli
 
 - **Neck Guard:** apresenta uma pontuação de saúde e identifica os maiores consumidores de memória.
 - **Modo Reunião:** executa uma checagem prévia e mantém computador e tela acordados por 30, 60 ou 120 minutos.
+- **Guard contínuo:** pode continuar na bandeja, mantém histórico local de 24 horas e alerta apenas sobre problemas persistentes.
 - **Limpeza rápida:** remove somente temporários seguros e relatórios antigos.
 - **Manutenção completa:** mantém as opções técnicas em uma tela separada e explicada.
 - **Drivers e Windows Update:** mostra versões instaladas e abre apenas fontes oficiais.

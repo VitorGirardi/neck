@@ -18,13 +18,17 @@ $common = @(
     '/reference:System.Windows.Forms.dll'
     "/win32icon:$iconPath"
 )
+$applicationSources = Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.cs' |
+    Where-Object { $_.Name -ne 'SelfTest.cs' } |
+    Sort-Object Name |
+    ForEach-Object { $_.FullName }
 
 $selfTest = Join-Path $testDirectory 'Neck.SelfTest.exe'
 $selfArguments = $common + @(
     '/target:exe'
     '/main:Neck.SelfTest'
     "/out:$selfTest"
-    (Join-Path $PSScriptRoot 'Program.cs')
+    $applicationSources
     (Join-Path $PSScriptRoot 'SelfTest.cs')
 )
 & $compiler $selfArguments
@@ -38,7 +42,7 @@ $uiArguments = $common + @(
     '/define:NOELEVATION'
     '/main:Neck.Program'
     "/out:$uiProbe"
-    (Join-Path $PSScriptRoot 'Program.cs')
+    $applicationSources
 )
 & $compiler $uiArguments
 if ($LASTEXITCODE -ne 0) { throw 'Falha ao compilar a verificação visual.' }
