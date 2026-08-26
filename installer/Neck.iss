@@ -54,4 +54,3 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Abrir o Neck"; Flags: nowait po
 
 [UninstallRun]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--remove-startup"; Flags: runhidden; RunOnceId: "RemoveNeckStartup"
-
