@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.2.0.0")]
 
 namespace Neck
 {
@@ -161,6 +161,7 @@ namespace Neck
         private readonly CheckBox _drivesCheck = new CheckBox();
         private readonly Timer _statusTimer = new Timer();
         private readonly Timer _guardMonitorTimer = new Timer();
+        private readonly Timer _adaptiveTimer = new Timer();
         private readonly NotifyIcon _trayIcon = new NotifyIcon();
         private Icon _trayStableIcon;
         private readonly GuardHistoryStore _guardHistory = new GuardHistoryStore();
@@ -215,6 +216,14 @@ namespace Neck
             _guardMonitorTimer.Interval = 30000;
             _guardMonitorTimer.Tick += delegate { CaptureGuardSample(); };
             _guardMonitorTimer.Start();
+            _adaptiveTimer.Interval = 2000;
+            _adaptiveTimer.Tick += delegate
+            {
+                if (_closing) return;
+                try { EfficiencyModeManager.RefreshAdaptiveModes(); }
+                catch { }
+            };
+            _adaptiveTimer.Start();
 
             if (!startHidden)
             {
@@ -241,6 +250,7 @@ namespace Neck
                 if (_meetingActive) NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
                 _statusTimer.Stop();
                 _guardMonitorTimer.Stop();
+                _adaptiveTimer.Stop();
                 EfficiencyModeManager.RestoreAll();
                 _trayIcon.Visible = false;
                 _trayIcon.Icon = null;
@@ -579,15 +589,15 @@ namespace Neck
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
             menu.Items.Add("SOS Neck", null, delegate { ShowFromTray(); OpenSos(); });
-            menu.Items.Add("Restaurar todos os Modos Leves", null, async delegate
+            menu.Items.Add("Desativar todo o Neck Adaptive", null, async delegate
             {
                 if (EfficiencyModeManager.ActiveCount == 0)
                 {
-                    _trayIcon.ShowBalloonTip(2500, "Neck", "Nenhum Modo Leve está ativo.", ToolTipIcon.Info);
+                    _trayIcon.ShowBalloonTip(2500, "Neck Adaptive", "Nenhum aplicativo está sob otimização adaptativa.", ToolTipIcon.Info);
                     return;
                 }
                 EfficiencyModeResult result = await Task.Run(delegate { return EfficiencyModeManager.RestoreAll(); });
-                _trayIcon.ShowBalloonTip(3000, "Neck", "Desempenho normal restaurado em " + result.ProcessesChanged + " processo(s).", ToolTipIcon.Info);
+                _trayIcon.ShowBalloonTip(3000, "Neck Adaptive", "Configurações originais restauradas em " + result.ProcessesChanged + " processo(s).", ToolTipIcon.Info);
             });
             menu.Items.Add("Abrir diagnóstico", null, delegate
             {
@@ -654,6 +664,7 @@ namespace Neck
             if (_closing || IsDisposed || _busy) return;
             using (SosForm form = new SosForm()) form.ShowDialog(this);
             UpdateSystemStatus();
+            UpdateGuardView(_healthSnapshot);
         }
 
         private void ShowPreferences(bool firstRun)
@@ -763,6 +774,7 @@ namespace Neck
             _closing = true;
             _statusTimer.Stop();
             _guardMonitorTimer.Stop();
+            _adaptiveTimer.Stop();
         }
 
         private void HideToTray(string message)
@@ -785,7 +797,6 @@ namespace Neck
             if (_closing || IsDisposed || _busy) return;
             try
             {
-                EfficiencyModeManager.RefreshActiveModes();
                 HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
                 _healthSnapshot = snapshot;
                 UpdateGuardView(snapshot);
@@ -1051,9 +1062,12 @@ namespace Neck
 
             _guardMessage.Text = snapshot.Summary;
             ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
-            _guardProcess.Text = top == null
+            string adaptive = EfficiencyModeManager.ActiveCount > 0
+                ? "  •  Adaptive: " + EfficiencyModeManager.ActiveCount + " app(s)"
+                : string.Empty;
+            _guardProcess.Text = (top == null
                 ? "Nenhum processo pôde ser analisado."
-                : "Maior uso: " + top.DisplayName + "  •  " + FormatBytes(top.MemoryBytes);
+                : "Maior uso: " + top.DisplayName + "  •  " + FormatBytes(top.MemoryBytes)) + adaptive;
         }
 
         private void ToggleMeetingMode()

@@ -206,14 +206,14 @@ namespace Neck
                     history.Close();
                 }
                 System.Collections.Generic.List<SosCandidate> sosCandidates = SosInspector.GetCandidates();
-                if (EfficiencyModeManager.CanTarget("svchost")) throw new InvalidOperationException("Processo protegido aceito pelo Modo Leve.");
-                if (!EfficiencyModeManager.CanTarget("NeckEfficiencyCandidate")) throw new InvalidOperationException("Candidato seguro rejeitado pelo Modo Leve.");
+                if (EfficiencyModeManager.CanTarget("svchost")) throw new InvalidOperationException("Processo protegido aceito pelo Neck Adaptive.");
+                if (!EfficiencyModeManager.CanTarget("NeckEfficiencyCandidate")) throw new InvalidOperationException("Candidato seguro rejeitado pelo Neck Adaptive.");
                 ProcessPowerThrottlingState efficiencyState = EfficiencyModeManager.CreateEfficiencyState(true);
                 if (efficiencyState.Version != 1 || efficiencyState.ControlMask != 1 || efficiencyState.StateMask != 1)
                     throw new InvalidOperationException("Estado EcoQoS inválido.");
                 EfficiencyModeResult missingMode = EfficiencyModeManager.Apply("NeckProcessThatDoesNotExist");
                 if (missingMode.HasChanges || EfficiencyModeManager.IsActive("NeckProcessThatDoesNotExist"))
-                    throw new InvalidOperationException("Modo Leve vazio permaneceu ativo.");
+                    throw new InvalidOperationException("Neck Adaptive vazio permaneceu ativo.");
                 TestEfficiencyModeRoundTrip();
                 using (SosForm sos = new SosForm())
                 {
@@ -275,11 +275,24 @@ namespace Neck
                 Thread.Sleep(500);
                 EfficiencyModeResult applied = EfficiencyModeManager.Apply("NeckEcoProbe");
                 if (!applied.HasChanges || !EfficiencyModeManager.IsActive("NeckEcoProbe"))
-                    throw new InvalidOperationException("Modo Leve não foi aplicado ao processo de teste.");
+                    throw new InvalidOperationException("Neck Adaptive não foi aplicado ao processo de teste.");
+                if (applied.MemoryPriorityChanges < 1 || EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Optimized)
+                    throw new InvalidOperationException("Neck Adaptive não reduziu a prioridade de memória do processo de teste.");
+                DateTime transitionStart = DateTime.UtcNow;
+                EfficiencyModeManager.RefreshAdaptiveModesForTesting("NeckEcoProbe", transitionStart);
+                if (EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Foreground)
+                    throw new InvalidOperationException("Neck Adaptive não restaurou o processo em primeiro plano.");
+                EfficiencyModeManager.RefreshAdaptiveModesForTesting("OutroProcesso", transitionStart.AddSeconds(1));
+                if (EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Waiting)
+                    throw new InvalidOperationException("Neck Adaptive ignorou o período de espera após a troca de foco.");
+                EfficiencyModeManager.RefreshAdaptiveModesForTesting("OutroProcesso", transitionStart.AddSeconds(17));
+                if (EfficiencyModeManager.GetState("NeckEcoProbe") != AdaptiveModeState.Optimized)
+                    throw new InvalidOperationException("Neck Adaptive não retomou a otimização em segundo plano.");
                 EfficiencyModeResult restored = EfficiencyModeManager.Restore("NeckEcoProbe");
                 if (!restored.HasChanges || EfficiencyModeManager.IsActive("NeckEcoProbe"))
-                    throw new InvalidOperationException("Modo Leve não foi restaurado no processo de teste.");
-                Console.WriteLine("EfficiencyModeRoundTrip=" + applied.ProcessesChanged + "/" + restored.ProcessesChanged);
+                    throw new InvalidOperationException("Neck Adaptive não foi restaurado no processo de teste.");
+                Console.WriteLine("AdaptiveRoundTrip=" + applied.ProcessesChanged + "/" + restored.ProcessesChanged +
+                                  "; Memory=" + applied.MemoryPriorityChanges + "/" + restored.MemoryPriorityChanges);
             }
             finally
             {

@@ -43,7 +43,7 @@ Ele foi criado para quem quer responder três perguntas simples:
 | **Meu Plano Neck** | Cruza RAM, disco, temporários, inicialização e Windows Update para escolher três prioridades. | Não executa nenhuma ação automaticamente. |
 | **Neck Guard** | Mostra a saúde do computador e os maiores consumidores de memória. | Diagnóstico somente leitura. |
 | **Guard contínuo** | Monitora a cada 30 segundos e alerta apenas sobre pressão persistente. | Histórico local limitado às últimas 24 horas. |
-| **Modo Leve** | Mantém um aplicativo aberto com menor prioridade de CPU e eficiência energética do Windows. | Temporário, reversível e restaurado ao sair do Neck. |
+| **Neck Adaptive** | Otimiza CPU, memória e energia enquanto um aplicativo permanece aberto em segundo plano. | Restaura o estado original automaticamente quando você volta a usá-lo. |
 | **SOS Neck** | Lista aplicativos visíveis que podem aliviar uma sobrecarga. | Solicita fechamento normal; nunca força processos. |
 | **Neck Boot** | Explica o que inicia com o Windows e quais itens opcionais merecem revisão. | Encaminha mudanças para a tela oficial do Windows. |
 | **Modo Reunião** | Verifica o computador e impede suspensão durante uma apresentação. | Temporário, reversível e sem manutenção concorrente. |
@@ -59,26 +59,35 @@ Em vez de apresentar dezenas de métricas, o plano personalizado transforma o di
 
 O plano pode encaminhar para SOS Neck, limpeza segura, Neck Boot, diagnóstico ou Windows Update. Confirmações e proteções continuam valendo em todas as etapas.
 
-## Modo Leve
+## Neck Adaptive
 
-Quando um aplicativo pesado precisa continuar aberto — como Claude, Chrome, Teams ou um editor — o Modo Leve reduz temporariamente sua disputa por CPU sem encerrar janelas ou perder trabalho.
+Quando um aplicativo pesado precisa continuar aberto — como Claude, Chrome, Teams ou um editor — o Neck Adaptive reduz seu impacto enquanto ele está em segundo plano, sem encerrar janelas ou perder trabalho.
 
 1. Abra o **SOS Neck**.
 2. Selecione o aplicativo.
-3. Clique em **Ativar Modo Leve** e confirme.
-4. Para desfazer, selecione-o novamente e clique em **Restaurar normal**.
+3. Clique em **Ativar Adaptive** e confirme.
+4. Para desfazer, selecione-o novamente e clique em **Desativar Adaptive**.
 
-O Neck aplica prioridade abaixo do normal e o mecanismo nativo de eficiência energética do Windows (EcoQoS) aos processos atuais. O Guard acompanha subprocessos novos a cada 30 segundos. O estado anterior é preservado e restaurado individualmente; ao encerrar o Neck, todos os Modos Leves restantes também são removidos.
+O estado muda sozinho conforme o uso:
 
-![Modo Leve no SOS Neck](assets/screenshots/neck-sos.png)
+- **Em uso:** CPU, memória e energia permanecem no estado original.
+- **Aguardando:** após você trocar de janela, o Neck espera 15 segundos para evitar mudanças durante um Alt+Tab rápido.
+- **Otimizado:** aplica prioridade de CPU abaixo do normal, EcoQoS e baixa prioridade de memória a todos os processos do aplicativo.
+- Ao retornar à janela, o Neck restaura os três controles em até 2 segundos.
+
+Subprocessos novos também são detectados. Cada valor anterior é preservado individualmente e todos os ajustes restantes são restaurados ao encerrar o Neck.
+
+A implementação utiliza as APIs documentadas [`SetProcessInformation`](https://learn.microsoft.com/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessinformation) e [`MEMORY_PRIORITY_INFORMATION`](https://learn.microsoft.com/windows/win32/api/processthreadsapi/ns-processthreadsapi-memory_priority_information) do Windows.
+
+![Neck Adaptive no SOS Neck](assets/screenshots/neck-sos.png)
 
 > [!NOTE]
-> O Modo Leve alivia disputa por processamento, consumo e temperatura. Ele não “cria RAM” nem reduz imediatamente toda a memória que o aplicativo já reservou, e pode deixá-lo um pouco menos responsivo enquanto estiver ativo.
+> O Neck Adaptive ajuda o Windows a priorizar o que você está usando. Baixa prioridade de memória não apaga dados: ela orienta o Windows a retirar primeiro essas páginas quando houver pressão. Ao retornar ao aplicativo, algumas informações podem precisar ser carregadas novamente.
 
 ## Segurança por padrão
 
 - Não usa “limpeza de RAM” artificial nem encerra processos em massa.
-- Não aplica o Modo Leve a componentes críticos do Windows nem ao próprio Neck.
+- Não aplica o Neck Adaptive a componentes críticos do Windows nem ao próprio Neck.
 - Não aplica ajustes genéricos no Registro para prometer desempenho.
 - Não apaga documentos, fotos, downloads, senhas ou dados de navegadores.
 - Não esvazia a Lixeira sem uma seleção explícita.
@@ -96,11 +105,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.1.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.2.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.1.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.2.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -159,7 +168,7 @@ Program.cs                 Interface principal e manutenção segura
 SystemMonitoring.cs        Diagnóstico de memória, disco e reunião
 GuardMonitoring.cs         Monitoramento contínuo, histórico e bandeja
 SosMode.cs                 Alívio seguro de sobrecarga
-EfficiencyMode.cs          Prioridade reversível e EcoQoS por aplicativo
+EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
 StartupAnalysis.cs         Análise somente leitura da inicialização
 PersonalPlan.cs            Motor e interface das três prioridades
 ElevatedOperations.cs      Executor administrativo com lista fechada
@@ -192,7 +201,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] SOS Neck e privilégios sob demanda
 - [x] Instalador, preferências e checksums
 - [x] Neck Boot e Meu Plano Neck
-- [x] Modo Leve reversível por aplicativo
+- [x] Neck Adaptive com foco, EcoQoS e prioridade de memória
 - [ ] Assinatura digital dos binários
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface

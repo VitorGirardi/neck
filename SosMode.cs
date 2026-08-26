@@ -107,7 +107,7 @@ namespace Neck
 
         public SosForm()
         {
-            Text = "SOS Neck — alívio seguro";
+            Text = "SOS Neck — Adaptive";
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(880, 700);
             MinimumSize = new Size(800, 640);
@@ -145,7 +145,7 @@ namespace Neck
             header.Controls.Add(badge);
             header.Controls.Add(new Label
             {
-                Text = "Alívio seguro, sem força bruta",
+                Text = "Neck Adaptive — potência sob controle",
                 AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
                 ForeColor = Color.White,
@@ -153,7 +153,7 @@ namespace Neck
             });
             header.Controls.Add(new Label
             {
-                Text = "Escolha uma ação. O Neck nunca força o encerramento de um aplicativo.",
+                Text = "Otimiza tarefas pesadas em segundo plano e devolve desempenho quando você volta a usá-las.",
                 AutoSize = true,
                 Font = Theme.Body,
                 ForeColor = Color.FromArgb(186, 199, 218),
@@ -184,7 +184,7 @@ namespace Neck
             Label explanation = new Label
             {
                 Dock = DockStyle.Fill,
-                Text = "Aplicativos com janela aberta, ordenados pelo uso aproximado de memória:",
+                Text = "Aplicativos com janela aberta. O estado muda entre Em uso, Aguardando e Otimizado:",
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
                 TextAlign = ContentAlignment.MiddleLeft
@@ -206,13 +206,13 @@ namespace Neck
             _applications.SelectedIndexChanged += delegate { UpdateSelectionState(); };
 
             _result.Dock = DockStyle.Fill;
-            _result.Text = "Selecione um aplicativo somente se você tiver salvo seu trabalho.";
+            _result.Text = "Selecione uma tarefa pesada para mantê-la aberta com otimização adaptativa.";
             _result.Font = Theme.Small;
             _result.ForeColor = Theme.Muted;
             _result.TextAlign = ContentAlignment.MiddleLeft;
 
             FlowLayoutPanel footer = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0, 12, 0, 0) };
-            ConfigureButton(_lightMode, "Ativar Modo Leve", Theme.Green, 150);
+            ConfigureButton(_lightMode, "Ativar Adaptive", Theme.Green, 150);
             ConfigureButton(_closeApplication, "Pedir fechamento", Color.FromArgb(185, 28, 28), 145);
             ConfigureButton(_clean, "Limpeza segura", Theme.Blue, 130);
             ConfigureButton(_taskManager, "Gerenciador", Theme.NavySoft, 145);
@@ -253,7 +253,7 @@ namespace Neck
                 ListViewItem item = new ListViewItem(candidate.DisplayName) { Tag = candidate };
                 item.SubItems.Add(candidate.ProcessCount.ToString(CultureInfo.CurrentCulture));
                 item.SubItems.Add(MainForm.FormatBytes(candidate.MemoryBytes));
-                item.SubItems.Add(EfficiencyModeManager.IsActive(candidate.ProcessName) ? "Leve" : "Normal");
+                item.SubItems.Add(EfficiencyModeManager.GetStateLabel(candidate.ProcessName));
                 _applications.Items.Add(item);
             }
             UpdateSelectionState();
@@ -268,14 +268,14 @@ namespace Neck
             bool active = EfficiencyModeManager.IsActive(candidate.ProcessName);
             if (!active)
             {
-                string warning = "O " + candidate.DisplayName + " continuará aberto, mas receberá menos prioridade de CPU e o modo de eficiência do Windows.\n\n" +
-                                 "Isso reduz a disputa por processamento, energia e temperatura. Não libera a RAM já usada imediatamente e pode deixar o aplicativo um pouco menos responsivo.\n\n" +
-                                 "Você poderá restaurar o desempenho normal a qualquer momento.";
-                if (MessageBox.Show(warning, "Ativar Modo Leve em " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
+                string warning = candidate.DisplayName + " continuará aberto. Quando estiver em segundo plano, o Neck reduzirá sua prioridade de CPU, ativará EcoQoS e marcará sua memória como baixa prioridade.\n\n" +
+                                 "Ao voltar para o aplicativo, CPU, memória e energia retornam automaticamente ao estado original em até 2 segundos. Ao sair novamente, a otimização retorna após 15 segundos.\n\n" +
+                                 "Isso ajuda o Windows sob pressão, mas dados já retirados da RAM podem precisar ser carregados novamente.";
+                if (MessageBox.Show(warning, "Ativar Neck Adaptive em " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
                     MessageBoxIcon.Information) != DialogResult.OK) return;
             }
 
-            SetBusy(true, active ? "Restaurando o desempenho normal..." : "Ativando o Modo Leve...");
+            SetBusy(true, active ? "Desativando o Neck Adaptive..." : "Ativando otimização adaptativa...");
             try
             {
                 EfficiencyModeResult result = await Task.Run(delegate
@@ -288,17 +288,17 @@ namespace Neck
                 {
                     _result.Text = result.ProcessesChanged > 0
                         ? candidate.DisplayName + " voltou ao modo normal em " + result.ProcessesChanged + " processo(s)."
-                        : "O Modo Leve de " + candidate.DisplayName + " foi removido; os processos anteriores já não estavam disponíveis.";
+                        : "O Neck Adaptive foi desativado para " + candidate.DisplayName + "; os processos anteriores já não estavam disponíveis.";
                 }
                 else if (result.ProcessesChanged > 0)
                 {
-                    _result.Text = "Modo Leve ativo em " + result.ProcessesChanged + " processo(s) de " + candidate.DisplayName +
-                                   ". O aplicativo continua aberto e o Neck acompanhará novos processos.";
+                    _result.Text = "Neck Adaptive ativo em " + result.ProcessesChanged + " processo(s) de " + candidate.DisplayName +
+                                   ": CPU, EcoQoS e " + result.MemoryPriorityChanges + " ajuste(s) de memória. O aplicativo continua aberto.";
                     if (result.AccessErrors > 0) _result.Text += " Alguns processos protegidos não aceitaram a alteração.";
                 }
                 else
                 {
-                    _result.Text = "O Windows não permitiu otimizar " + candidate.DisplayName + ". Nenhuma configuração foi deixada ativa.";
+                    _result.Text = "O Windows não permitiu otimizar " + candidate.DisplayName + ". Nenhuma configuração adaptativa foi deixada ativa.";
                 }
 
                 RefreshSnapshot();
@@ -306,7 +306,7 @@ namespace Neck
             }
             catch (Exception ex)
             {
-                if (!_closing && !IsDisposed) _result.Text = "Não foi possível alterar o Modo Leve: " + ex.Message;
+                if (!_closing && !IsDisposed) _result.Text = "Não foi possível alterar o Neck Adaptive: " + ex.Message;
             }
             finally
             {
@@ -391,14 +391,14 @@ namespace Neck
             _lightMode.Enabled = selected;
             if (!selected)
             {
-                _lightMode.Text = "Ativar Modo Leve";
+                _lightMode.Text = "Ativar Adaptive";
                 _lightMode.BackColor = Theme.Green;
                 return;
             }
 
             SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
             bool active = candidate != null && EfficiencyModeManager.IsActive(candidate.ProcessName);
-            _lightMode.Text = active ? "Restaurar normal" : "Ativar Modo Leve";
+            _lightMode.Text = active ? "Desativar Adaptive" : "Ativar Adaptive";
             _lightMode.BackColor = active ? Theme.Amber : Theme.Green;
         }
 
