@@ -33,6 +33,11 @@ namespace Neck
             "smss", "spoolsv", "StartMenuExperienceHost", "svchost", "System", "TextInputHost", "wininit", "winlogon"
         };
 
+        public static bool IsProtectedProcessName(string processName)
+        {
+            return string.IsNullOrWhiteSpace(processName) || ProtectedNames.Contains(processName);
+        }
+
         public static List<SosCandidate> GetCandidates()
         {
             Dictionary<string, SosCandidate> grouped = new Dictionary<string, SosCandidate>(StringComparer.OrdinalIgnoreCase);
@@ -44,7 +49,7 @@ namespace Neck
                     try
                     {
                         string name = process.ProcessName;
-                        if (string.Equals(name, current, StringComparison.OrdinalIgnoreCase) || ProtectedNames.Contains(name)) continue;
+                        if (string.Equals(name, current, StringComparison.OrdinalIgnoreCase) || IsProtectedProcessName(name)) continue;
                         SosCandidate candidate;
                         if (!grouped.TryGetValue(name, out candidate))
                         {
@@ -68,7 +73,7 @@ namespace Neck
         public static SosCloseResult RequestGracefulClose(string processName)
         {
             SosCloseResult result = new SosCloseResult();
-            if (string.IsNullOrWhiteSpace(processName) || ProtectedNames.Contains(processName) ||
+            if (IsProtectedProcessName(processName) ||
                 string.Equals(processName, Process.GetCurrentProcess().ProcessName, StringComparison.OrdinalIgnoreCase))
                 return result;
 
@@ -92,6 +97,7 @@ namespace Neck
         private readonly ListView _applications = new ListView();
         private readonly Label _result = new Label();
         private readonly Label _memory = new Label();
+        private readonly Button _lightMode = new Button();
         private readonly Button _closeApplication = new Button();
         private readonly Button _clean = new Button();
         private readonly Button _taskManager = new Button();
@@ -193,10 +199,11 @@ namespace Neck
             _applications.ForeColor = Theme.Text;
             _applications.Font = Theme.Body;
             _applications.HeaderStyle = ColumnHeaderStyle.Nonclickable;
-            _applications.Columns.Add("Aplicativo", 390);
-            _applications.Columns.Add("Processos", 110, HorizontalAlignment.Center);
-            _applications.Columns.Add("Memória", 170, HorizontalAlignment.Right);
-            _applications.SelectedIndexChanged += delegate { _closeApplication.Enabled = !_busy && _applications.SelectedIndices.Count == 1; };
+            _applications.Columns.Add("Aplicativo", 330);
+            _applications.Columns.Add("Processos", 100, HorizontalAlignment.Center);
+            _applications.Columns.Add("Memória", 145, HorizontalAlignment.Right);
+            _applications.Columns.Add("Modo", 100, HorizontalAlignment.Center);
+            _applications.SelectedIndexChanged += delegate { UpdateSelectionState(); };
 
             _result.Dock = DockStyle.Fill;
             _result.Text = "Selecione um aplicativo somente se você tiver salvo seu trabalho.";
@@ -205,16 +212,20 @@ namespace Neck
             _result.TextAlign = ContentAlignment.MiddleLeft;
 
             FlowLayoutPanel footer = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0, 12, 0, 0) };
-            ConfigureButton(_closeApplication, "Pedir fechamento", Color.FromArgb(185, 28, 28), 170);
-            ConfigureButton(_clean, "Limpeza segura", Theme.Blue, 150);
-            ConfigureButton(_taskManager, "Gerenciador de Tarefas", Theme.NavySoft, 210);
+            ConfigureButton(_lightMode, "Ativar Modo Leve", Theme.Green, 150);
+            ConfigureButton(_closeApplication, "Pedir fechamento", Color.FromArgb(185, 28, 28), 145);
+            ConfigureButton(_clean, "Limpeza segura", Theme.Blue, 130);
+            ConfigureButton(_taskManager, "Gerenciador", Theme.NavySoft, 145);
             Button close = new Button();
-            ConfigureButton(close, "Fechar", Theme.NavySoft, 110);
+            ConfigureButton(close, "Fechar", Theme.NavySoft, 90);
+            _lightMode.Enabled = false;
             _closeApplication.Enabled = false;
+            _lightMode.Click += async delegate { await ToggleLightModeAsync(); };
             _closeApplication.Click += async delegate { await CloseSelectedAsync(); };
             _clean.Click += async delegate { await CleanAsync(); };
             _taskManager.Click += delegate { MainForm.OpenTarget("taskmgr.exe"); };
             close.Click += delegate { Close(); };
+            footer.Controls.Add(_lightMode);
             footer.Controls.Add(_closeApplication);
             footer.Controls.Add(_clean);
             footer.Controls.Add(_taskManager);
@@ -242,7 +253,64 @@ namespace Neck
                 ListViewItem item = new ListViewItem(candidate.DisplayName) { Tag = candidate };
                 item.SubItems.Add(candidate.ProcessCount.ToString(CultureInfo.CurrentCulture));
                 item.SubItems.Add(MainForm.FormatBytes(candidate.MemoryBytes));
+                item.SubItems.Add(EfficiencyModeManager.IsActive(candidate.ProcessName) ? "Leve" : "Normal");
                 _applications.Items.Add(item);
+            }
+            UpdateSelectionState();
+        }
+
+        private async Task ToggleLightModeAsync()
+        {
+            if (_busy || _applications.SelectedItems.Count != 1) return;
+            SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
+            if (candidate == null) return;
+
+            bool active = EfficiencyModeManager.IsActive(candidate.ProcessName);
+            if (!active)
+            {
+                string warning = "O " + candidate.DisplayName + " continuará aberto, mas receberá menos prioridade de CPU e o modo de eficiência do Windows.\n\n" +
+                                 "Isso reduz a disputa por processamento, energia e temperatura. Não libera a RAM já usada imediatamente e pode deixar o aplicativo um pouco menos responsivo.\n\n" +
+                                 "Você poderá restaurar o desempenho normal a qualquer momento.";
+                if (MessageBox.Show(warning, "Ativar Modo Leve em " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
+                    MessageBoxIcon.Information) != DialogResult.OK) return;
+            }
+
+            SetBusy(true, active ? "Restaurando o desempenho normal..." : "Ativando o Modo Leve...");
+            try
+            {
+                EfficiencyModeResult result = await Task.Run(delegate
+                {
+                    return active ? EfficiencyModeManager.Restore(candidate.ProcessName) : EfficiencyModeManager.Apply(candidate.ProcessName);
+                });
+                if (_closing || IsDisposed) return;
+
+                if (active)
+                {
+                    _result.Text = result.ProcessesChanged > 0
+                        ? candidate.DisplayName + " voltou ao modo normal em " + result.ProcessesChanged + " processo(s)."
+                        : "O Modo Leve de " + candidate.DisplayName + " foi removido; os processos anteriores já não estavam disponíveis.";
+                }
+                else if (result.ProcessesChanged > 0)
+                {
+                    _result.Text = "Modo Leve ativo em " + result.ProcessesChanged + " processo(s) de " + candidate.DisplayName +
+                                   ". O aplicativo continua aberto e o Neck acompanhará novos processos.";
+                    if (result.AccessErrors > 0) _result.Text += " Alguns processos protegidos não aceitaram a alteração.";
+                }
+                else
+                {
+                    _result.Text = "O Windows não permitiu otimizar " + candidate.DisplayName + ". Nenhuma configuração foi deixada ativa.";
+                }
+
+                RefreshSnapshot();
+                SelectProcess(candidate.ProcessName);
+            }
+            catch (Exception ex)
+            {
+                if (!_closing && !IsDisposed) _result.Text = "Não foi possível alterar o Modo Leve: " + ex.Message;
+            }
+            finally
+            {
+                if (!_closing && !IsDisposed) SetBusy(false, null);
             }
         }
 
@@ -309,11 +377,42 @@ namespace Neck
         {
             if (_closing || IsDisposed) return;
             _busy = busy;
-            _closeApplication.Enabled = !busy && _applications.SelectedIndices.Count == 1;
+            UpdateSelectionState();
             _clean.Enabled = !busy;
             _taskManager.Enabled = !busy;
             if (!string.IsNullOrWhiteSpace(message)) _result.Text = message;
             Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
+        }
+
+        private void UpdateSelectionState()
+        {
+            bool selected = !_busy && _applications.SelectedIndices.Count == 1;
+            _closeApplication.Enabled = selected;
+            _lightMode.Enabled = selected;
+            if (!selected)
+            {
+                _lightMode.Text = "Ativar Modo Leve";
+                _lightMode.BackColor = Theme.Green;
+                return;
+            }
+
+            SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
+            bool active = candidate != null && EfficiencyModeManager.IsActive(candidate.ProcessName);
+            _lightMode.Text = active ? "Restaurar normal" : "Ativar Modo Leve";
+            _lightMode.BackColor = active ? Theme.Amber : Theme.Green;
+        }
+
+        private void SelectProcess(string processName)
+        {
+            foreach (ListViewItem item in _applications.Items)
+            {
+                SosCandidate candidate = item.Tag as SosCandidate;
+                if (candidate == null || !string.Equals(candidate.ProcessName, processName, StringComparison.OrdinalIgnoreCase)) continue;
+                item.Selected = true;
+                item.Focused = true;
+                item.EnsureVisible();
+                break;
+            }
         }
 
         private static void ConfigureButton(Button button, string text, Color color, int width)

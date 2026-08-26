@@ -6,8 +6,13 @@ namespace Neck
 {
     internal static class SelfTest
     {
-        private static int Main()
+        private static int Main(string[] args)
         {
+            if (args != null && args.Length == 1 && args[0] == "--efficiency-helper")
+            {
+                Thread.Sleep(15000);
+                return 0;
+            }
             try
             {
                 ScanResult result = Cleaner.Analyze();
@@ -201,6 +206,15 @@ namespace Neck
                     history.Close();
                 }
                 System.Collections.Generic.List<SosCandidate> sosCandidates = SosInspector.GetCandidates();
+                if (EfficiencyModeManager.CanTarget("svchost")) throw new InvalidOperationException("Processo protegido aceito pelo Modo Leve.");
+                if (!EfficiencyModeManager.CanTarget("NeckEfficiencyCandidate")) throw new InvalidOperationException("Candidato seguro rejeitado pelo Modo Leve.");
+                ProcessPowerThrottlingState efficiencyState = EfficiencyModeManager.CreateEfficiencyState(true);
+                if (efficiencyState.Version != 1 || efficiencyState.ControlMask != 1 || efficiencyState.StateMask != 1)
+                    throw new InvalidOperationException("Estado EcoQoS inválido.");
+                EfficiencyModeResult missingMode = EfficiencyModeManager.Apply("NeckProcessThatDoesNotExist");
+                if (missingMode.HasChanges || EfficiencyModeManager.IsActive("NeckProcessThatDoesNotExist"))
+                    throw new InvalidOperationException("Modo Leve vazio permaneceu ativo.");
+                TestEfficiencyModeRoundTrip();
                 using (SosForm sos = new SosForm())
                 {
                     sos.ShowInTaskbar = false;
@@ -241,6 +255,43 @@ namespace Neck
                 Console.Error.WriteLine("SELF_TEST_FAILED");
                 Console.Error.WriteLine(ex);
                 return 1;
+            }
+        }
+
+        private static void TestEfficiencyModeRoundTrip()
+        {
+            string probePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NeckEcoProbe.exe");
+            System.Diagnostics.Process probe = null;
+            try
+            {
+                System.IO.File.Copy(Application.ExecutablePath, probePath, true);
+                probe = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = probePath,
+                    Arguments = "--efficiency-helper",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                Thread.Sleep(500);
+                EfficiencyModeResult applied = EfficiencyModeManager.Apply("NeckEcoProbe");
+                if (!applied.HasChanges || !EfficiencyModeManager.IsActive("NeckEcoProbe"))
+                    throw new InvalidOperationException("Modo Leve não foi aplicado ao processo de teste.");
+                EfficiencyModeResult restored = EfficiencyModeManager.Restore("NeckEcoProbe");
+                if (!restored.HasChanges || EfficiencyModeManager.IsActive("NeckEcoProbe"))
+                    throw new InvalidOperationException("Modo Leve não foi restaurado no processo de teste.");
+                Console.WriteLine("EfficiencyModeRoundTrip=" + applied.ProcessesChanged + "/" + restored.ProcessesChanged);
+            }
+            finally
+            {
+                EfficiencyModeManager.Restore("NeckEcoProbe");
+                if (probe != null)
+                {
+                    try { if (!probe.HasExited) probe.Kill(); }
+                    catch { }
+                    probe.Dispose();
+                }
+                try { if (System.IO.File.Exists(probePath)) System.IO.File.Delete(probePath); }
+                catch { }
             }
         }
     }

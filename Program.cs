@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
 
 namespace Neck
 {
@@ -241,6 +241,7 @@ namespace Neck
                 if (_meetingActive) NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
                 _statusTimer.Stop();
                 _guardMonitorTimer.Stop();
+                EfficiencyModeManager.RestoreAll();
                 _trayIcon.Visible = false;
                 _trayIcon.Icon = null;
                 _trayIcon.Dispose();
@@ -578,6 +579,16 @@ namespace Neck
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
             menu.Items.Add("SOS Neck", null, delegate { ShowFromTray(); OpenSos(); });
+            menu.Items.Add("Restaurar todos os Modos Leves", null, async delegate
+            {
+                if (EfficiencyModeManager.ActiveCount == 0)
+                {
+                    _trayIcon.ShowBalloonTip(2500, "Neck", "Nenhum Modo Leve está ativo.", ToolTipIcon.Info);
+                    return;
+                }
+                EfficiencyModeResult result = await Task.Run(delegate { return EfficiencyModeManager.RestoreAll(); });
+                _trayIcon.ShowBalloonTip(3000, "Neck", "Desempenho normal restaurado em " + result.ProcessesChanged + " processo(s).", ToolTipIcon.Info);
+            });
             menu.Items.Add("Abrir diagnóstico", null, delegate
             {
                 ShowFromTray();
@@ -774,6 +785,7 @@ namespace Neck
             if (_closing || IsDisposed || _busy) return;
             try
             {
+                EfficiencyModeManager.RefreshActiveModes();
                 HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
                 _healthSnapshot = snapshot;
                 UpdateGuardView(snapshot);
