@@ -21,6 +21,7 @@ namespace Neck
                 HealthSnapshot health = SystemInfo.GetHealthSnapshot();
                 healthTimer.Stop();
                 if (health.Score < 0 || health.Score > 100) throw new InvalidOperationException("Pontuação de saúde inválida.");
+                if (health.CpuPercent < 0 || health.CpuPercent > 100) throw new InvalidOperationException("Leitura de CPU inválida.");
                 MeetingPreflight meeting = SystemInfo.GetMeetingPreflight();
                 if (meeting.Checks.Count < 6) throw new InvalidOperationException("Checklist de reunião incompleto.");
                 if (ElevatedOperations.ParseTasks("health,drives").Length != 2) throw new InvalidOperationException("Plano elevado válido foi recusado.");
@@ -189,6 +190,20 @@ namespace Neck
                 }
                 GuardAlert syntheticAlert = new GuardPressureDetector().Evaluate(synthetic);
                 if (syntheticAlert.Kind != GuardAlertKind.MemoryPressure) throw new InvalidOperationException("Pressão persistente não detectada.");
+                System.Collections.Generic.List<GuardSample> syntheticCpu = new System.Collections.Generic.List<GuardSample>();
+                for (int i = 0; i < 3; i++)
+                {
+                    syntheticCpu.Add(new GuardSample
+                    {
+                        TimestampUtc = DateTime.UtcNow.AddSeconds(-30 * (2 - i)),
+                        MemoryPercent = 55,
+                        CpuPercent = 95,
+                        AvailableBytes = 6L * 1024 * 1024 * 1024,
+                        DiskFreeBytes = 100L * 1024 * 1024 * 1024
+                    });
+                }
+                if (new GuardPressureDetector().Evaluate(syntheticCpu).Kind != GuardAlertKind.CpuPressure)
+                    throw new InvalidOperationException("Pressão persistente de CPU não detectada.");
                 using (GuardHistoryForm history = new GuardHistoryForm(synthetic, System.IO.Path.GetTempPath()))
                 {
                     history.ShowInTaskbar = false;
@@ -216,6 +231,7 @@ namespace Neck
                     throw new InvalidOperationException("Neck Adaptive vazio permaneceu ativo.");
                 TestProcessFamilyDiscovery();
                 TestEfficiencyModeRoundTrip();
+                TestTurboModeRoundTrip();
                 using (SosForm sos = new SosForm())
                 {
                     sos.ShowInTaskbar = false;
@@ -245,6 +261,7 @@ namespace Neck
                 Console.WriteLine("HealthScanMilliseconds=" + healthTimer.ElapsedMilliseconds);
                 Console.WriteLine("MeetingChecks=" + meeting.Checks.Count);
                 Console.WriteLine("SyntheticGuardAlert=" + syntheticAlert.Kind);
+                Console.WriteLine("CpuPercent=" + health.CpuPercent.ToString("0.0"));
                 Console.WriteLine("SosVisibleCandidates=" + sosCandidates.Count);
                 Console.WriteLine("StartupEntries=" + startupEntries.Count);
                 Console.WriteLine("PlanActions=" + currentPlan.Actions.Count);
@@ -302,6 +319,49 @@ namespace Neck
             finally
             {
                 EfficiencyModeManager.Restore("NeckEcoProbe");
+                if (probe != null)
+                {
+                    try { if (!probe.HasExited) probe.Kill(); }
+                    catch { }
+                    probe.Dispose();
+                }
+                try { if (System.IO.File.Exists(probePath)) System.IO.File.Delete(probePath); }
+                catch { }
+            }
+        }
+
+        private static void TestTurboModeRoundTrip()
+        {
+            string probePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NeckTurboProbe.exe");
+            System.Diagnostics.Process probe = null;
+            try
+            {
+                System.IO.File.Copy(Application.ExecutablePath, probePath, true);
+                probe = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = probePath,
+                    Arguments = "--efficiency-helper",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                Thread.Sleep(500);
+                TurboModeManager.Start("NeckTurboProbe", "Teste Turbo", 60);
+                TurboModeManager.RefreshForTesting("NeckTurboProbe", DateTime.UtcNow);
+                probe.Refresh();
+                if (!TurboModeManager.IsActive || !TurboModeManager.IsForeground ||
+                    probe.PriorityClass != System.Diagnostics.ProcessPriorityClass.AboveNormal)
+                    throw new InvalidOperationException("Neck Turbo não acelerou o processo de teste em primeiro plano.");
+                TurboModeManager.RefreshForTesting("OutroProcesso", DateTime.UtcNow.AddSeconds(2));
+                probe.Refresh();
+                if (TurboModeManager.IsForeground || probe.PriorityClass != System.Diagnostics.ProcessPriorityClass.Normal)
+                    throw new InvalidOperationException("Neck Turbo não restaurou a prioridade ao perder o foco.");
+                TurboModeResult stopped = TurboModeManager.Stop();
+                if (TurboModeManager.IsActive) throw new InvalidOperationException("Neck Turbo permaneceu ativo após ser encerrado.");
+                Console.WriteLine("TurboRoundTrip=OK; Restored=" + stopped.ProcessesChanged);
+            }
+            finally
+            {
+                TurboModeManager.Stop();
                 if (probe != null)
                 {
                     try { if (!probe.HasExited) probe.Kill(); }

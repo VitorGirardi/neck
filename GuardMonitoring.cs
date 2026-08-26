@@ -47,6 +47,7 @@ namespace Neck
     {
         public DateTime TimestampUtc;
         public double MemoryPercent;
+        public double CpuPercent;
         public long AvailableBytes;
         public long DiskFreeBytes;
         public string TopProcess = "";
@@ -59,6 +60,7 @@ namespace Neck
             {
                 TimestampUtc = DateTime.UtcNow,
                 MemoryPercent = snapshot.Memory.PercentUsed,
+                CpuPercent = snapshot.CpuPercent,
                 AvailableBytes = (long)snapshot.Memory.AvailableBytes,
                 DiskFreeBytes = snapshot.DiskFreeBytes,
                 TopProcess = top == null ? "" : top.DisplayName,
@@ -67,7 +69,7 @@ namespace Neck
         }
     }
 
-    internal enum GuardAlertKind { None, MemoryPressure, ProcessGrowth, LowDisk }
+    internal enum GuardAlertKind { None, MemoryPressure, CpuPressure, ProcessGrowth, LowDisk }
 
     internal sealed class GuardAlert
     {
@@ -90,6 +92,16 @@ namespace Neck
                     Kind = GuardAlertKind.MemoryPressure,
                     Title = "Memória sob pressão",
                     Message = "A RAM permanece acima de 85%. " + ProcessMessage(latest)
+                };
+            }
+
+            if (recent.Count >= 3 && recent.Skip(recent.Count - 3).All(item => item.CpuPercent >= 90))
+            {
+                return new GuardAlert
+                {
+                    Kind = GuardAlertKind.CpuPressure,
+                    Title = "CPU sob pressão",
+                    Message = "A CPU permanece acima de 90%. Ative o Neck Turbo no aplicativo que precisa responder melhor."
                 };
             }
 
@@ -196,7 +208,8 @@ namespace Neck
                 sample.AvailableBytes.ToString(CultureInfo.InvariantCulture),
                 sample.DiskFreeBytes.ToString(CultureInfo.InvariantCulture),
                 process,
-                sample.TopProcessBytes.ToString(CultureInfo.InvariantCulture)
+                sample.TopProcessBytes.ToString(CultureInfo.InvariantCulture),
+                sample.CpuPercent.ToString("0.0", CultureInfo.InvariantCulture)
             });
         }
 
@@ -205,7 +218,7 @@ namespace Neck
             try
             {
                 string[] parts = line.Split('|');
-                if (parts.Length != 6) return null;
+                if (parts.Length != 6 && parts.Length != 7) return null;
                 return new GuardSample
                 {
                     TimestampUtc = new DateTime(long.Parse(parts[0], CultureInfo.InvariantCulture), DateTimeKind.Utc),
@@ -213,7 +226,8 @@ namespace Neck
                     AvailableBytes = long.Parse(parts[2], CultureInfo.InvariantCulture),
                     DiskFreeBytes = long.Parse(parts[3], CultureInfo.InvariantCulture),
                     TopProcess = Encoding.UTF8.GetString(Convert.FromBase64String(parts[4])),
-                    TopProcessBytes = long.Parse(parts[5], CultureInfo.InvariantCulture)
+                    TopProcessBytes = long.Parse(parts[5], CultureInfo.InvariantCulture),
+                    CpuPercent = parts.Length == 7 ? double.Parse(parts[6], CultureInfo.InvariantCulture) : 0
                 };
             }
             catch { return null; }
@@ -299,11 +313,12 @@ namespace Neck
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
             double average = samples.Count == 0 ? 0 : samples.Average(item => item.MemoryPercent);
             double maximum = samples.Count == 0 ? 0 : samples.Max(item => item.MemoryPercent);
+            double cpuMaximum = samples.Count == 0 ? 0 : samples.Max(item => item.CpuPercent);
             Label summary = new Label
             {
                 Dock = DockStyle.Fill,
                 Text = samples.Count == 0 ? "O histórico começará após a primeira medição." :
-                    "Média de RAM: " + average.ToString("0", CultureInfo.CurrentCulture) + "%     •     Pico: " + maximum.ToString("0", CultureInfo.CurrentCulture) + "%     •     " + samples.Count + " medições",
+                    "RAM média: " + average.ToString("0", CultureInfo.CurrentCulture) + "%  •  Pico RAM: " + maximum.ToString("0", CultureInfo.CurrentCulture) + "%  •  Pico CPU: " + cpuMaximum.ToString("0", CultureInfo.CurrentCulture) + "%  •  " + samples.Count + " medições",
                 Font = Theme.Heading,
                 ForeColor = Theme.Text,
                 TextAlign = ContentAlignment.MiddleLeft,
@@ -312,14 +327,16 @@ namespace Neck
             };
             ListView list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body, BackColor = Color.White };
             list.Columns.Add("Horário", 150);
-            list.Columns.Add("RAM", 90, HorizontalAlignment.Right);
-            list.Columns.Add("Disponível", 130, HorizontalAlignment.Right);
-            list.Columns.Add("Maior consumidor", 250);
-            list.Columns.Add("Uso", 120, HorizontalAlignment.Right);
+            list.Columns.Add("RAM", 75, HorizontalAlignment.Right);
+            list.Columns.Add("CPU", 75, HorizontalAlignment.Right);
+            list.Columns.Add("Disponível", 115, HorizontalAlignment.Right);
+            list.Columns.Add("Maior consumidor", 230);
+            list.Columns.Add("Uso", 105, HorizontalAlignment.Right);
             foreach (GuardSample sample in samples.OrderByDescending(item => item.TimestampUtc).Take(250))
             {
                 ListViewItem item = new ListViewItem(sample.TimestampUtc.ToLocalTime().ToString("dd/MM HH:mm:ss"));
                 item.SubItems.Add(sample.MemoryPercent.ToString("0", CultureInfo.CurrentCulture) + "%");
+                item.SubItems.Add(sample.CpuPercent.ToString("0", CultureInfo.CurrentCulture) + "%");
                 item.SubItems.Add(MainForm.FormatBytes(sample.AvailableBytes));
                 item.SubItems.Add(string.IsNullOrWhiteSpace(sample.TopProcess) ? "—" : sample.TopProcess);
                 item.SubItems.Add(MainForm.FormatBytes(sample.TopProcessBytes));

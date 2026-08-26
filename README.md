@@ -41,8 +41,9 @@ Ele foi criado para quem quer responder três perguntas simples:
 | Recurso | O que faz | Proteção principal |
 | --- | --- | --- |
 | **Meu Plano Neck** | Cruza RAM, disco, temporários, inicialização e Windows Update para escolher três prioridades. | Não executa nenhuma ação automaticamente. |
-| **Neck Guard** | Mostra a saúde do computador e os maiores consumidores de memória. | Diagnóstico somente leitura. |
-| **Guard contínuo** | Monitora a cada 30 segundos e alerta apenas sobre pressão persistente. | Histórico local limitado às últimas 24 horas. |
+| **Neck Guard** | Mostra a saúde do computador, CPU, RAM e os maiores consumidores de memória. | Diagnóstico somente leitura. |
+| **Guard contínuo** | Monitora a cada 30 segundos e alerta apenas sobre pressão persistente de CPU ou RAM. | Histórico local limitado às últimas 24 horas. |
+| **Neck Turbo** | Prioriza temporariamente a família do aplicativo que está em foco. | Usa somente prioridade Acima do normal e restaura tudo automaticamente. |
 | **Neck Adaptive + RAM Park** | Otimiza a família completa de um aplicativo e retira páginas ociosas da RAM física. | Mantém o aplicativo aberto e recarrega dados sob demanda. |
 | **SOS Neck** | Lista aplicativos visíveis que podem aliviar uma sobrecarga. | Solicita fechamento normal; nunca força processos. |
 | **Neck Boot** | Explica o que inicia com o Windows e quais itens opcionais merecem revisão. | Encaminha mudanças para a tela oficial do Windows. |
@@ -84,10 +85,26 @@ A implementação utiliza as APIs documentadas [`SetProcessInformation`](https:/
 > [!NOTE]
 > O RAM Park reduz memória física residente, não a memória privada comprometida pelo aplicativo. Nenhum estado é apagado, mas o primeiro retorno pode ficar mais lento enquanto o Windows recarrega páginas da memória standby, de arquivos ou do pagefile.
 
+## Neck Turbo
+
+O Neck Turbo melhora a resposta do aplicativo que não pode travar — uma apresentação, navegador, editor ou ferramenta de IA — quando existe disputa por CPU. Ele não cria capacidade de processamento: diz ao agendador do Windows qual tarefa deve passar na frente durante o período escolhido.
+
+1. Abra o **SOS Neck** e selecione o aplicativo principal.
+2. Clique em **Turbo 60 min** e confirme.
+3. Feche o SOS e volte ao aplicativo.
+4. Para interromper antes, use **Encerrar Turbo** no SOS ou na bandeja.
+
+Enquanto a janela do aplicativo ou de um subprocesso da família estiver em primeiro plano, o Neck aplica `ABOVE_NORMAL_PRIORITY_CLASS`. Ao trocar de janela, expirar o período ou fechar o Neck, cada processo volta à sua prioridade anterior. Processos que já usam prioridade Alta ou Tempo real nunca são alterados; componentes críticos do Windows e o próprio Neck permanecem excluídos.
+
+Turbo e Adaptive podem trabalhar juntos: o aplicativo recebe prioridade quando está em uso e, depois de 15 segundos em segundo plano, volta a receber o alívio configurado pelo Adaptive. O plano de energia do Windows não é alterado.
+
+A implementação segue as APIs documentadas [`SetPriorityClass`](https://learn.microsoft.com/windows/win32/api/processthreadsapi/nf-processthreadsapi-setpriorityclass) e [Scheduling Priorities](https://learn.microsoft.com/windows/win32/procthread/scheduling-priorities) do Windows.
+
 ## Segurança por padrão
 
 - Não usa “limpeza de RAM” artificial nem encerra processos em massa.
 - Não aplica o Neck Adaptive a componentes críticos do Windows nem ao próprio Neck.
+- Não usa prioridade Alta ou Tempo real no Neck Turbo e não altera o plano de energia.
 - Não confunde RAM estacionada com memória definitivamente liberada e apresenta o resultado como estimativa.
 - Não aplica ajustes genéricos no Registro para prometer desempenho.
 - Não apaga documentos, fotos, downloads, senhas ou dados de navegadores.
@@ -106,11 +123,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.3.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.4.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.3.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.4.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -166,10 +183,11 @@ O comando produz o instalador, o executável portátil e os respectivos checksum
 
 ```text
 Program.cs                 Interface principal e manutenção segura
-SystemMonitoring.cs        Diagnóstico de memória, disco e reunião
+SystemMonitoring.cs        Diagnóstico de CPU, memória, disco e reunião
 GuardMonitoring.cs         Monitoramento contínuo, histórico e bandeja
 SosMode.cs                 Alívio seguro de sobrecarga
 EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
+TurboMode.cs               Prioridade de foco temporária e reversível
 ProcessFamily.cs           Descoberta de processos-filhos e RAM real da família
 StartupAnalysis.cs         Análise somente leitura da inicialização
 PersonalPlan.cs            Motor e interface das três prioridades
@@ -205,6 +223,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Neck Boot e Meu Plano Neck
 - [x] Neck Adaptive com foco, EcoQoS e prioridade de memória
 - [x] RAM Park e otimização por família de processos
+- [x] Neck Turbo e detecção de pressão persistente de CPU
 - [ ] Assinatura digital dos binários
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface

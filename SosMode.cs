@@ -103,6 +103,7 @@ namespace Neck
         private readonly ListView _applications = new ListView();
         private readonly Label _result = new Label();
         private readonly Label _memory = new Label();
+        private readonly Button _turbo = new Button();
         private readonly Button _lightMode = new Button();
         private readonly Button _closeApplication = new Button();
         private readonly Button _clean = new Button();
@@ -113,7 +114,7 @@ namespace Neck
 
         public SosForm()
         {
-            Text = "SOS Neck — Adaptive";
+            Text = "SOS Neck — Adaptive + Turbo";
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(880, 700);
             MinimumSize = new Size(800, 640);
@@ -151,7 +152,7 @@ namespace Neck
             header.Controls.Add(badge);
             header.Controls.Add(new Label
             {
-                Text = "Neck Adaptive — potência sob controle",
+                Text = "Neck Adaptive + Turbo — potência sob controle",
                 AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
                 ForeColor = Color.White,
@@ -159,7 +160,7 @@ namespace Neck
             });
             header.Controls.Add(new Label
             {
-                Text = "Otimiza tarefas pesadas em segundo plano e devolve desempenho quando você volta a usá-las.",
+                Text = "Desacelera o que está ocioso e dá prioridade temporária ao aplicativo que precisa responder.",
                 AutoSize = true,
                 Font = Theme.Body,
                 ForeColor = Color.FromArgb(186, 199, 218),
@@ -190,7 +191,7 @@ namespace Neck
             Label explanation = new Label
             {
                 Dock = DockStyle.Fill,
-                Text = "Aplicativos e processos-filhos. O estado muda entre Em uso, Aguardando e Otimizado:",
+                Text = "Escolha a família inteira do aplicativo. Turbo acelera o foco; Adaptive alivia o segundo plano:",
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
                 TextAlign = ContentAlignment.MiddleLeft
@@ -212,25 +213,29 @@ namespace Neck
             _applications.SelectedIndexChanged += delegate { UpdateSelectionState(); };
 
             _result.Dock = DockStyle.Fill;
-            _result.Text = "Selecione uma tarefa pesada para mantê-la aberta com otimização adaptativa.";
+            _result.Text = "Selecione uma tarefa: Turbo prioriza o foco; Adaptive reduz a pressão em segundo plano.";
             _result.Font = Theme.Small;
             _result.ForeColor = Theme.Muted;
             _result.TextAlign = ContentAlignment.MiddleLeft;
 
             FlowLayoutPanel footer = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0, 12, 0, 0) };
-            ConfigureButton(_lightMode, "Ativar Adaptive", Theme.Green, 150);
-            ConfigureButton(_closeApplication, "Pedir fechamento", Color.FromArgb(185, 28, 28), 145);
-            ConfigureButton(_clean, "Limpeza segura", Theme.Blue, 130);
-            ConfigureButton(_taskManager, "Gerenciador", Theme.NavySoft, 145);
+            ConfigureButton(_turbo, "Turbo 60 min", Theme.Blue, 128);
+            ConfigureButton(_lightMode, "Ativar Adaptive", Theme.Green, 138);
+            ConfigureButton(_closeApplication, "Pedir fechamento", Color.FromArgb(185, 28, 28), 132);
+            ConfigureButton(_clean, "Limpeza segura", Theme.NavySoft, 118);
+            ConfigureButton(_taskManager, "Gerenciador", Theme.NavySoft, 122);
             Button close = new Button();
             ConfigureButton(close, "Fechar", Theme.NavySoft, 90);
             _lightMode.Enabled = false;
+            _turbo.Enabled = false;
             _closeApplication.Enabled = false;
+            _turbo.Click += delegate { ToggleTurbo(); };
             _lightMode.Click += async delegate { await ToggleLightModeAsync(); };
             _closeApplication.Click += async delegate { await CloseSelectedAsync(); };
             _clean.Click += async delegate { await CleanAsync(); };
             _taskManager.Click += delegate { MainForm.OpenTarget("taskmgr.exe"); };
             close.Click += delegate { Close(); };
+            footer.Controls.Add(_turbo);
             footer.Controls.Add(_lightMode);
             footer.Controls.Add(_closeApplication);
             footer.Controls.Add(_clean);
@@ -259,7 +264,8 @@ namespace Neck
                 ListViewItem item = new ListViewItem(candidate.DisplayName) { Tag = candidate };
                 item.SubItems.Add(candidate.ProcessCount.ToString(CultureInfo.CurrentCulture));
                 item.SubItems.Add(MainForm.FormatBytes(candidate.MemoryBytes));
-                item.SubItems.Add(EfficiencyModeManager.GetStateLabel(candidate.ProcessName));
+                string turboState = TurboModeManager.GetStateLabel(candidate.ProcessName);
+                item.SubItems.Add(string.IsNullOrWhiteSpace(turboState) ? EfficiencyModeManager.GetStateLabel(candidate.ProcessName) : turboState);
                 _applications.Items.Add(item);
             }
             UpdateSelectionState();
@@ -319,6 +325,38 @@ namespace Neck
             {
                 if (!_closing && !IsDisposed) SetBusy(false, null);
             }
+        }
+
+        private void ToggleTurbo()
+        {
+            if (_busy || _applications.SelectedItems.Count != 1) return;
+            SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
+            if (candidate == null) return;
+
+            if (TurboModeManager.IsTarget(candidate.ProcessName))
+            {
+                TurboModeResult stopped = TurboModeManager.Stop();
+                _result.Text = "Neck Turbo encerrado para " + candidate.DisplayName + "; prioridade original restaurada em " +
+                               stopped.ProcessesChanged + " processo(s).";
+                RefreshSnapshot();
+                SelectProcess(candidate.ProcessName);
+                return;
+            }
+
+            string replacing = TurboModeManager.IsActive
+                ? " O Turbo atual em " + TurboModeManager.ActiveDisplayName + " será encerrado."
+                : string.Empty;
+            string warning = "O Neck Turbo ficará preparado por 60 minutos para " + candidate.DisplayName + "." + replacing + "\n\n" +
+                             "Quando essa janela estiver em primeiro plano, a família do aplicativo receberá prioridade Acima do normal. " +
+                             "Ao trocar de janela, ao expirar ou ao fechar o Neck, a prioridade original será restaurada automaticamente.\n\n" +
+                             "O Turbo não usa prioridade Alta/Tempo real e não altera o plano de energia do Windows.";
+            if (MessageBox.Show(warning, "Ativar Neck Turbo em " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Information) != DialogResult.OK) return;
+
+            TurboModeManager.Start(candidate.ProcessName, candidate.DisplayName, 60);
+            _result.Text = "Turbo preparado para " + candidate.DisplayName + ". Feche esta tela e volte ao aplicativo: a aceleração entra quando ele recebe o foco.";
+            RefreshSnapshot();
+            SelectProcess(candidate.ProcessName);
         }
 
         private async Task CloseSelectedAsync()
@@ -396,8 +434,11 @@ namespace Neck
             bool selected = !_busy && _applications.SelectedIndices.Count == 1;
             _closeApplication.Enabled = selected;
             _lightMode.Enabled = selected;
+            _turbo.Enabled = selected;
             if (!selected)
             {
+                _turbo.Text = "Turbo 60 min";
+                _turbo.BackColor = Theme.Blue;
                 _lightMode.Text = "Ativar Adaptive";
                 _lightMode.BackColor = Theme.Green;
                 return;
@@ -405,6 +446,9 @@ namespace Neck
 
             SosCandidate candidate = _applications.SelectedItems[0].Tag as SosCandidate;
             bool active = candidate != null && EfficiencyModeManager.IsActive(candidate.ProcessName);
+            bool turbo = candidate != null && TurboModeManager.IsTarget(candidate.ProcessName);
+            _turbo.Text = turbo ? "Encerrar Turbo" : "Turbo 60 min";
+            _turbo.BackColor = turbo ? Theme.Amber : Theme.Blue;
             _lightMode.Text = active ? "Desativar Adaptive" : "Ativar Adaptive";
             _lightMode.BackColor = active ? Theme.Amber : Theme.Green;
         }

@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.3.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.4.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.4.0.0")]
 
 namespace Neck
 {
@@ -220,7 +220,14 @@ namespace Neck
             _adaptiveTimer.Tick += delegate
             {
                 if (_closing) return;
-                try { EfficiencyModeManager.RefreshAdaptiveModes(); }
+                try
+                {
+                    string turboBefore = TurboModeManager.ActiveDisplayName;
+                    EfficiencyModeManager.RefreshAdaptiveModes();
+                    TurboModeManager.Refresh();
+                    if (!string.IsNullOrWhiteSpace(turboBefore) && string.IsNullOrWhiteSpace(TurboModeManager.ActiveDisplayName))
+                        _trayIcon.ShowBalloonTip(3000, "Neck Turbo concluído", "O tempo terminou e as prioridades originais foram restauradas.", ToolTipIcon.Info);
+                }
                 catch { }
             };
             _adaptiveTimer.Start();
@@ -251,6 +258,7 @@ namespace Neck
                 _statusTimer.Stop();
                 _guardMonitorTimer.Stop();
                 _adaptiveTimer.Stop();
+                TurboModeManager.Stop();
                 EfficiencyModeManager.RestoreAll();
                 _trayIcon.Visible = false;
                 _trayIcon.Icon = null;
@@ -589,6 +597,18 @@ namespace Neck
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
             menu.Items.Add("SOS Neck", null, delegate { ShowFromTray(); OpenSos(); });
+            menu.Items.Add("Encerrar Neck Turbo", null, delegate
+            {
+                if (!TurboModeManager.IsActive)
+                {
+                    _trayIcon.ShowBalloonTip(2500, "Neck Turbo", "Nenhum aplicativo está com Turbo ativo.", ToolTipIcon.Info);
+                    return;
+                }
+                string displayName = TurboModeManager.ActiveDisplayName;
+                TurboModeResult result = TurboModeManager.Stop();
+                _trayIcon.ShowBalloonTip(3000, "Neck Turbo encerrado", displayName + " voltou à prioridade original em " + result.ProcessesChanged + " processo(s).", ToolTipIcon.Info);
+                UpdateGuardView(_healthSnapshot);
+            });
             menu.Items.Add("Desativar todo o Neck Adaptive", null, async delegate
             {
                 if (EfficiencyModeManager.ActiveCount == 0)
@@ -830,10 +850,10 @@ namespace Neck
             _trayIcon.Icon = snapshot.Level == HealthLevel.Critical ? SystemIcons.Error :
                              snapshot.Level == HealthLevel.Warning ? SystemIcons.Warning :
                              _trayStableIcon;
-            string text = "Neck Guard — " + state + " — RAM " + snapshot.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "%";
+            string text = "Neck — " + state + " — RAM " + snapshot.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% • CPU " + snapshot.CpuPercent.ToString("0", CultureInfo.CurrentCulture) + "%";
             _trayIcon.Text = text.Length > 63 ? text.Substring(0, 63) : text;
             ToolStripItem status = _trayIcon.ContextMenuStrip.Items["status"];
-            if (status != null) status.Text = state + " • RAM " + snapshot.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "%";
+            if (status != null) status.Text = state + " • RAM " + snapshot.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% • CPU " + snapshot.CpuPercent.ToString("0", CultureInfo.CurrentCulture) + "%";
         }
 
         private void ShowGuardAlertIfNeeded(GuardAlert alert)
@@ -846,7 +866,7 @@ namespace Neck
             _lastAlertKind = alert.Kind;
             _lastAlertUtc = DateTime.UtcNow;
             _trayIcon.ShowBalloonTip(6000, alert.Title, alert.Message + " Clique para abrir o SOS Neck.",
-                alert.Kind == GuardAlertKind.LowDisk ? ToolTipIcon.Warning : ToolTipIcon.Info);
+                alert.Kind == GuardAlertKind.LowDisk || alert.Kind == GuardAlertKind.CpuPressure ? ToolTipIcon.Warning : ToolTipIcon.Info);
         }
 
         internal void ForceCloseForTesting()
@@ -1060,7 +1080,10 @@ namespace Neck
                 _guardBadge.ForeColor = Theme.Green;
             }
 
-            _guardMessage.Text = snapshot.Summary;
+            string turbo = TurboModeManager.IsActive
+                ? " Turbo: " + TurboModeManager.ActiveDisplayName + " por mais " + Math.Max(1, (int)Math.Ceiling(TurboModeManager.Remaining.TotalMinutes)) + " min."
+                : string.Empty;
+            _guardMessage.Text = snapshot.Summary + turbo;
             ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
             string adaptive = EfficiencyModeManager.ActiveCount > 0
                 ? "  •  Adaptive: " + EfficiencyModeManager.ActiveCount + " app(s)"

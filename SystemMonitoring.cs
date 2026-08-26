@@ -32,6 +32,7 @@ namespace Neck
         public string Title = "Diagnóstico indisponível";
         public string Summary = "Não foi possível concluir a leitura agora.";
         public MemoryStatus Memory;
+        public double CpuPercent;
         public long DiskFreeBytes;
         public long DiskTotalBytes;
         public List<ResourceProcess> TopProcesses = new List<ResourceProcess>();
@@ -66,6 +67,7 @@ namespace Neck
         {
             HealthSnapshot snapshot = new HealthSnapshot();
             snapshot.Memory = GetMemoryStatus();
+            snapshot.CpuPercent = CpuUsageSampler.Sample();
             try
             {
                 string root = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
@@ -104,31 +106,36 @@ namespace Neck
                                 (snapshot.DiskFreeBytes < 2L * 1024 * 1024 * 1024 ||
                                  snapshot.DiskFreeBytes * 100 / snapshot.DiskTotalBytes < 5);
             bool diskWarning = snapshot.DiskTotalBytes > 0 && snapshot.DiskFreeBytes < 15L * 1024 * 1024 * 1024;
-            snapshot.Level = snapshot.Memory.PercentUsed >= 90 || diskCritical ? HealthLevel.Critical :
-                             snapshot.Memory.PercentUsed >= 75 || diskWarning ? HealthLevel.Warning : HealthLevel.Stable;
+            snapshot.Level = snapshot.Memory.PercentUsed >= 90 || snapshot.CpuPercent >= 92 || diskCritical ? HealthLevel.Critical :
+                             snapshot.Memory.PercentUsed >= 75 || snapshot.CpuPercent >= 80 || diskWarning ? HealthLevel.Warning : HealthLevel.Stable;
 
             int memoryPenalty = (int)Math.Max(0, (snapshot.Memory.PercentUsed - 55) * 1.35);
+            int cpuPenalty = (int)Math.Max(0, (snapshot.CpuPercent - 65) * 0.75);
             int diskPenalty = diskCritical ? 30 : diskWarning ? 15 : 0;
-            snapshot.Score = Math.Max(10, Math.Min(100, 100 - memoryPenalty - diskPenalty));
+            snapshot.Score = Math.Max(10, Math.Min(100, 100 - memoryPenalty - cpuPenalty - diskPenalty));
             ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
             if (snapshot.Level == HealthLevel.Critical)
             {
                 snapshot.Title = "Pressão alta detectada";
                 snapshot.Summary = snapshot.Memory.PercentUsed >= 90
                     ? "A memória está quase cheia. " + TopProcessSentence(top)
-                    : "O disco do Windows está praticamente cheio e pode deixar todo o sistema lento.";
+                    : snapshot.CpuPercent >= 92
+                        ? "A CPU está em " + snapshot.CpuPercent.ToString("0", CultureInfo.CurrentCulture) + "% e pode limitar a resposta dos aplicativos."
+                        : "O disco do Windows está praticamente cheio e pode deixar todo o sistema lento.";
             }
             else if (snapshot.Level == HealthLevel.Warning)
             {
                 snapshot.Title = "O computador merece atenção";
                 snapshot.Summary = snapshot.Memory.PercentUsed >= 75
                     ? "O uso de memória está elevado. " + TopProcessSentence(top)
-                    : "Há pouco espaço livre no disco do Windows; uma limpeza segura pode ajudar.";
+                    : snapshot.CpuPercent >= 80
+                        ? "A CPU está ocupada em " + snapshot.CpuPercent.ToString("0", CultureInfo.CurrentCulture) + "%; o Neck Guard acompanhará se a pressão persiste."
+                        : "Há pouco espaço livre no disco do Windows; uma limpeza segura pode ajudar.";
             }
             else
             {
                 snapshot.Title = "Sistema estável agora";
-                snapshot.Summary = "Não encontramos pressão crítica de memória ou disco. " + TopProcessSentence(top);
+                snapshot.Summary = "CPU em " + snapshot.CpuPercent.ToString("0", CultureInfo.CurrentCulture) + "%; sem pressão persistente de memória ou disco. " + TopProcessSentence(top);
             }
             return snapshot;
         }
@@ -252,6 +259,51 @@ namespace Neck
         }
     }
 
+    internal static class CpuUsageSampler
+    {
+        private static readonly object SyncRoot = new object();
+        private static ulong _previousIdle;
+        private static ulong _previousKernel;
+        private static ulong _previousUser;
+        private static bool _initialized;
+
+        public static double Sample()
+        {
+            NativeMethods.FILETIME idleTime;
+            NativeMethods.FILETIME kernelTime;
+            NativeMethods.FILETIME userTime;
+            if (!NativeMethods.GetSystemTimes(out idleTime, out kernelTime, out userTime)) return 0;
+            ulong idle = ToUInt64(idleTime);
+            ulong kernel = ToUInt64(kernelTime);
+            ulong user = ToUInt64(userTime);
+            lock (SyncRoot)
+            {
+                if (!_initialized)
+                {
+                    _previousIdle = idle;
+                    _previousKernel = kernel;
+                    _previousUser = user;
+                    _initialized = true;
+                    return 0;
+                }
+                ulong idleDelta = idle >= _previousIdle ? idle - _previousIdle : 0;
+                ulong kernelDelta = kernel >= _previousKernel ? kernel - _previousKernel : 0;
+                ulong userDelta = user >= _previousUser ? user - _previousUser : 0;
+                _previousIdle = idle;
+                _previousKernel = kernel;
+                _previousUser = user;
+                ulong total = kernelDelta + userDelta;
+                if (total == 0 || idleDelta > total) return 0;
+                return Math.Max(0, Math.Min(100, (total - idleDelta) * 100.0 / total));
+            }
+        }
+
+        private static ulong ToUInt64(NativeMethods.FILETIME value)
+        {
+            return ((ulong)value.HighDateTime << 32) | value.LowDateTime;
+        }
+    }
+
     internal static class NativeMethods
     {
         public const uint SHERB_NOCONFIRMATION = 0x00000001;
@@ -285,9 +337,20 @@ namespace Neck
             public int Bottom;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct FILETIME
+        {
+            public uint LowDateTime;
+            public uint HighDateTime;
+        }
+
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetSystemTimes(out FILETIME idleTime, out FILETIME kernelTime, out FILETIME userTime);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern uint SetThreadExecutionState(uint esFlags);
