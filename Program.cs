@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.5.1.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.5.1.0")]
+[assembly: System.Reflection.AssemblyVersion("0.6.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.6.0.0")]
 
 namespace Neck
 {
@@ -479,7 +479,7 @@ namespace Neck
             _backgroundCheck.Cursor = Cursors.Hand;
 
             ConfigureButton(_meetingButton, "Modo reunião", Theme.Blue, 140);
-            ConfigureButton(_guardButton, "Diagnóstico", Theme.NavySoft, 112);
+            ConfigureButton(_guardButton, "SOS Neck", Color.FromArgb(185, 28, 28), 112);
             ConfigureButton(_driversButton, "Drivers", Theme.NavySoft, 82);
             ConfigureButton(_reportsButton, "Histórico", Theme.NavySoft, 96);
             _meetingButton.Location = new Point(22, 142);
@@ -489,8 +489,7 @@ namespace Neck
             _meetingButton.Click += delegate { ToggleMeetingMode(); };
             _guardButton.Click += delegate
             {
-                HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
-                using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
+                OpenSos();
             };
             _driversButton.Click += delegate { using (DriverCenterForm form = new DriverCenterForm()) form.ShowDialog(this); };
             _reportsButton.Click += delegate
@@ -528,6 +527,7 @@ namespace Neck
             menu.Items.Add(status);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
+            menu.Items.Add("SOS Neck", null, delegate { ShowFromTray(); OpenSos(); });
             menu.Items.Add("Abrir diagnóstico", null, delegate
             {
                 ShowFromTray();
@@ -564,9 +564,15 @@ namespace Neck
             _trayIcon.BalloonTipClicked += delegate
             {
                 ShowFromTray();
-                HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
-                using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
+                OpenSos();
             };
+        }
+
+        private void OpenSos()
+        {
+            if (_closing || IsDisposed || _busy) return;
+            using (SosForm form = new SosForm()) form.ShowDialog(this);
+            UpdateSystemStatus();
         }
 
         private void HandleMainFormClosing(object sender, FormClosingEventArgs e)
@@ -672,7 +678,7 @@ namespace Neck
             if (alert.Kind == _lastAlertKind && DateTime.UtcNow - _lastAlertUtc < TimeSpan.FromMinutes(30)) return;
             _lastAlertKind = alert.Kind;
             _lastAlertUtc = DateTime.UtcNow;
-            _trayIcon.ShowBalloonTip(6000, alert.Title, alert.Message + " Clique para abrir o diagnóstico.",
+            _trayIcon.ShowBalloonTip(6000, alert.Title, alert.Message + " Clique para abrir o SOS Neck.",
                 alert.Kind == GuardAlertKind.LowDisk ? ToolTipIcon.Warning : ToolTipIcon.Info);
         }
 

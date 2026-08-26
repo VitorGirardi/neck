@@ -120,6 +120,23 @@ namespace Neck
                     }
                     history.Close();
                 }
+                System.Collections.Generic.List<SosCandidate> sosCandidates = SosInspector.GetCandidates();
+                using (SosForm sos = new SosForm())
+                {
+                    sos.ShowInTaskbar = false;
+                    sos.StartPosition = FormStartPosition.Manual;
+                    sos.Location = new System.Drawing.Point(-32000, -32000);
+                    sos.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(sos.Width, sos.Height))
+                    {
+                        sos.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, sos.Width, sos.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.SOS.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("SosPreview=" + previewPath);
+                    }
+                    sos.Close();
+                }
                 Console.WriteLine("SELF_TEST_OK");
                 Console.WriteLine("TempBytes=" + result.TempBytes);
                 Console.WriteLine("TempFiles=" + result.TempFiles);
@@ -133,6 +150,7 @@ namespace Neck
                 Console.WriteLine("HealthScanMilliseconds=" + healthTimer.ElapsedMilliseconds);
                 Console.WriteLine("MeetingChecks=" + meeting.Checks.Count);
                 Console.WriteLine("SyntheticGuardAlert=" + syntheticAlert.Kind);
+                Console.WriteLine("SosVisibleCandidates=" + sosCandidates.Count);
                 return 0;
             }
             catch (Exception ex)

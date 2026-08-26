@@ -239,7 +239,7 @@ namespace Neck
                 process.DisplayName + " é o maior consumidor de memória agora.";
         }
 
-        private static string FriendlyProcessName(string name)
+        internal static string FriendlyProcessName(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return "Processo desconhecido";
             if (string.Equals(name, "msedge", StringComparison.OrdinalIgnoreCase)) return "Microsoft Edge";

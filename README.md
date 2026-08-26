@@ -18,6 +18,10 @@ Nenhuma métrica é enviada pela internet. O histórico contém horário, uso ge
 
 Durante uma manutenção ativa, fechar a janela oferece continuar a tarefa na bandeja. O Neck impede apenas o encerramento completo até a ferramenta do Windows terminar e envia uma notificação com o resultado.
 
+## SOS Neck (v0.6)
+
+O SOS apresenta somente aplicativos com janela visível, ordenados pelo consumo aproximado de memória. Com confirmação explícita, ele pode enviar um pedido normal de fechamento — equivalente ao botão `X` — e aguarda o próprio aplicativo responder. Processos críticos do Windows e encerramento forçado são excluídos por projeto. O SOS também oferece limpeza segura de temporários antigos e acesso ao Gerenciador de Tarefas.
+
 O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Proteções adotadas
@@ -34,6 +38,7 @@ O projeto ainda está em fase inicial. Revise o relatório apresentado pelo apli
 - **Neck Guard:** apresenta uma pontuação de saúde e identifica os maiores consumidores de memória.
 - **Modo Reunião:** executa uma checagem prévia e mantém computador e tela acordados por 30, 60 ou 120 minutos.
 - **Guard contínuo:** pode continuar na bandeja, mantém histórico local de 24 horas e alerta apenas sobre problemas persistentes.
+- **SOS Neck:** reúne ações imediatas e confirmadas para aliviar uma sobrecarga sem forçar processos.
 - **Limpeza rápida:** remove somente temporários seguros e relatórios antigos.
 - **Manutenção completa:** mantém as opções técnicas em uma tela separada e explicada.
 - **Drivers e Windows Update:** mostra versões instaladas e abre apenas fontes oficiais.
