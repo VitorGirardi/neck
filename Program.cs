@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.9.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.9.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")]
 
 namespace Neck
 {
@@ -148,6 +148,7 @@ namespace Neck
         private readonly Button _meetingButton = new Button();
         private readonly Button _reportsButton = new Button();
         private readonly Button _settingsButton = new Button();
+        private readonly Button _planButton = new Button();
         private readonly Label _guardBadge = new Label();
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
@@ -309,15 +310,22 @@ namespace Neck
             _settingsButton.Location = new Point(ClientSize.Width - 430, 31);
             _settingsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _settingsButton.Click += delegate { ShowPreferences(false); };
+            ConfigureButton(_planButton, "Meu plano", Theme.Blue, 118);
+            _planButton.Height = 44;
+            _planButton.Location = new Point(ClientSize.Width - 560, 31);
+            _planButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _planButton.Click += async delegate { await ShowPersonalPlanAsync(); };
             header.Resize += delegate
             {
                 _recommendation.Left = header.ClientSize.Width - _recommendation.Width - 32;
                 _settingsButton.Left = _recommendation.Left - _settingsButton.Width - 12;
+                _planButton.Left = _settingsButton.Left - _planButton.Width - 12;
             };
 
             header.Controls.Add(mark);
             header.Controls.Add(title);
             header.Controls.Add(subtitle);
+            header.Controls.Add(_planButton);
             header.Controls.Add(_settingsButton);
             header.Controls.Add(_recommendation);
             return header;
@@ -649,6 +657,66 @@ namespace Neck
             if (_startupMenuItem != null) _startupMenuItem.Checked = StartupManager.IsEnabled();
             if (_notificationsMenuItem != null) _notificationsMenuItem.Checked = _guardSettings.Notifications;
             if (_fullscreenMenuItem != null) _fullscreenMenuItem.Checked = _guardSettings.SilenceFullscreen;
+        }
+
+        private async Task ShowPersonalPlanAsync()
+        {
+            if (_closing || IsDisposed || _busy) return;
+            SetBusy(true, "Preparando seu plano personalizado...");
+            PersonalPlan plan;
+            try
+            {
+                plan = await Task.Run(delegate { return PersonalPlanAnalyzer.Build(); });
+                if (_closing || IsDisposed) return;
+            }
+            catch (Exception ex)
+            {
+                if (!_closing && !IsDisposed)
+                    MessageBox.Show("Não foi possível montar o plano agora.\n\n" + ex.Message, "Meu Plano Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            finally
+            {
+                if (!_closing && !IsDisposed) SetBusy(false, null);
+            }
+
+            PlanActionKind selected;
+            using (PersonalPlanForm form = new PersonalPlanForm(plan))
+            {
+                if (form.ShowDialog(this) != DialogResult.OK) return;
+                selected = form.SelectedAction;
+            }
+            await ExecutePlanActionAsync(selected, plan.Health);
+        }
+
+        private async Task ExecutePlanActionAsync(PlanActionKind action, HealthSnapshot health)
+        {
+            if (action == PlanActionKind.Sos)
+            {
+                OpenSos();
+            }
+            else if (action == PlanActionKind.Clean)
+            {
+                _tempCheck.Checked = true;
+                _reportsCheck.Checked = true;
+                _recycleCheck.Checked = false;
+                _componentsCheck.Checked = false;
+                _healthCheck.Checked = false;
+                _drivesCheck.Checked = false;
+                await RunMaintenanceAsync();
+            }
+            else if (action == PlanActionKind.Startup)
+            {
+                using (StartupAppsForm form = new StartupAppsForm()) form.ShowDialog(this);
+            }
+            else if (action == PlanActionKind.WindowsUpdate)
+            {
+                OpenTarget("ms-settings:windowsupdate");
+            }
+            else if (action == PlanActionKind.Diagnostic)
+            {
+                using (DiagnosticForm form = new DiagnosticForm(health ?? SystemInfo.GetHealthSnapshot())) form.ShowDialog(this);
+            }
         }
 
         private void HandleMainFormClosing(object sender, FormClosingEventArgs e)
@@ -1250,6 +1318,7 @@ namespace Neck
             _bootButton.Enabled = !busy && !_meetingActive;
             _driversButton.Enabled = !busy;
             _settingsButton.Enabled = !busy;
+            _planButton.Enabled = !busy;
             _guardButton.Enabled = !busy;
             _meetingButton.Enabled = !busy;
             _progress.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;

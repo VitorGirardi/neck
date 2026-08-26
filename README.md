@@ -40,6 +40,12 @@ O Neck Boot reúne os aplicativos encontrados nos locais comuns de inicializaç�
 
 O Neck Boot é somente leitura: não apaga entradas nem altera o Registro. Quando você decide revisar um item, ele abre a página oficial **Aplicativos de Inicialização** do Windows, onde a mudança continua explícita e reversível.
 
+## Meu Plano Neck (v1.0)
+
+O Meu Plano Neck cruza o estado atual da memória e do disco, o maior consumidor de RAM, a quantidade segura disponível para limpeza, aplicativos opcionais na inicialização e reinicializações pendentes. Em vez de exibir uma lista interminável, ele escolhe exatamente três prioridades e explica por que cada uma entrou no plano.
+
+As ações continuam confirmadas e reversíveis: o plano pode encaminhar para SOS Neck, limpeza segura, Neck Boot, diagnóstico ou Windows Update, mas nunca fecha aplicativos, limpa arquivos, reinicia o computador ou altera a inicialização sozinho.
+
 O projeto ainda está em fase inicial. Revise o relatório apresentado pelo aplicativo e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Proteções adotadas
@@ -59,6 +65,7 @@ O projeto ainda está em fase inicial. Revise o relatório apresentado pelo apli
 - **SOS Neck:** reúne ações imediatas e confirmadas para aliviar uma sobrecarga sem forçar processos.
 - **Privilégios sob demanda:** mantém o Guard comum e solicita administrador somente para ferramentas do Windows que realmente precisam.
 - **Neck Boot:** explica os programas que acompanham o Windows e encaminha qualquer alteração para a tela oficial do sistema.
+- **Meu Plano Neck:** cruza os diagnósticos e apresenta somente as três ações mais úteis para o momento atual.
 - **Limpeza rápida:** remove somente temporários seguros e relatórios antigos.
 - **Manutenção completa:** mantém as opções técnicas em uma tela separada e explicada.
 - **Drivers e Windows Update:** mostra versões instaladas e abre apenas fontes oficiais.
@@ -72,7 +79,7 @@ Uma análise a cada 30 dias é suficiente para a maioria dos computadores. A ver
 
 Execute `build.ps1` no PowerShell. O resultado é criado em `dist\Neck.exe`. O compilador do .NET Framework 4.8 que acompanha o Windows é utilizado, sem dependências de terceiros.
 
-Para gerar o instalador, instale o Inno Setup 6 e execute `build-installer.ps1`. Serão criados `dist\Neck-Setup-0.9.0.exe` e os checksums SHA-256 do instalador e do executável portátil.
+Para gerar o instalador, instale o Inno Setup 6 e execute `build-installer.ps1`. Serão criados `dist\Neck-Setup-1.0.0.exe` e os checksums SHA-256 do instalador e do executável portátil.
 
 Para executar os autotestes de análise e gerar uma versão de verificação visual, use `test.ps1`. Os arquivos de teste são criados em `test-output` e não são versionados.
 

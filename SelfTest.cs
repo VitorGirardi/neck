@@ -82,6 +82,44 @@ namespace Neck
                     }
                     startup.Close();
                 }
+                HealthSnapshot planHealth = new HealthSnapshot
+                {
+                    Score = 32,
+                    Level = HealthLevel.Critical,
+                    Summary = "Memória e disco sob pressão.",
+                    Memory = new MemoryStatus { PercentUsed = 92, AvailableBytes = 512UL * 1024 * 1024 },
+                    DiskFreeBytes = 5L * 1024 * 1024 * 1024,
+                    DiskTotalBytes = 256L * 1024 * 1024 * 1024,
+                    TopProcesses = new System.Collections.Generic.List<ResourceProcess>
+                    {
+                        new ResourceProcess { DisplayName = "Aplicativo de teste", MemoryBytes = 4L * 1024 * 1024 * 1024, ProcessCount = 1 }
+                    }
+                };
+                ScanResult planCleanup = new ScanResult { TempBytes = 900L * 1024 * 1024, TempFiles = 1200 };
+                System.Collections.Generic.List<StartupEntry> planStartup = new System.Collections.Generic.List<StartupEntry>
+                {
+                    new StartupEntry { Name = "Aplicativo opcional", Enabled = true, Recommendation = "Pode revisar" }
+                };
+                PersonalPlan syntheticPlan = PersonalPlanAnalyzer.BuildFromInputs(planHealth, planCleanup, planStartup, true);
+                if (syntheticPlan.Actions.Count != 3) throw new InvalidOperationException("O plano não retornou exatamente três prioridades.");
+                if (syntheticPlan.Actions[0].Kind != PlanActionKind.Sos) throw new InvalidOperationException("A pressão crítica de memória não recebeu prioridade.");
+                PersonalPlan currentPlan = PersonalPlanAnalyzer.Build();
+                using (PersonalPlanForm planForm = new PersonalPlanForm(currentPlan))
+                {
+                    planForm.ShowInTaskbar = false;
+                    planForm.StartPosition = FormStartPosition.Manual;
+                    planForm.Location = new System.Drawing.Point(-32000, -32000);
+                    planForm.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(planForm.Width, planForm.Height))
+                    {
+                        planForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, planForm.Width, planForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Plan.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("PlanPreview=" + previewPath);
+                    }
+                    planForm.Close();
+                }
                 using (MaintenanceOptionsForm options = new MaintenanceOptionsForm(true, true, false, true, false, true))
                 {
                     options.ShowInTaskbar = false;
@@ -194,6 +232,7 @@ namespace Neck
                 Console.WriteLine("SyntheticGuardAlert=" + syntheticAlert.Kind);
                 Console.WriteLine("SosVisibleCandidates=" + sosCandidates.Count);
                 Console.WriteLine("StartupEntries=" + startupEntries.Count);
+                Console.WriteLine("PlanActions=" + currentPlan.Actions.Count);
                 Console.WriteLine("SelfTestIsAdministrator=" + SecurityHelper.IsAdministrator());
                 return 0;
             }

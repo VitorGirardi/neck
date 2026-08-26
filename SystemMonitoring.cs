@@ -215,7 +215,7 @@ namespace Neck
             catch { return false; }
         }
 
-        private static bool IsRestartPending()
+        internal static bool IsRestartPending()
         {
             try
             {
