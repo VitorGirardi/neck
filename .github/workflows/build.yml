@@ -29,5 +29,5 @@ jobs:
         uses: actions/upload-artifact@v7.0.1
         with:
           name: mestre-pc-care-windows
-          path: dist/Mestre PC Care.exe
+          path: dist/Neck.exe
           if-no-files-found: error

@@ -1,6 +1,7 @@
 # Build and test outputs
 dist/
 test-output/
+build-artifacts/
 bin/
 obj/
 

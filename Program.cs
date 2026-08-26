@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -11,14 +12,14 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-[assembly: System.Reflection.AssemblyTitle("Mestre PC Care")]
+[assembly: System.Reflection.AssemblyTitle("Neck")]
 [assembly: System.Reflection.AssemblyDescription("Manutenção periódica segura para Windows")]
-[assembly: System.Reflection.AssemblyCompany("Mestre PC Care")]
-[assembly: System.Reflection.AssemblyProduct("Mestre PC Care")]
-[assembly: System.Reflection.AssemblyVersion("0.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.0.0")]
+[assembly: System.Reflection.AssemblyCompany("Neck")]
+[assembly: System.Reflection.AssemblyProduct("Neck")]
+[assembly: System.Reflection.AssemblyVersion("0.2.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.0.0")]
 
-namespace MestrePCCare
+namespace Neck
 {
     internal static class Program
     {
@@ -45,7 +46,7 @@ namespace MestrePCCare
                 {
                     MessageBox.Show(
                         "A manutenção do Windows precisa de permissão de administrador. Nenhuma alteração foi feita.",
-                        "Mestre PC Care",
+                        "Neck",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
                 }
@@ -59,20 +60,71 @@ namespace MestrePCCare
 
     internal static class Theme
     {
-        public static readonly Color Background = Color.FromArgb(244, 247, 251);
+        public static readonly Color Background = Color.FromArgb(246, 248, 252);
         public static readonly Color Card = Color.White;
-        public static readonly Color Navy = Color.FromArgb(19, 35, 58);
-        public static readonly Color NavySoft = Color.FromArgb(43, 61, 86);
-        public static readonly Color Blue = Color.FromArgb(35, 108, 228);
-        public static readonly Color Green = Color.FromArgb(20, 148, 105);
-        public static readonly Color Amber = Color.FromArgb(224, 139, 35);
-        public static readonly Color Text = Color.FromArgb(34, 43, 56);
-        public static readonly Color Muted = Color.FromArgb(101, 113, 130);
-        public static readonly Color Border = Color.FromArgb(222, 228, 236);
-        public static readonly Font Title = new Font("Segoe UI Semibold", 24f, FontStyle.Bold);
-        public static readonly Font Heading = new Font("Segoe UI Semibold", 13f, FontStyle.Bold);
+        public static readonly Color Navy = Color.FromArgb(15, 23, 42);
+        public static readonly Color NavySoft = Color.FromArgb(51, 65, 85);
+        public static readonly Color Blue = Color.FromArgb(37, 99, 235);
+        public static readonly Color BlueSoft = Color.FromArgb(239, 246, 255);
+        public static readonly Color Cyan = Color.FromArgb(6, 182, 212);
+        public static readonly Color Green = Color.FromArgb(5, 150, 105);
+        public static readonly Color GreenSoft = Color.FromArgb(236, 253, 245);
+        public static readonly Color Amber = Color.FromArgb(217, 119, 6);
+        public static readonly Color Text = Color.FromArgb(30, 41, 59);
+        public static readonly Color Muted = Color.FromArgb(100, 116, 139);
+        public static readonly Color Border = Color.FromArgb(226, 232, 240);
+        public static readonly Font Title = new Font("Segoe UI Semibold", 25f, FontStyle.Bold);
+        public static readonly Font Heading = new Font("Segoe UI Semibold", 15f, FontStyle.Bold);
         public static readonly Font Body = new Font("Segoe UI", 10f, FontStyle.Regular);
         public static readonly Font Small = new Font("Segoe UI", 9f, FontStyle.Regular);
+    }
+
+    internal sealed class RoundedPanel : Panel
+    {
+        public int CornerRadius { get; set; }
+        public Color OutlineColor { get; set; }
+
+        public RoundedPanel()
+        {
+            CornerRadius = 18;
+            OutlineColor = Theme.Border;
+            DoubleBuffered = true;
+            Resize += delegate { UpdateShape(); };
+        }
+
+        private GraphicsPath BuildPath(Rectangle bounds)
+        {
+            int radius = Math.Max(4, CornerRadius);
+            int diameter = radius * 2;
+            GraphicsPath path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private void UpdateShape()
+        {
+            if (Width < 4 || Height < 4) return;
+            using (GraphicsPath path = BuildPath(new Rectangle(0, 0, Width - 1, Height - 1)))
+            {
+                Region = new Region(path);
+            }
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (GraphicsPath path = BuildPath(new Rectangle(0, 0, Width - 1, Height - 1)))
+            using (Pen pen = new Pen(OutlineColor, 1f))
+            {
+                e.Graphics.DrawPath(pen, path);
+            }
+        }
     }
 
     internal sealed class MainForm : Form
@@ -86,6 +138,7 @@ namespace MestrePCCare
         private readonly RichTextBox _log = new RichTextBox();
         private readonly Button _analyzeButton = new Button();
         private readonly Button _runButton = new Button();
+        private readonly Button _advancedButton = new Button();
         private readonly Button _driversButton = new Button();
         private readonly Button _reportsButton = new Button();
         private readonly CheckBox _tempCheck = new CheckBox();
@@ -99,20 +152,25 @@ namespace MestrePCCare
         private bool _busy;
 
         private static readonly string DataDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MestrePCCare");
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neck");
         private static readonly string LastRunFile = Path.Combine(DataDirectory, "ultima-manutencao.txt");
         private static readonly string ReportDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mestre PC Care", "Relatorios");
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Neck", "Relatorios");
 
         public MainForm()
         {
-            Text = "Mestre PC Care";
+            Text = "Neck";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(1040, 720);
-            Size = new Size(1120, 780);
+            MinimumSize = new Size(1040, 740);
+            Size = new Size(1120, 790);
             BackColor = Theme.Background;
             Font = Theme.Body;
-            Icon = SystemIcons.Shield;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+
+            _tempCheck.Checked = true;
+            _reportsCheck.Checked = true;
+            _componentsCheck.Checked = true;
+            _drivesCheck.Checked = true;
 
             BuildInterface();
             UpdateSystemStatus();
@@ -136,37 +194,55 @@ namespace MestrePCCare
             Panel header = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 128,
+                Height = 108,
                 BackColor = Theme.Navy,
-                Padding = new Padding(34, 22, 34, 18)
+                Padding = new Padding(30, 18, 30, 16)
             };
+
+            RoundedPanel mark = new RoundedPanel
+            {
+                Size = new Size(54, 54),
+                Location = new Point(31, 24),
+                BackColor = Theme.Cyan,
+                OutlineColor = Theme.Cyan,
+                CornerRadius = 15
+            };
+            mark.Controls.Add(new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "N",
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI Semibold", 23f, FontStyle.Bold),
+                ForeColor = Color.White
+            });
 
             Label title = new Label
             {
                 AutoSize = true,
-                Text = "Mestre PC Care",
+                Text = "Neck",
                 Font = Theme.Title,
                 ForeColor = Color.White,
-                Location = new Point(32, 22)
+                Location = new Point(101, 18)
             };
             Label subtitle = new Label
             {
                 AutoSize = true,
-                Text = "Manutenção periódica segura • análise antes de qualquer limpeza",
+                Text = "Cuide do Windows sem complicação",
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(194, 207, 225),
-                Location = new Point(36, 69)
+                ForeColor = Color.FromArgb(186, 199, 218),
+                Location = new Point(105, 62)
             };
             _recommendation.AutoSize = false;
-            _recommendation.Size = new Size(310, 55);
+            _recommendation.Size = new Size(258, 44);
             _recommendation.TextAlign = ContentAlignment.MiddleCenter;
             _recommendation.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
             _recommendation.ForeColor = Color.White;
             _recommendation.BackColor = Theme.NavySoft;
             _recommendation.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _recommendation.Location = new Point(ClientSize.Width - 350, 31);
-            header.Resize += delegate { _recommendation.Left = header.ClientSize.Width - _recommendation.Width - 34; };
+            _recommendation.Location = new Point(ClientSize.Width - 292, 31);
+            header.Resize += delegate { _recommendation.Left = header.ClientSize.Width - _recommendation.Width - 32; };
 
+            header.Controls.Add(mark);
             header.Controls.Add(title);
             header.Controls.Add(subtitle);
             header.Controls.Add(_recommendation);
@@ -179,177 +255,236 @@ namespace MestrePCCare
             {
                 Dock = DockStyle.Fill,
                 BackColor = Theme.Background,
-                Padding = new Padding(26, 20, 26, 24),
+                Padding = new Padding(26, 18, 26, 24),
                 ColumnCount = 2,
-                RowCount = 1
-            };
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 47f));
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 53f));
-            body.Controls.Add(BuildActionsCard(), 0, 0);
-            body.Controls.Add(BuildStatusColumn(), 1, 0);
-            return body;
-        }
-
-        private Control BuildActionsCard()
-        {
-            Panel card = MakeCard(new Padding(24));
-            card.Margin = new Padding(0, 0, 12, 0);
-
-            Label heading = MakeHeading("O que deseja verificar?");
-            heading.Dock = DockStyle.Top;
-            heading.Height = 34;
-
-            Label help = new Label
-            {
-                Text = "As opções recomendadas não apagam documentos, fotos, senhas ou arquivos pessoais.",
-                ForeColor = Theme.Muted,
-                Font = Theme.Small,
-                Dock = DockStyle.Top,
-                Height = 44
-            };
-
-            FlowLayoutPanel tasks = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                AutoScroll = true,
-                Padding = new Padding(0, 8, 0, 0)
-            };
-
-            ConfigureCheck(_tempCheck, "Temporários seguros", "Arquivos antigos das pastas temporárias do usuário e do Windows.", true);
-            ConfigureCheck(_reportsCheck, "Relatórios de erro antigos", "Dumps e relatórios do Windows com mais de 14 dias.", true);
-            ConfigureCheck(_recycleCheck, "Esvaziar Lixeira", "Apaga definitivamente o conteúdo atual da Lixeira.", false);
-            ConfigureCheck(_componentsCheck, "Limpeza de componentes do Windows", "DISM remove versões substituídas de componentes. Pode demorar.", true);
-            ConfigureCheck(_healthCheck, "Verificar integridade do Windows", "Executa DISM ScanHealth e SFC VerifyOnly, sem reparar automaticamente.", false);
-            ConfigureCheck(_drivesCheck, "Otimizar unidade do sistema", "O Windows escolhe TRIM para SSD ou desfragmentação para HD.", true);
-
-            tasks.Controls.AddRange(new Control[]
-            {
-                _tempCheck, _reportsCheck, _recycleCheck,
-                _componentsCheck, _healthCheck, _drivesCheck
-            });
-
-            FlowLayoutPanel buttons = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 102,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = true,
-                Padding = new Padding(0, 12, 0, 0)
-            };
-            ConfigureButton(_analyzeButton, "Analisar", Theme.NavySoft, 136);
-            ConfigureButton(_runButton, "Executar selecionados", Theme.Blue, 224);
-            _analyzeButton.Click += async delegate { await AnalyzeAsync(true); };
-            _runButton.Click += async delegate { await RunMaintenanceAsync(); };
-            buttons.Controls.Add(_analyzeButton);
-            buttons.Controls.Add(_runButton);
-
-            card.Controls.Add(tasks);
-            card.Controls.Add(help);
-            card.Controls.Add(heading);
-            card.Controls.Add(buttons);
-            return card;
-        }
-
-        private Control BuildStatusColumn()
-        {
-            TableLayoutPanel right = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                Margin = new Padding(12, 0, 0, 0),
-                ColumnCount = 1,
                 RowCount = 3
             };
-            right.RowStyles.Add(new RowStyle(SizeType.Absolute, 152));
-            right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            right.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
-            right.Controls.Add(BuildSummaryCard(), 0, 0);
-            right.Controls.Add(BuildLogCard(), 0, 1);
-            right.Controls.Add(BuildFooterButtons(), 0, 2);
-            return right;
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 124f));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 272f));
+            body.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+            Control summary = BuildSummaryCard();
+            body.SetColumnSpan(summary, 2);
+            body.Controls.Add(summary, 0, 0);
+            body.Controls.Add(BuildQuickCard(), 0, 1);
+            body.Controls.Add(BuildDeepCard(), 1, 1);
+            body.Controls.Add(BuildUpdatesCard(), 0, 2);
+            body.Controls.Add(BuildActivityCard(), 1, 2);
+            return body;
         }
 
         private Control BuildSummaryCard()
         {
-            Panel card = MakeCard(new Padding(20));
-            card.Margin = new Padding(0, 0, 0, 12);
-
+            Panel card = MakeCard(new Padding(18, 14, 18, 12));
+            card.Margin = new Padding(0, 0, 0, 14);
             TableLayoutPanel grid = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 4,
-                RowCount = 2
+                RowCount = 2,
+                BackColor = Color.White
             };
             for (int i = 0; i < 4; i++) grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 38));
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 62));
-
-            AddMetric(grid, 0, "RAM EM USO", _memoryValue);
-            AddMetric(grid, 1, "LIVRE NO DISCO", _diskValue);
-            AddMetric(grid, 2, "PODE LIBERAR", _analysisValue);
-            AddMetric(grid, 3, "ÚLTIMA MANUTENÇÃO", _lastRunValue);
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 58));
+            AddMetric(grid, 0, "MEMÓRIA EM USO", _memoryValue);
+            AddMetric(grid, 1, "ESPAÇO LIVRE", _diskValue);
+            AddMetric(grid, 2, "LIMPEZA DISPONÍVEL", _analysisValue);
+            AddMetric(grid, 3, "ÚLTIMO CUIDADO", _lastRunValue);
             card.Controls.Add(grid);
             return card;
         }
 
-        private Control BuildLogCard()
+        private Control BuildQuickCard()
         {
-            Panel card = MakeCard(new Padding(20));
-            card.Margin = new Padding(0, 0, 0, 10);
-            Label heading = MakeHeading("Relatório da execução");
-            heading.Dock = DockStyle.Top;
-            heading.Height = 35;
+            Panel card = MakeCard(new Padding(24));
+            card.Margin = new Padding(0, 0, 10, 14);
 
-            _progress.Dock = DockStyle.Bottom;
-            _progress.Height = 8;
-            _progress.Style = ProgressBarStyle.Continuous;
+            Label badge = CreateBadge("RECOMENDADO", Theme.BlueSoft, Theme.Blue);
+            badge.Location = new Point(24, 22);
+            Label title = new Label
+            {
+                Text = "Limpeza rápida",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 19f, FontStyle.Bold),
+                ForeColor = Theme.Text,
+                Location = new Point(23, 60)
+            };
+            Label description = new Label
+            {
+                Text = "Remove apenas temporários antigos e relatórios de erro. Seus documentos, senhas e downloads ficam intactos.",
+                AutoSize = false,
+                Size = new Size(430, 58),
+                Font = Theme.Body,
+                ForeColor = Theme.Muted,
+                Location = new Point(26, 105)
+            };
+            Label safe = new Label
+            {
+                Text = "✓  Não fecha programas    ✓  Não reinicia o PC",
+                AutoSize = true,
+                Font = Theme.Small,
+                ForeColor = Theme.Green,
+                Location = new Point(25, 166)
+            };
 
-            _log.Dock = DockStyle.Fill;
-            _log.BorderStyle = BorderStyle.None;
-            _log.BackColor = Color.White;
-            _log.ForeColor = Theme.Text;
-            _log.Font = new Font("Consolas", 9.2f, FontStyle.Regular);
-            _log.ReadOnly = true;
-            _log.DetectUrls = false;
-            _log.Text = "Pronto para analisar. Nenhum arquivo será removido durante a análise.\n";
+            ConfigureButton(_analyzeButton, "Analisar agora", Theme.NavySoft, 142);
+            ConfigureButton(_runButton, "Fazer limpeza segura", Theme.Blue, 218);
+            _analyzeButton.Location = new Point(24, 202);
+            _runButton.Location = new Point(176, 202);
+            _analyzeButton.Click += async delegate { await AnalyzeAsync(true); };
+            _runButton.Click += async delegate
+            {
+                _tempCheck.Checked = true;
+                _reportsCheck.Checked = true;
+                _recycleCheck.Checked = false;
+                _componentsCheck.Checked = false;
+                _healthCheck.Checked = false;
+                _drivesCheck.Checked = false;
+                await RunMaintenanceAsync();
+            };
 
-            card.Controls.Add(_log);
-            card.Controls.Add(heading);
-            card.Controls.Add(_progress);
+            card.Controls.Add(badge);
+            card.Controls.Add(title);
+            card.Controls.Add(description);
+            card.Controls.Add(safe);
+            card.Controls.Add(_analyzeButton);
+            card.Controls.Add(_runButton);
             return card;
         }
 
-        private Control BuildFooterButtons()
+        private Control BuildDeepCard()
         {
-            FlowLayoutPanel footer = new FlowLayoutPanel
+            Panel card = MakeCard(new Padding(24));
+            card.Margin = new Padding(10, 0, 0, 14);
+
+            Label badge = CreateBadge("MENSAL", Theme.GreenSoft, Theme.Green);
+            badge.Location = new Point(24, 22);
+            Label title = new Label
             {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Padding = new Padding(0, 8, 0, 0)
+                Text = "Manutenção completa",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 19f, FontStyle.Bold),
+                ForeColor = Theme.Text,
+                Location = new Point(23, 60)
             };
-            ConfigureButton(_driversButton, "Drivers e atualizações", Theme.Green, 224);
-            ConfigureButton(_reportsButton, "Abrir relatórios", Theme.NavySoft, 170);
+            Label description = new Label
+            {
+                Text = "Reúne as ferramentas nativas do Windows para componentes, integridade e otimização da unidade.",
+                AutoSize = false,
+                Size = new Size(430, 50),
+                Font = Theme.Body,
+                ForeColor = Theme.Muted,
+                Location = new Point(26, 105)
+            };
+            Label included = new Label
+            {
+                Text = "Componentes  •  DISM/SFC  •  TRIM ou desfragmentação",
+                AutoSize = true,
+                Font = Theme.Small,
+                ForeColor = Theme.Muted,
+                Location = new Point(25, 166)
+            };
+            ConfigureButton(_advancedButton, "Escolher tarefas", Theme.Green, 190);
+            _advancedButton.Location = new Point(24, 202);
+            _advancedButton.Click += async delegate { await ShowAdvancedAndRunAsync(); };
+
+            card.Controls.Add(badge);
+            card.Controls.Add(title);
+            card.Controls.Add(description);
+            card.Controls.Add(included);
+            card.Controls.Add(_advancedButton);
+            return card;
+        }
+
+        private Control BuildUpdatesCard()
+        {
+            Panel card = MakeCard(new Padding(22));
+            card.Margin = new Padding(0, 0, 10, 0);
+            Label icon = new Label
+            {
+                Text = "↻",
+                Font = new Font("Segoe UI Symbol", 28f),
+                ForeColor = Theme.Cyan,
+                AutoSize = true,
+                Location = new Point(22, 20)
+            };
+            Label title = new Label
+            {
+                Text = "Drivers e Windows Update",
+                AutoSize = true,
+                Font = Theme.Heading,
+                ForeColor = Theme.Text,
+                Location = new Point(72, 24)
+            };
+            Label text = new Label
+            {
+                Text = "Veja as versões instaladas e use somente os canais oficiais da Microsoft, Intel, NVIDIA e HP.",
+                AutoSize = false,
+                Size = new Size(420, 46),
+                Font = Theme.Small,
+                ForeColor = Theme.Muted,
+                Location = new Point(73, 58)
+            };
+            ConfigureButton(_driversButton, "Abrir central", Theme.Blue, 150);
+            ConfigureButton(_reportsButton, "Histórico", Theme.NavySoft, 120);
+            _driversButton.Location = new Point(23, 112);
+            _reportsButton.Location = new Point(183, 112);
             _driversButton.Click += delegate { using (DriverCenterForm form = new DriverCenterForm()) form.ShowDialog(this); };
             _reportsButton.Click += delegate
             {
                 Directory.CreateDirectory(ReportDirectory);
                 OpenTarget(ReportDirectory);
             };
-            footer.Controls.Add(_driversButton);
-            footer.Controls.Add(_reportsButton);
-            return footer;
+
+            card.Controls.Add(icon);
+            card.Controls.Add(title);
+            card.Controls.Add(text);
+            card.Controls.Add(_driversButton);
+            card.Controls.Add(_reportsButton);
+            return card;
+        }
+
+        private Control BuildActivityCard()
+        {
+            Panel card = MakeCard(new Padding(20));
+            card.Margin = new Padding(10, 0, 0, 0);
+            Label heading = new Label
+            {
+                Text = "Atividade",
+                Dock = DockStyle.Top,
+                Height = 32,
+                Font = Theme.Heading,
+                ForeColor = Theme.Text
+            };
+            _progress.Dock = DockStyle.Bottom;
+            _progress.Height = 6;
+            _progress.Style = ProgressBarStyle.Continuous;
+            _log.Dock = DockStyle.Fill;
+            _log.BorderStyle = BorderStyle.None;
+            _log.BackColor = Color.White;
+            _log.ForeColor = Theme.Muted;
+            _log.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
+            _log.ReadOnly = true;
+            _log.DetectUrls = false;
+            _log.Text = "Tudo pronto. A análise não remove nenhum arquivo.\n";
+            card.Controls.Add(_log);
+            card.Controls.Add(heading);
+            card.Controls.Add(_progress);
+            return card;
         }
 
         private static Panel MakeCard(Padding padding)
         {
-            Panel panel = new Panel
+            RoundedPanel panel = new RoundedPanel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Theme.Card,
                 Padding = padding,
-                BorderStyle = BorderStyle.FixedSingle
+                OutlineColor = Theme.Border,
+                CornerRadius = 18
             };
             return panel;
         }
@@ -377,7 +512,7 @@ namespace MestrePCCare
                 TextAlign = ContentAlignment.BottomCenter
             };
             value.Text = "—";
-            value.Font = new Font("Segoe UI Semibold", 15f, FontStyle.Bold);
+            value.Font = new Font("Segoe UI Semibold", 17f, FontStyle.Bold);
             value.ForeColor = Theme.Text;
             value.Dock = DockStyle.Fill;
             value.TextAlign = ContentAlignment.TopCenter;
@@ -412,6 +547,57 @@ namespace MestrePCCare
             button.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
             button.Cursor = Cursors.Hand;
             button.Margin = new Padding(0, 0, 10, 8);
+            button.UseVisualStyleBackColor = false;
+            button.Resize += delegate
+            {
+                if (button.Width < 4 || button.Height < 4) return;
+                using (GraphicsPath path = RoundedRectangle(new Rectangle(0, 0, button.Width, button.Height), 10))
+                    button.Region = new Region(path);
+            };
+        }
+
+        private static Label CreateBadge(string text, Color background, Color foreground)
+        {
+            Label badge = new Label
+            {
+                Text = text,
+                AutoSize = false,
+                Size = new Size(118, 26),
+                BackColor = background,
+                ForeColor = foreground,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold)
+            };
+            return badge;
+        }
+
+        private static GraphicsPath RoundedRectangle(Rectangle bounds, int radius)
+        {
+            int diameter = radius * 2;
+            GraphicsPath path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private async Task ShowAdvancedAndRunAsync()
+        {
+            using (MaintenanceOptionsForm form = new MaintenanceOptionsForm(
+                _tempCheck.Checked, _reportsCheck.Checked, _recycleCheck.Checked,
+                _componentsCheck.Checked, _healthCheck.Checked, _drivesCheck.Checked))
+            {
+                if (form.ShowDialog(this) != DialogResult.OK) return;
+                _tempCheck.Checked = form.CleanTemp;
+                _reportsCheck.Checked = form.CleanReports;
+                _recycleCheck.Checked = form.EmptyRecycleBin;
+                _componentsCheck.Checked = form.CleanComponents;
+                _healthCheck.Checked = form.CheckHealth;
+                _drivesCheck.Checked = form.OptimizeDrive;
+            }
+            await RunMaintenanceAsync();
         }
 
         private void UpdateSystemStatus()
@@ -466,6 +652,7 @@ namespace MestrePCCare
                 _analyzedBytes = result.TotalBytes;
                 _analysisValue.Text = FormatBytes(result.TotalBytes);
                 _analysisValue.ForeColor = result.TotalBytes > 512L * 1024 * 1024 ? Theme.Green : Theme.Text;
+                _runButton.Text = result.TotalBytes > 0 ? "Limpar " + FormatBytes(result.TotalBytes) : "Limpeza rápida";
 
                 AppendLog("Temporários seguros: " + FormatBytes(result.TempBytes) + " em " + result.TempFiles + " arquivos");
                 AppendLog("Relatórios de erro: " + FormatBytes(result.ReportBytes) + " em " + result.ReportFiles + " arquivos");
@@ -489,7 +676,7 @@ namespace MestrePCCare
             List<string> selected = GetSelectedTasks();
             if (selected.Count == 0)
             {
-                MessageBox.Show("Marque pelo menos uma opção.", "Mestre PC Care", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Marque pelo menos uma opção.", "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -504,7 +691,7 @@ namespace MestrePCCare
             _log.Clear();
             AppendLog("MANUTENÇÃO — " + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
             StringBuilder report = new StringBuilder();
-            report.AppendLine("Mestre PC Care — Relatório de manutenção");
+            report.AppendLine("Neck — Relatório de manutenção");
             report.AppendLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
             report.AppendLine(new string('-', 64));
             long freed = 0;
@@ -606,7 +793,7 @@ namespace MestrePCCare
 
                 MessageBox.Show(
                     "Manutenção concluída.\n\nEspaço liberado diretamente: " + FormatBytes(freed) + "\nUm relatório detalhado foi salvo em Documentos.",
-                    "Mestre PC Care",
+                    "Neck",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
@@ -614,7 +801,7 @@ namespace MestrePCCare
             {
                 AppendLog("A manutenção foi interrompida: " + ex.Message);
                 MessageBox.Show("A manutenção foi interrompida. Consulte o relatório na tela.\n\n" + ex.Message,
-                    "Mestre PC Care", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally
             {
@@ -639,6 +826,7 @@ namespace MestrePCCare
             _busy = busy;
             _analyzeButton.Enabled = !busy;
             _runButton.Enabled = !busy;
+            _advancedButton.Enabled = !busy;
             _driversButton.Enabled = !busy;
             _progress.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
             _progress.MarqueeAnimationSpeed = busy ? 25 : 0;
@@ -675,7 +863,187 @@ namespace MestrePCCare
         internal static void OpenTarget(string target)
         {
             try { Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true }); }
-            catch (Exception ex) { MessageBox.Show("Não foi possível abrir:\n" + target + "\n\n" + ex.Message, "Mestre PC Care", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            catch (Exception ex) { MessageBox.Show("Não foi possível abrir:\n" + target + "\n\n" + ex.Message, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        }
+    }
+
+    internal sealed class MaintenanceOptionsForm : Form
+    {
+        private readonly CheckBox _temp = new CheckBox();
+        private readonly CheckBox _reports = new CheckBox();
+        private readonly CheckBox _recycle = new CheckBox();
+        private readonly CheckBox _components = new CheckBox();
+        private readonly CheckBox _health = new CheckBox();
+        private readonly CheckBox _drives = new CheckBox();
+
+        public bool CleanTemp { get { return _temp.Checked; } }
+        public bool CleanReports { get { return _reports.Checked; } }
+        public bool EmptyRecycleBin { get { return _recycle.Checked; } }
+        public bool CleanComponents { get { return _components.Checked; } }
+        public bool CheckHealth { get { return _health.Checked; } }
+        public bool OptimizeDrive { get { return _drives.Checked; } }
+
+        public MaintenanceOptionsForm(bool temp, bool reports, bool recycle, bool components, bool health, bool drives)
+        {
+            Text = "Manutenção completa — Neck";
+            StartPosition = FormStartPosition.CenterParent;
+            Size = new Size(760, 690);
+            MinimumSize = new Size(720, 650);
+            BackColor = Theme.Background;
+            Font = Theme.Body;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+
+            _temp.Checked = temp;
+            _reports.Checked = reports;
+            _recycle.Checked = recycle;
+            _components.Checked = components;
+            _health.Checked = health;
+            _drives.Checked = drives;
+            BuildInterface();
+        }
+
+        private void BuildInterface()
+        {
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Navy };
+            header.Controls.Add(new Label
+            {
+                Text = "Escolha o que o Neck deve fazer",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(28, 20)
+            });
+            header.Controls.Add(new Label
+            {
+                Text = "Nada será executado até você confirmar na próxima tela.",
+                AutoSize = true,
+                Font = Theme.Body,
+                ForeColor = Color.FromArgb(186, 199, 218),
+                Location = new Point(31, 62)
+            });
+
+            TableLayoutPanel body = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 20, 24, 20),
+                ColumnCount = 2,
+                RowCount = 2,
+                BackColor = Theme.Background
+            };
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+
+            Panel safeCard = CreateOptionCard("Limpeza", "Arquivos dispensáveis e antigos", Theme.Blue);
+            Panel systemCard = CreateOptionCard("Sistema", "Ferramentas nativas do Windows", Theme.Green);
+            safeCard.Margin = new Padding(0, 0, 10, 0);
+            systemCard.Margin = new Padding(10, 0, 0, 0);
+
+            FlowLayoutPanel safeList = OptionList();
+            ConfigureOption(_temp, "Temporários seguros", "Preserva arquivos recentes e ignora itens em uso.");
+            ConfigureOption(_reports, "Relatórios de erro antigos", "Remove dumps e relatórios com mais de 14 dias.");
+            ConfigureOption(_recycle, "Esvaziar Lixeira", "Apaga definitivamente o conteúdo atual da Lixeira.");
+            _recycle.ForeColor = Theme.Amber;
+            safeList.Controls.AddRange(new Control[] { _temp, _reports, _recycle });
+            safeCard.Controls.Add(safeList);
+
+            FlowLayoutPanel systemList = OptionList();
+            ConfigureOption(_components, "Componentes do Windows", "Remove versões substituídas usando DISM.");
+            ConfigureOption(_health, "Verificar integridade", "Executa DISM ScanHealth e SFC VerifyOnly.");
+            ConfigureOption(_drives, "Otimizar unidade", "Usa TRIM para SSD ou desfragmentação para HD.");
+            systemList.Controls.AddRange(new Control[] { _components, _health, _drives });
+            systemCard.Controls.Add(systemList);
+
+            FlowLayoutPanel footer = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                Padding = new Padding(0, 13, 0, 0)
+            };
+            Button run = new Button { Text = "Continuar", DialogResult = DialogResult.OK };
+            Button cancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel };
+            ConfigureDialogButton(run, Theme.Blue, 150);
+            ConfigureDialogButton(cancel, Theme.NavySoft, 118);
+            footer.Controls.Add(run);
+            footer.Controls.Add(cancel);
+            AcceptButton = run;
+            CancelButton = cancel;
+
+            body.Controls.Add(safeCard, 0, 0);
+            body.Controls.Add(systemCard, 1, 0);
+            body.SetColumnSpan(footer, 2);
+            body.Controls.Add(footer, 0, 1);
+            Controls.Add(body);
+            Controls.Add(header);
+        }
+
+        private static Panel CreateOptionCard(string title, string subtitle, Color accent)
+        {
+            RoundedPanel card = new RoundedPanel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White,
+                OutlineColor = Theme.Border,
+                CornerRadius = 16,
+                Padding = new Padding(20, 78, 20, 18)
+            };
+            card.Controls.Add(new Label
+            {
+                Text = title,
+                AutoSize = true,
+                Font = Theme.Heading,
+                ForeColor = Theme.Text,
+                Location = new Point(20, 19)
+            });
+            card.Controls.Add(new Label
+            {
+                Text = subtitle,
+                AutoSize = true,
+                Font = Theme.Small,
+                ForeColor = accent,
+                Location = new Point(22, 51)
+            });
+            return card;
+        }
+
+        private static FlowLayoutPanel OptionList()
+        {
+            return new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                AutoScroll = false,
+                BackColor = Color.White
+            };
+        }
+
+        private static void ConfigureOption(CheckBox box, string title, string description)
+        {
+            box.AutoSize = false;
+            box.Width = 295;
+            box.Height = 98;
+            box.Text = title + Environment.NewLine + description;
+            box.Font = Theme.Body;
+            box.ForeColor = Theme.Text;
+            box.CheckAlign = ContentAlignment.TopLeft;
+            box.TextAlign = ContentAlignment.TopLeft;
+            box.Padding = new Padding(2, 5, 2, 2);
+            box.Margin = new Padding(0, 0, 0, 6);
+        }
+
+        private static void ConfigureDialogButton(Button button, Color color, int width)
+        {
+            button.Width = width;
+            button.Height = 42;
+            button.BackColor = color;
+            button.ForeColor = Color.White;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0;
+            button.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+            button.Margin = new Padding(10, 0, 0, 0);
+            button.Cursor = Cursors.Hand;
         }
     }
 
@@ -686,13 +1054,13 @@ namespace MestrePCCare
 
         public DriverCenterForm()
         {
-            Text = "Drivers e atualizações — Mestre PC Care";
+            Text = "Drivers e atualizações — Neck";
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(820, 650);
             MinimumSize = new Size(760, 600);
             BackColor = Theme.Background;
             Font = Theme.Body;
-            Icon = SystemIcons.Shield;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
             BuildInterface();
             Shown += async delegate { await LoadVersionsAsync(); };
         }
@@ -805,14 +1173,14 @@ namespace MestrePCCare
             _restoreButton.Text = "Criando...";
             try
             {
-                string script = "Checkpoint-Computer -Description 'Mestre PC Care - antes dos drivers' -RestorePointType MODIFY_SETTINGS";
+                string script = "Checkpoint-Computer -Description 'Neck - antes dos drivers' -RestorePointType MODIFY_SETTINGS";
                 ProcessResult result = await Task.Run(delegate
                 {
                     return ProcessRunner.Run(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
                         "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + script + "\"", 180000);
                 });
                 MessageBox.Show(result.ExitCode == 0 ? "Ponto de restauração criado." : "O Windows não criou o ponto de restauração. A Proteção do Sistema pode estar desativada.\n\n" + result.Output,
-                    "Mestre PC Care", MessageBoxButtons.OK, result.ExitCode == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                    "Neck", MessageBoxButtons.OK, result.ExitCode == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             }
             finally
             {

@@ -5,10 +5,14 @@ param(
 $ErrorActionPreference = 'Stop'
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-$outputPath = Join-Path $OutputDirectory 'Mestre PC Care.exe'
+$outputPath = Join-Path $OutputDirectory 'Neck.exe'
 if (Test-Path -LiteralPath $outputPath) {
     Remove-Item -LiteralPath $outputPath -Force
 }
+
+$artifactDirectory = Join-Path $PSScriptRoot 'build-artifacts'
+$iconPath = Join-Path $artifactDirectory 'neck.ico'
+& (Join-Path $PSScriptRoot 'generate-icon.ps1') -OutputPath $iconPath
 
 $compiler = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) {
@@ -22,6 +26,7 @@ $arguments = @(
     '/optimize+'
     '/warn:4'
     "/win32manifest:$PSScriptRoot\app.manifest"
+    "/win32icon:$iconPath"
     "/out:$outputPath"
     '/reference:System.dll'
     '/reference:System.Core.dll'
