@@ -16,6 +16,8 @@ namespace Neck
                 HealthSnapshot health = SystemInfo.GetHealthSnapshot();
                 healthTimer.Stop();
                 if (health.Score < 0 || health.Score > 100) throw new InvalidOperationException("Pontuação de saúde inválida.");
+                MeetingPreflight meeting = SystemInfo.GetMeetingPreflight();
+                if (meeting.Checks.Count < 6) throw new InvalidOperationException("Checklist de reunião incompleto.");
                 using (MainForm form = new MainForm())
                 {
                     Console.WriteLine("MainFormSize=" + form.ClientSize.Width + "x" + form.ClientSize.Height);
@@ -70,6 +72,23 @@ namespace Neck
                     }
                     diagnostic.Close();
                 }
+                using (MeetingModeForm meetingForm = new MeetingModeForm(meeting))
+                {
+                    meetingForm.ShowInTaskbar = false;
+                    meetingForm.StartPosition = FormStartPosition.Manual;
+                    meetingForm.Location = new System.Drawing.Point(-32000, -32000);
+                    meetingForm.Show();
+                    Application.DoEvents();
+                    if (meetingForm.DurationMinutes != 60) throw new InvalidOperationException("Duração padrão do Modo Reunião inválida.");
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(meetingForm.Width, meetingForm.Height))
+                    {
+                        meetingForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, meetingForm.Width, meetingForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Meeting.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("MeetingPreview=" + previewPath);
+                    }
+                    meetingForm.Close();
+                }
                 Console.WriteLine("SELF_TEST_OK");
                 Console.WriteLine("TempBytes=" + result.TempBytes);
                 Console.WriteLine("TempFiles=" + result.TempFiles);
@@ -81,6 +100,7 @@ namespace Neck
                 Console.WriteLine("HealthLevel=" + health.Level);
                 Console.WriteLine("ObservedProcessGroups=" + health.TopProcesses.Count);
                 Console.WriteLine("HealthScanMilliseconds=" + healthTimer.ElapsedMilliseconds);
+                Console.WriteLine("MeetingChecks=" + meeting.Checks.Count);
                 return 0;
             }
             catch (Exception ex)

@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("0.3.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.3.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.4.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.4.0.0")]
 
 namespace Neck
 {
@@ -141,6 +141,7 @@ namespace Neck
         private readonly Button _advancedButton = new Button();
         private readonly Button _driversButton = new Button();
         private readonly Button _guardButton = new Button();
+        private readonly Button _meetingButton = new Button();
         private readonly Button _reportsButton = new Button();
         private readonly Label _guardBadge = new Label();
         private readonly Label _guardMessage = new Label();
@@ -156,6 +157,8 @@ namespace Neck
         private bool _busy;
         private DateTime _lastHealthScan = DateTime.MinValue;
         private HealthSnapshot _healthSnapshot;
+        private bool _meetingActive;
+        private DateTime _meetingEndsAt;
 
         private static readonly string DataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neck");
@@ -187,6 +190,10 @@ namespace Neck
             _statusTimer.Start();
 
             Shown += async delegate { await AnalyzeAsync(false); };
+            FormClosed += delegate
+            {
+                if (_meetingActive) NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
+            };
         }
 
         private void BuildInterface()
@@ -438,12 +445,15 @@ namespace Neck
             _guardProcess.ForeColor = Theme.Text;
             _guardProcess.Location = new Point(23, 112);
 
-            ConfigureButton(_guardButton, "Ver diagnóstico", Theme.Blue, 150);
-            ConfigureButton(_driversButton, "Drivers", Theme.NavySoft, 106);
-            ConfigureButton(_reportsButton, "Histórico", Theme.NavySoft, 112);
-            _guardButton.Location = new Point(22, 142);
-            _driversButton.Location = new Point(182, 142);
-            _reportsButton.Location = new Point(298, 142);
+            ConfigureButton(_meetingButton, "Modo reunião", Theme.Blue, 140);
+            ConfigureButton(_guardButton, "Diagnóstico", Theme.NavySoft, 112);
+            ConfigureButton(_driversButton, "Drivers", Theme.NavySoft, 82);
+            ConfigureButton(_reportsButton, "Histórico", Theme.NavySoft, 96);
+            _meetingButton.Location = new Point(22, 142);
+            _guardButton.Location = new Point(172, 142);
+            _driversButton.Location = new Point(294, 142);
+            _reportsButton.Location = new Point(386, 142);
+            _meetingButton.Click += delegate { ToggleMeetingMode(); };
             _guardButton.Click += delegate
             {
                 HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
@@ -460,6 +470,7 @@ namespace Neck
             card.Controls.Add(title);
             card.Controls.Add(_guardMessage);
             card.Controls.Add(_guardProcess);
+            card.Controls.Add(_meetingButton);
             card.Controls.Add(_guardButton);
             card.Controls.Add(_driversButton);
             card.Controls.Add(_reportsButton);
@@ -621,6 +632,8 @@ namespace Neck
 
         private void UpdateSystemStatus()
         {
+            if (_meetingActive && DateTime.Now >= _meetingEndsAt) DeactivateMeetingMode("O tempo escolhido terminou.");
+
             MemoryStatus status = SystemInfo.GetMemoryStatus();
             _memoryValue.Text = status.PercentUsed.ToString("0.0", CultureInfo.CurrentCulture) + "%";
             _memoryValue.ForeColor = status.PercentUsed >= 85 ? Color.Firebrick : status.PercentUsed >= 70 ? Theme.Amber : Theme.Green;
@@ -645,6 +658,11 @@ namespace Neck
         private void UpdateGuardView(HealthSnapshot snapshot)
         {
             if (snapshot == null) return;
+            if (_meetingActive)
+            {
+                UpdateMeetingDisplay();
+                return;
+            }
             if (snapshot.Level == HealthLevel.Critical)
             {
                 _guardBadge.Text = "CRÍTICO";
@@ -669,6 +687,71 @@ namespace Neck
             _guardProcess.Text = top == null
                 ? "Nenhum processo pôde ser analisado."
                 : "Maior uso: " + top.DisplayName + "  •  " + FormatBytes(top.MemoryBytes);
+        }
+
+        private void ToggleMeetingMode()
+        {
+            if (_meetingActive)
+            {
+                DeactivateMeetingMode("Encerrado por você.");
+                return;
+            }
+
+            MeetingPreflight preflight = SystemInfo.GetMeetingPreflight();
+            using (MeetingModeForm form = new MeetingModeForm(preflight))
+            {
+                if (form.ShowDialog(this) != DialogResult.OK) return;
+                ActivateMeetingMode(form.DurationMinutes);
+            }
+        }
+
+        private void ActivateMeetingMode(int durationMinutes)
+        {
+            uint state = NativeMethods.SetThreadExecutionState(
+                NativeMethods.ES_CONTINUOUS | NativeMethods.ES_SYSTEM_REQUIRED | NativeMethods.ES_DISPLAY_REQUIRED);
+            if (state == 0)
+            {
+                MessageBox.Show("O Windows não permitiu ativar a proteção contra suspensão.", "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            _meetingActive = true;
+            _meetingEndsAt = DateTime.Now.AddMinutes(Math.Max(15, durationMinutes));
+            _analyzeButton.Enabled = false;
+            _runButton.Enabled = false;
+            _advancedButton.Enabled = false;
+            UpdateMeetingDisplay();
+            AppendLog("MODO REUNIÃO — ativo até " + _meetingEndsAt.ToString("HH:mm") + ". Suspensão e tela apagada foram bloqueadas.");
+        }
+
+        private void UpdateMeetingDisplay()
+        {
+            TimeSpan remaining = _meetingEndsAt - DateTime.Now;
+            int minutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+            _guardBadge.Text = "PROTEGIDO";
+            _guardBadge.BackColor = Color.FromArgb(236, 254, 255);
+            _guardBadge.ForeColor = Theme.Cyan;
+            _guardMessage.Text = "Reunião protegida por mais " + minutes + " min. Manutenções estão pausadas.";
+            _guardProcess.Text = "A tela e o computador não entrarão em suspensão.";
+            _meetingButton.Text = "Encerrar modo";
+            _meetingButton.BackColor = Theme.Cyan;
+            _recommendation.Text = "MODO REUNIÃO  •  até " + _meetingEndsAt.ToString("HH:mm");
+            _recommendation.BackColor = Color.FromArgb(14, 116, 144);
+        }
+
+        private void DeactivateMeetingMode(string reason)
+        {
+            NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
+            _meetingActive = false;
+            _meetingButton.Text = "Modo reunião";
+            _meetingButton.BackColor = Theme.Blue;
+            _analyzeButton.Enabled = !_busy;
+            _runButton.Enabled = !_busy;
+            _advancedButton.Enabled = !_busy;
+            _recommendation.BackColor = Theme.NavySoft;
+            LoadLastRun();
+            UpdateGuardView(_healthSnapshot);
+            AppendLog("MODO REUNIÃO — desativado. " + reason);
         }
 
         private void LoadLastRun()
@@ -728,6 +811,11 @@ namespace Neck
         private async Task RunMaintenanceAsync()
         {
             if (_busy) return;
+            if (_meetingActive)
+            {
+                MessageBox.Show("Encerre o Modo Reunião antes de iniciar uma manutenção.", "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
             List<string> selected = GetSelectedTasks();
             if (selected.Count == 0)
             {
@@ -879,11 +967,12 @@ namespace Neck
         private void SetBusy(bool busy, string status)
         {
             _busy = busy;
-            _analyzeButton.Enabled = !busy;
-            _runButton.Enabled = !busy;
-            _advancedButton.Enabled = !busy;
+            _analyzeButton.Enabled = !busy && !_meetingActive;
+            _runButton.Enabled = !busy && !_meetingActive;
+            _advancedButton.Enabled = !busy && !_meetingActive;
             _driversButton.Enabled = !busy;
             _guardButton.Enabled = !busy;
+            _meetingButton.Enabled = !busy;
             _progress.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
             _progress.MarqueeAnimationSpeed = busy ? 25 : 0;
             if (!string.IsNullOrEmpty(status)) AppendLog(status);
@@ -920,6 +1009,185 @@ namespace Neck
         {
             try { Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true }); }
             catch (Exception ex) { MessageBox.Show("Não foi possível abrir:\n" + target + "\n\n" + ex.Message, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        }
+    }
+
+    internal sealed class MeetingModeForm : Form
+    {
+        private readonly MeetingPreflight _preflight;
+        private readonly ComboBox _duration = new ComboBox();
+
+        public int DurationMinutes
+        {
+            get
+            {
+                if (_duration.SelectedIndex == 0) return 30;
+                if (_duration.SelectedIndex == 2) return 120;
+                return 60;
+            }
+        }
+
+        public MeetingModeForm(MeetingPreflight preflight)
+        {
+            _preflight = preflight ?? new MeetingPreflight();
+            Text = "Modo Reunião — Neck";
+            StartPosition = FormStartPosition.CenterParent;
+            Size = new Size(820, 700);
+            MinimumSize = new Size(760, 650);
+            BackColor = Theme.Background;
+            Font = Theme.Body;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+            BuildInterface();
+        }
+
+        private void BuildInterface()
+        {
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 116, BackColor = Theme.Navy };
+            header.Controls.Add(new Label
+            {
+                Text = "Modo Reunião",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 22f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(28, 18)
+            });
+            header.Controls.Add(new Label
+            {
+                Text = "Prepare o computador antes de compartilhar sua tela",
+                AutoSize = true,
+                Font = Theme.Body,
+                ForeColor = Color.FromArgb(186, 199, 218),
+                Location = new Point(31, 67)
+            });
+
+            TableLayoutPanel body = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 20, 24, 20),
+                ColumnCount = 1,
+                RowCount = 4,
+                BackColor = Theme.Background
+            };
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
+            body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));
+
+            RoundedPanel summary = new RoundedPanel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White,
+                OutlineColor = Theme.Border,
+                CornerRadius = 16,
+                Margin = new Padding(0, 0, 0, 12)
+            };
+            int warnings = _preflight.Checks.Count(item => item.Status != MeetingCheckStatus.Ready);
+            Color summaryColor = warnings == 0 ? Theme.Green : warnings >= 2 ? Theme.Amber : Theme.Blue;
+            summary.Controls.Add(new Label
+            {
+                Text = warnings == 0 ? "PRONTO" : warnings + " ALERTA" + (warnings == 1 ? "" : "S"),
+                AutoSize = false,
+                Size = new Size(128, 31),
+                BackColor = warnings == 0 ? Theme.GreenSoft : Color.FromArgb(255, 247, 237),
+                ForeColor = summaryColor,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
+                Location = new Point(20, 20)
+            });
+            summary.Controls.Add(new Label
+            {
+                Text = warnings == 0 ? "Seu computador está pronto para apresentar." : "Revise os alertas antes de começar.",
+                AutoSize = true,
+                Font = Theme.Heading,
+                ForeColor = Theme.Text,
+                Location = new Point(166, 20)
+            });
+            summary.Controls.Add(new Label
+            {
+                Text = "Ao ativar, o Neck impede suspensão e tela apagada e pausa suas próprias manutenções.",
+                AutoSize = false,
+                Size = new Size(660, 37),
+                Font = Theme.Small,
+                ForeColor = Theme.Muted,
+                Location = new Point(22, 64)
+            });
+
+            ListView checklist = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = false,
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White,
+                ForeColor = Theme.Text,
+                Font = Theme.Body,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable
+            };
+            checklist.Columns.Add("Estado", 90, HorizontalAlignment.Center);
+            checklist.Columns.Add("Verificação", 185);
+            checklist.Columns.Add("Resultado", 425);
+            foreach (MeetingCheck check in _preflight.Checks)
+            {
+                string state = check.Status == MeetingCheckStatus.Ready ? "PRONTO" : check.Status == MeetingCheckStatus.Warning ? "ATENÇÃO" : "RISCO";
+                ListViewItem item = new ListViewItem(state);
+                item.SubItems.Add(check.Title);
+                item.SubItems.Add(check.Message);
+                item.ForeColor = check.Status == MeetingCheckStatus.Ready ? Theme.Green :
+                                     check.Status == MeetingCheckStatus.Warning ? Theme.Amber : Color.Firebrick;
+                checklist.Items.Add(item);
+            }
+
+            Panel durationPanel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background };
+            durationPanel.Controls.Add(new Label
+            {
+                Text = "Duração da proteção",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
+                ForeColor = Theme.Text,
+                Location = new Point(4, 13)
+            });
+            _duration.DropDownStyle = ComboBoxStyle.DropDownList;
+            _duration.Items.AddRange(new object[] { "30 minutos", "1 hora", "2 horas" });
+            _duration.SelectedIndex = 1;
+            _duration.Size = new Size(180, 32);
+            _duration.Location = new Point(190, 9);
+            durationPanel.Controls.Add(_duration);
+
+            FlowLayoutPanel footer = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                Padding = new Padding(0, 10, 0, 0)
+            };
+            Button activate = new Button { Text = "Ativar Modo Reunião", DialogResult = DialogResult.OK };
+            Button cancel = new Button { Text = "Agora não", DialogResult = DialogResult.Cancel };
+            ConfigureMeetingButton(activate, Theme.Blue, 190);
+            ConfigureMeetingButton(cancel, Theme.NavySoft, 120);
+            footer.Controls.Add(activate);
+            footer.Controls.Add(cancel);
+            AcceptButton = activate;
+            CancelButton = cancel;
+
+            body.Controls.Add(summary, 0, 0);
+            body.Controls.Add(checklist, 0, 1);
+            body.Controls.Add(durationPanel, 0, 2);
+            body.Controls.Add(footer, 0, 3);
+            Controls.Add(body);
+            Controls.Add(header);
+        }
+
+        private static void ConfigureMeetingButton(Button button, Color color, int width)
+        {
+            button.Width = width;
+            button.Height = 42;
+            button.BackColor = color;
+            button.ForeColor = Color.White;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0;
+            button.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+            button.Margin = new Padding(10, 0, 0, 0);
+            button.Cursor = Cursors.Hand;
         }
     }
 
@@ -1660,6 +1928,26 @@ namespace Neck
         public List<ResourceProcess> TopProcesses = new List<ResourceProcess>();
     }
 
+    internal enum MeetingCheckStatus
+    {
+        Ready,
+        Warning,
+        Risk
+    }
+
+    internal sealed class MeetingCheck
+    {
+        public MeetingCheckStatus Status;
+        public string Title;
+        public string Message;
+    }
+
+    internal sealed class MeetingPreflight
+    {
+        public HealthSnapshot Health = new HealthSnapshot();
+        public List<MeetingCheck> Checks = new List<MeetingCheck>();
+    }
+
     internal static class SystemInfo
     {
         public static MemoryStatus GetMemoryStatus()
@@ -1747,6 +2035,99 @@ namespace Neck
             return snapshot;
         }
 
+        public static MeetingPreflight GetMeetingPreflight()
+        {
+            MeetingPreflight preflight = new MeetingPreflight();
+            preflight.Health = GetHealthSnapshot();
+            HealthSnapshot health = preflight.Health;
+
+            preflight.Checks.Add(new MeetingCheck
+            {
+                Status = health.Memory.PercentUsed >= 90 ? MeetingCheckStatus.Risk :
+                         health.Memory.PercentUsed >= 75 ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
+                Title = "Memória RAM",
+                Message = health.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% em uso; " +
+                          MainForm.FormatBytes((long)health.Memory.AvailableBytes) + " disponíveis."
+            });
+
+            bool diskRisk = health.DiskTotalBytes > 0 &&
+                            (health.DiskFreeBytes < 2L * 1024 * 1024 * 1024 || health.DiskFreeBytes * 100 / health.DiskTotalBytes < 5);
+            bool diskWarning = health.DiskTotalBytes > 0 && health.DiskFreeBytes < 15L * 1024 * 1024 * 1024;
+            preflight.Checks.Add(new MeetingCheck
+            {
+                Status = diskRisk ? MeetingCheckStatus.Risk : diskWarning ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
+                Title = "Disco do Windows",
+                Message = MainForm.FormatBytes(health.DiskFreeBytes) + " livres para arquivos e memória virtual."
+            });
+
+            bool restartPending = IsRestartPending();
+            preflight.Checks.Add(new MeetingCheck
+            {
+                Status = restartPending ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
+                Title = "Reinicialização",
+                Message = restartPending ? "O Windows indica uma reinicialização pendente." : "Nenhuma reinicialização pendente foi detectada."
+            });
+
+            bool networkAvailable = false;
+            try { networkAvailable = System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable(); }
+            catch { }
+            preflight.Checks.Add(new MeetingCheck
+            {
+                Status = networkAvailable ? MeetingCheckStatus.Ready : MeetingCheckStatus.Warning,
+                Title = "Rede",
+                Message = networkAvailable ? "Uma conexão de rede ativa foi detectada." : "Nenhuma conexão de rede ativa foi detectada."
+            });
+
+            PowerStatus power = SystemInformation.PowerStatus;
+            bool onBattery = power.PowerLineStatus == PowerLineStatus.Offline;
+            string powerMessage;
+            if (onBattery)
+            {
+                int battery = power.BatteryLifePercent >= 0 && power.BatteryLifePercent <= 1
+                    ? (int)Math.Round(power.BatteryLifePercent * 100) : 0;
+                powerMessage = "Usando bateria" + (battery > 0 ? " com " + battery + "% de carga." : ".");
+            }
+            else if (power.PowerLineStatus == PowerLineStatus.Online)
+                powerMessage = "O computador está conectado à energia.";
+            else
+                powerMessage = "Estado de energia não aplicável ou não informado.";
+            preflight.Checks.Add(new MeetingCheck
+            {
+                Status = onBattery ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
+                Title = "Energia",
+                Message = powerMessage
+            });
+
+            ResourceProcess top = health.TopProcesses.FirstOrDefault();
+            bool heavy = top != null && top.MemoryBytes >= 3L * 1024 * 1024 * 1024;
+            preflight.Checks.Add(new MeetingCheck
+            {
+                Status = heavy ? MeetingCheckStatus.Warning : MeetingCheckStatus.Ready,
+                Title = "Aplicativos pesados",
+                Message = top == null ? "Nenhum aplicativo pôde ser comparado." :
+                          top.DisplayName + " lidera o uso com aproximadamente " + MainForm.FormatBytes(top.MemoryBytes) + "."
+            });
+            return preflight;
+        }
+
+        private static bool IsRestartPending()
+        {
+            try
+            {
+                using (Microsoft.Win32.RegistryKey cbs = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"))
+                    if (cbs != null) return true;
+                using (Microsoft.Win32.RegistryKey update = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"))
+                    if (update != null) return true;
+                using (Microsoft.Win32.RegistryKey session = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Control\Session Manager"))
+                    if (session != null && session.GetValue("PendingFileRenameOperations") != null) return true;
+            }
+            catch { }
+            return false;
+        }
+
         private static string TopProcessSentence(ResourceProcess process)
         {
             return process == null
@@ -1772,6 +2153,9 @@ namespace Neck
         public const uint SHERB_NOCONFIRMATION = 0x00000001;
         public const uint SHERB_NOPROGRESSUI = 0x00000002;
         public const uint SHERB_NOSOUND = 0x00000004;
+        public const uint ES_CONTINUOUS = 0x80000000;
+        public const uint ES_SYSTEM_REQUIRED = 0x00000001;
+        public const uint ES_DISPLAY_REQUIRED = 0x00000002;
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         public struct MEMORYSTATUSEX
@@ -1790,6 +2174,9 @@ namespace Neck
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern uint SetThreadExecutionState(uint esFlags);
 
         [DllImport("Shell32.dll", CharSet = CharSet.Unicode)]
         public static extern int SHEmptyRecycleBin(IntPtr hwnd, string pszRootPath, uint dwFlags);
