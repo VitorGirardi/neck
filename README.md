@@ -70,6 +70,7 @@ A animação ocorre por um intervalo curto após cada diagnóstico e não perman
 | **Gargalo Guiado** | Distingue pressão de memória, CPU e armazenamento e recomenda a ação mais útil naquele momento. | Explica o motivo e mantém a confirmação com o usuário. |
 | **Monitor Inteligente** | Ajusta o intervalo de leitura conforme a pressão, confirma persistência e reconhece a recuperação. | Não limpa, fecha ou altera aplicativos automaticamente. |
 | **Escudo de Foco** | Reduz temporariamente a disputa de até três aplicativos pesados quando o aplicativo escolhido está em uso. | Só age sob pressão, protege comunicação e restaura ao trocar de janela. |
+| **Hardware local** | Mostra CPU, GPU, RAM, discos, placa-mãe, drivers e temperaturas realmente disponíveis. | Não envia inventário e nunca estima sensores ausentes. |
 | **Meu Plano Neck** | Cruza RAM, disco, temporários, inicialização e Windows Update para escolher três prioridades. | Não executa nenhuma ação automaticamente. |
 | **Neck Guard** | Mostra a saúde do computador, CPU, RAM e os maiores consumidores de memória. | Diagnóstico somente leitura. |
 | **Acelerar aplicativo** | Alterna automaticamente entre mais desempenho em uso e menor consumo em segundo plano. | Um único botão, duração de uma hora e restauração automática. |
@@ -99,6 +100,20 @@ O cartão principal agora funciona como uma orientação única, não como um pa
 O monitor trabalha de forma adaptativa: verifica a cada 60 segundos quando o computador está fluindo, a cada 30 segundos durante atenção e a cada 15 segundos em situação crítica. Um alerta só é liberado depois de três leituras consecutivas de pressão. Depois, duas leituras estáveis confirmam a recuperação e o intervalo volta ao normal.
 
 Essas leituras e decisões acontecem localmente. O monitor não fecha processos, não executa limpeza e não modifica o Windows por conta própria.
+
+## Hardware e temperaturas
+
+A tela principal apresenta um resumo compacto do computador: processador, memória instalada, placas de vídeo, armazenamento e a maior temperatura disponível. Clicar no resumo abre as especificações completas, incluindo núcleos e threads da CPU, frequência da RAM, módulos instalados, versões dos drivers de vídeo, placa-mãe e discos físicos.
+
+As temperaturas seguem uma ordem de fontes locais:
+
+1. sensores já publicados por LibreHardwareMonitor ou OpenHardwareMonitor, quando algum deles estiver disponível;
+2. driver NVIDIA por meio do `nvidia-smi` instalado junto ao driver;
+3. zonas térmicas ACPI fornecidas pelo firmware ao Windows.
+
+Uma zona ACPI é identificada como temperatura do sistema e não como CPU ou GPU. Quando nenhum sensor compatível está exposto, o Neck mostra **Sensor não disponibilizado**. Ele não inventa, calcula ou estima temperaturas.
+
+![Hardware e sensores locais do Neck](assets/screenshots/neck-hardware.png)
 
 ## Acelerar um aplicativo
 
@@ -161,6 +176,7 @@ A implementação utiliza as APIs documentadas [`SetPriorityClass`](https://lear
 - Não aplica o Neck Adaptive a componentes críticos do Windows nem ao próprio Neck.
 - Não usa prioridade Alta ou Tempo real no Neck Turbo e não altera o plano de energia.
 - Não aplica o Escudo de Foco sem pressão, em processos protegidos ou em aplicativos conhecidos de comunicação, áudio, vídeo e transmissão.
+- Não inventa temperaturas de CPU/GPU quando o firmware ou o driver não expõe um sensor compatível.
 - Não confunde RAM estacionada com memória definitivamente liberada e apresenta somente o resultado observado.
 - Não aplica ajustes genéricos no Registro para prometer desempenho.
 - Não apaga documentos, fotos, downloads, senhas ou dados de navegadores.
@@ -179,11 +195,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.10.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.11.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.10.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.11.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -248,6 +264,8 @@ TurboMode.cs               Prioridade de foco temporária e reversível
 FocusMode.cs               Orquestra Turbo, Adaptive e Escudo de Foco
 FocusShield.cs             Proteção temporária contra concorrentes pesados
 ProcessFamily.cs           Descoberta de processos-filhos e RAM real da família
+HardwareInfo.cs            Inventário local e fontes de temperatura
+HardwareForm.cs            Especificações e sensores em interface dedicada
 StartupAnalysis.cs         Análise somente leitura da inicialização
 PersonalPlan.cs            Motor e interface das três prioridades
 ElevatedOperations.cs      Executor administrativo com lista fechada
@@ -290,6 +308,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Monitor Inteligente adaptativo com confirmação de pressão e recuperação
 - [x] Medição honesta do resultado antes/depois da aceleração
 - [x] Escudo de Foco sensível a RAM e CPU, com restauração imediata
+- [x] Inventário de hardware e temperaturas locais com fontes explícitas
 - [ ] Assinatura digital dos binários
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface

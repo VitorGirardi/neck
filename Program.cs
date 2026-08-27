@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.10.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.10.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.11.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.11.0.0")]
 
 namespace Neck
 {
@@ -467,6 +467,8 @@ namespace Neck
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
         private readonly Label _activityStatus = new Label();
+        private readonly Label _hardwareSummary = new Label();
+        private readonly Label _hardwareTemperature = new Label();
         private readonly Label _actionTitle = new Label();
         private readonly Label _actionHelp = new Label();
         private readonly FlowIndicator _flowIndicator = new FlowIndicator();
@@ -480,6 +482,7 @@ namespace Neck
         private readonly Timer _statusTimer = new Timer();
         private readonly Timer _guardMonitorTimer = new Timer();
         private readonly Timer _adaptiveTimer = new Timer();
+        private readonly Timer _hardwareTimer = new Timer();
         private readonly NotifyIcon _trayIcon = new NotifyIcon();
         private Icon _trayStableIcon;
         private readonly GuardHistoryStore _guardHistory = new GuardHistoryStore();
@@ -504,6 +507,8 @@ namespace Neck
         private GuardAlertKind _lastAlertKind = GuardAlertKind.None;
         private BottleneckAdvice _currentAdvice;
         private DateTime _lastOutcomeShownUtc = DateTime.MinValue;
+        private HardwareSnapshot _hardwareSnapshot;
+        private bool _hardwareRefreshing;
 
         private static readonly string DataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neck");
@@ -561,6 +566,12 @@ namespace Neck
                 catch { }
             };
             _adaptiveTimer.Start();
+            _hardwareTimer.Interval = 30000;
+            _hardwareTimer.Tick += async delegate
+            {
+                if (Visible && !_closing) await RefreshHardwareAsync(false);
+            };
+            _hardwareTimer.Start();
 
             if (!startHidden)
             {
@@ -571,6 +582,7 @@ namespace Neck
                 };
             }
             Shown += delegate { CaptureGuardSample(); };
+            Shown += async delegate { await RefreshHardwareAsync(true); };
             Shown += delegate { if (!startHidden) VisualEffects.FadeIn(this); };
             if (startHidden)
             {
@@ -589,6 +601,7 @@ namespace Neck
                 _statusTimer.Stop();
                 _guardMonitorTimer.Stop();
                 _adaptiveTimer.Stop();
+                _hardwareTimer.Stop();
                 FocusModeManager.Stop();
                 EfficiencyModeManager.RestoreAll();
                 _trayIcon.Visible = false;
@@ -925,28 +938,63 @@ namespace Neck
             card.Margin = new Padding(0, 0, 0, 0);
             Label title = new Label
             {
-                Text = "Precisa de outra coisa?",
+                Text = "Hardware deste computador",
                 AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 12.5f, FontStyle.Bold),
                 ForeColor = Theme.Text,
-                Location = new Point(24, 18)
+                Location = new Point(24, 13),
+                Cursor = Cursors.Hand
             };
+            _hardwareSummary.Text = "Identificando processador, vídeo, memória e armazenamento...";
+            _hardwareSummary.AutoSize = false;
+            _hardwareSummary.Size = new Size(700, 44);
+            _hardwareSummary.Font = Theme.Small;
+            _hardwareSummary.ForeColor = Theme.Text;
+            _hardwareSummary.Location = new Point(25, 37);
+            _hardwareSummary.AutoEllipsis = true;
+            _hardwareSummary.Cursor = Cursors.Hand;
+            _hardwareTemperature.Text = "Temperatura: procurando sensores locais...  •  Ver especificações";
+            _hardwareTemperature.AutoSize = false;
+            _hardwareTemperature.Size = new Size(700, 22);
+            _hardwareTemperature.Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold);
+            _hardwareTemperature.ForeColor = Theme.Blue;
+            _hardwareTemperature.Location = new Point(25, 84);
+            _hardwareTemperature.Cursor = Cursors.Hand;
             _activityStatus.Text = "Tudo pronto. O Neck continua acompanhando o computador.";
             _activityStatus.AutoSize = false;
             _activityStatus.Size = new Size(650, 24);
             _activityStatus.Font = Theme.Small;
             _activityStatus.ForeColor = Theme.Muted;
             _activityStatus.Location = new Point(25, 48);
+            _activityStatus.Visible = false;
             _progress.Dock = DockStyle.Bottom;
             _progress.Height = 5;
             _progress.Visible = false;
             _log.Visible = false;
             ConfigureButton(_toolsButton, "Mais ferramentas", Theme.NavySoft, 190);
             _toolsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _toolsButton.Location = new Point(800, 29);
+            _toolsButton.Location = new Point(800, 37);
             _toolsButton.Click += async delegate { await ShowToolsHubAsync(); };
-            card.Resize += delegate { _toolsButton.Left = card.ClientSize.Width - _toolsButton.Width - 24; };
+            EventHandler showHardware = async delegate { await ShowHardwareDetailsAsync(); };
+            title.Click += showHardware;
+            _hardwareSummary.Click += showHardware;
+            _hardwareTemperature.Click += showHardware;
+            card.Resize += delegate
+            {
+                _toolsButton.Left = card.ClientSize.Width - _toolsButton.Width - 24;
+                int availableWidth = Math.Max(300, _toolsButton.Left - 44);
+                _hardwareSummary.Width = availableWidth;
+                _hardwareTemperature.Width = availableWidth;
+                bool compact = card.ClientSize.Height < 100;
+                _hardwareSummary.Height = compact ? 24 : 44;
+                _hardwareTemperature.Visible = !compact;
+                _hardwareSummary.Top = compact ? 39 : 37;
+                _toolsButton.Top = compact ? 22 : 37;
+                UpdateHardwareSummary(compact);
+            };
             card.Controls.Add(title);
+            card.Controls.Add(_hardwareSummary);
+            card.Controls.Add(_hardwareTemperature);
             card.Controls.Add(_activityStatus);
             card.Controls.Add(_toolsButton);
             card.Controls.Add(_progress);
@@ -1171,6 +1219,88 @@ namespace Neck
             }
             else if (choice == ToolHubChoice.Preferences)
                 ShowPreferences(false);
+        }
+
+        private async Task RefreshHardwareAsync(bool fullInventory)
+        {
+            if (_hardwareRefreshing || _closing || IsDisposed) return;
+            _hardwareRefreshing = true;
+            try
+            {
+                if (fullInventory || _hardwareSnapshot == null)
+                    _hardwareSnapshot = await Task.Run(delegate { return HardwareInfoProvider.Read(); });
+                else
+                {
+                    List<TemperatureReading> temperatures = await Task.Run(delegate { return HardwareInfoProvider.ReadTemperatures(); });
+                    if (_hardwareSnapshot != null)
+                    {
+                        _hardwareSnapshot.Temperatures = temperatures;
+                        _hardwareSnapshot.CapturedUtc = DateTime.UtcNow;
+                    }
+                }
+                if (_closing || IsDisposed) return;
+                UpdateHardwareSummary(_hardwareSummary.Parent != null && _hardwareSummary.Parent.ClientSize.Height < 100);
+            }
+            catch
+            {
+                if (!_closing && !IsDisposed)
+                {
+                    _hardwareSummary.Text = "O Windows não disponibilizou o inventário de hardware agora.";
+                    _hardwareTemperature.Text = "Temperatura: sensor não disponibilizado  •  Ver especificações";
+                    _hardwareTemperature.ForeColor = Theme.Muted;
+                }
+            }
+            finally { _hardwareRefreshing = false; }
+        }
+
+        private void UpdateHardwareSummary(bool compact)
+        {
+            if (_hardwareSummary == null || _hardwareSummary.IsDisposed) return;
+            HardwareSnapshot snapshot = _hardwareSnapshot;
+            if (snapshot == null)
+            {
+                _hardwareSummary.Text = "Identificando processador, vídeo, memória e armazenamento...";
+                return;
+            }
+            if (compact)
+            {
+                _hardwareSummary.Text = "CPU " + ShortHardware(snapshot.ProcessorSummary, 23) + "  •  RAM " +
+                    ShortHardware(snapshot.MemorySummary, 13) + "  •  GPU " + ShortHardware(snapshot.GraphicsSummary, 20) +
+                    "  •  TEMP " + CompactTemperature(snapshot);
+            }
+            else
+            {
+                _hardwareSummary.Text = "CPU  " + ShortHardware(snapshot.ProcessorSummary, 58) + "     RAM  " + ShortHardware(snapshot.MemorySummary, 28) +
+                    Environment.NewLine + "GPU  " + ShortHardware(snapshot.GraphicsSummary, 48) + "     DISCO  " + ShortHardware(snapshot.StorageSummary, 42);
+            }
+            _hardwareTemperature.Text = "Temperatura: " + snapshot.TemperatureSummary + "  •  Ver especificações e sensores";
+            if (snapshot.Temperatures.Count == 0) _hardwareTemperature.ForeColor = Theme.Muted;
+            else
+            {
+                double hottest = snapshot.Temperatures.Max(item => item.Celsius);
+                _hardwareTemperature.ForeColor = hottest >= 90d ? Color.Firebrick : hottest >= 75d ? Theme.Amber : Theme.Green;
+            }
+        }
+
+        private async Task ShowHardwareDetailsAsync()
+        {
+            if (_closing || IsDisposed || _hardwareRefreshing) return;
+            if (_hardwareSnapshot == null) await RefreshHardwareAsync(true);
+            if (_closing || IsDisposed || _hardwareSnapshot == null) return;
+            using (HardwareDetailsForm form = new HardwareDetailsForm(_hardwareSnapshot)) form.ShowDialog(this);
+            await RefreshHardwareAsync(false);
+        }
+
+        private static string ShortHardware(string value, int maximumLength)
+        {
+            string normalized = string.IsNullOrWhiteSpace(value) ? "Não informado" : value.Replace(Environment.NewLine, " ").Trim();
+            return normalized.Length <= maximumLength ? normalized : normalized.Substring(0, Math.Max(1, maximumLength - 1)).TrimEnd() + "…";
+        }
+
+        private static string CompactTemperature(HardwareSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.Temperatures.Count == 0) return "—";
+            return snapshot.Temperatures.Max(item => item.Celsius).ToString("0", CultureInfo.CurrentCulture) + " °C";
         }
 
         private void HandleMainFormClosing(object sender, FormClosingEventArgs e)

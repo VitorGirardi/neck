@@ -18,6 +18,12 @@ namespace Neck
             {
                 ScanResult result = Cleaner.Analyze();
                 MemoryStatus memory = SystemInfo.GetMemoryStatus();
+                HardwareSnapshot hardware = HardwareInfoProvider.Read();
+                if (hardware.CapturedUtc == DateTime.MinValue || string.IsNullOrWhiteSpace(hardware.ProcessorSummary) ||
+                    string.IsNullOrWhiteSpace(hardware.MemorySummary))
+                    throw new InvalidOperationException("O inventário de hardware não retornou um resumo válido.");
+                if (hardware.Temperatures.Any(item => item.Celsius < 5d || item.Celsius > 125d))
+                    throw new InvalidOperationException("Uma temperatura de hardware fora do intervalo seguro foi aceita.");
                 System.Diagnostics.Stopwatch healthTimer = System.Diagnostics.Stopwatch.StartNew();
                 HealthSnapshot health = SystemInfo.GetHealthSnapshot();
                 healthTimer.Stop();
@@ -100,6 +106,22 @@ namespace Neck
                         Console.WriteLine("PreferencesPreview=" + previewPath);
                     }
                     preferences.Close();
+                }
+                using (HardwareDetailsForm hardwareForm = new HardwareDetailsForm(hardware))
+                {
+                    hardwareForm.ShowInTaskbar = false;
+                    hardwareForm.StartPosition = FormStartPosition.Manual;
+                    hardwareForm.Location = new System.Drawing.Point(-32000, -32000);
+                    hardwareForm.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(hardwareForm.Width, hardwareForm.Height))
+                    {
+                        hardwareForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, hardwareForm.Width, hardwareForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Hardware.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("HardwarePreview=" + previewPath);
+                    }
+                    hardwareForm.Close();
                 }
                 System.Collections.Generic.List<StartupEntry> startupEntries = StartupAnalyzer.Analyze();
                 using (StartupAppsForm startup = new StartupAppsForm(startupEntries))

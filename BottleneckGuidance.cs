@@ -23,7 +23,7 @@ namespace Neck
             BottleneckAdvice advice = new BottleneckAdvice();
             if (snapshot == null) return advice;
             advice.Level = snapshot.Level;
-            ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
+            ResourceProcess top = snapshot.TopProcesses.FirstOrDefault(item => EfficiencyModeManager.CanTarget(item.ProcessName));
             bool diskCritical = snapshot.DiskTotalBytes > 0 &&
                 (snapshot.DiskFreeBytes < 2L * 1024 * 1024 * 1024 || snapshot.DiskFreeBytes * 100 / snapshot.DiskTotalBytes < 5);
             bool diskWarning = snapshot.DiskTotalBytes > 0 && snapshot.DiskFreeBytes < 15L * 1024 * 1024 * 1024;

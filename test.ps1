@@ -19,6 +19,7 @@ $common = @(
     '/reference:System.dll'
     '/reference:System.Core.dll'
     '/reference:System.Drawing.dll'
+    '/reference:System.Management.dll'
     '/reference:System.Windows.Forms.dll'
     "/win32icon:$iconPath"
     "/win32manifest:$manifestPath"
