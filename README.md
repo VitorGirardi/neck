@@ -47,6 +47,8 @@ A página inicial foi organizada para qualquer pessoa entender por onde começar
 
 Assim, nenhuma ferramenta foi removida: as ações mais importantes aparecem primeiro e os controles ocasionais ficam em uma segunda camada.
 
+As interações usam movimentos curtos e leves: janelas aparecem suavemente, botões respondem ao mouse e ao clique, cartões destacam o destino selecionado e tarefas exibem uma barra de atividade fluida. O botão principal pulsa somente diante de uma condição crítica e todas as animações contínuas param quando o Neck vai para a bandeja. A opção **Reduzir animações**, nas Preferências, mantém os realces sem movimento.
+
 ![Central de ferramentas secundárias do Neck](assets/screenshots/neck-tools.png)
 
 ## Principais recursos
@@ -135,11 +137,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.6.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.7.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.6.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.7.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -233,6 +235,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Modo Reunião e monitoramento na bandeja
 - [x] Aceleração com um botão e opções técnicas separadas
 - [x] Tela inicial guiada e central separada para ferramentas ocasionais
+- [x] Animações leves, estados interativos e opção de redução de movimento
 - [x] Instalador, preferências e checksums
 - [x] Neck Boot e Meu Plano Neck
 - [x] Neck Adaptive com foco, EcoQoS e prioridade de memória

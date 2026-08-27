@@ -1,5 +1,5 @@
 #define MyAppName "Neck"
-#define MyAppVersion "1.6.0"
+#define MyAppVersion "1.7.0"
 #define MyAppPublisher "Neck"
 #define MyAppURL "https://github.com/VitorGirardi/neck"
 #define MyAppExeName "Neck.exe"

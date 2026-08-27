@@ -120,9 +120,10 @@ namespace Neck
         private readonly CheckBox _tray = new CheckBox();
         private readonly CheckBox _notifications = new CheckBox();
         private readonly CheckBox _fullscreen = new CheckBox();
+        private readonly CheckBox _reduceMotion = new CheckBox();
         private readonly Label _updateStatus = new Label();
-        private readonly Button _checkUpdates = new Button();
-        private readonly Button _openRelease = new Button();
+        private readonly Button _checkUpdates = new AnimatedButton();
+        private readonly Button _openRelease = new AnimatedButton();
         private UpdateCheckResult _lastUpdate;
 
         public PreferencesForm(GuardSettings settings, bool firstRun)
@@ -132,13 +133,14 @@ namespace Neck
             _firstRun = firstRun;
             Text = firstRun ? "Primeiros passos — Neck" : "Preferências — Neck";
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(720, 700);
-            MinimumSize = new Size(680, 670);
+            Size = new Size(720, 750);
+            MinimumSize = new Size(680, 710);
             MaximizeBox = false;
             BackColor = Theme.Background;
             Font = Theme.Body;
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
             BuildInterface();
+            Shown += delegate { VisualEffects.FadeIn(this); };
         }
 
         private void BuildInterface()
@@ -199,7 +201,7 @@ namespace Neck
         {
             RoundedPanel card = new RoundedPanel
             {
-                Size = new Size(642, 242),
+                Size = new Size(642, 288),
                 BackColor = Color.White,
                 OutlineColor = Theme.Border,
                 CornerRadius = 16,
@@ -211,17 +213,20 @@ namespace Neck
             ConfigureChoice(_tray, "Continuar na bandeja ao fechar", "Mantém o monitoramento ativo quando a janela principal é fechada.", 104);
             ConfigureChoice(_notifications, "Avisar sobre sobrecarga persistente", "Exibe alerta somente após vários sinais consecutivos — não por um pico isolado.", 150);
             ConfigureChoice(_fullscreen, "Silenciar alertas em tela cheia", "Evita interromper apresentações, vídeos e jogos.", 196);
+            ConfigureChoice(_reduceMotion, "Reduzir animações", "Mantém os realces visuais, mas desativa transições, pulsos e movimentos.", 242);
 
             _startup.Checked = StartupManager.IsEnabled();
             _tray.Checked = _settings.ContinueInTray || _startup.Checked;
             _notifications.Checked = _settings.Notifications;
             _fullscreen.Checked = _settings.SilenceFullscreen;
+            _reduceMotion.Checked = _settings.ReduceMotion;
             _startup.CheckedChanged += delegate { if (_startup.Checked) _tray.Checked = true; };
 
             card.Controls.Add(_startup);
             card.Controls.Add(_tray);
             card.Controls.Add(_notifications);
             card.Controls.Add(_fullscreen);
+            card.Controls.Add(_reduceMotion);
             return card;
         }
 
@@ -294,6 +299,8 @@ namespace Neck
                 _settings.ContinueInTray = _tray.Checked || _startup.Checked;
                 _settings.Notifications = _notifications.Checked;
                 _settings.SilenceFullscreen = _fullscreen.Checked;
+                _settings.ReduceMotion = _reduceMotion.Checked;
+                VisualEffects.ReduceMotion = _settings.ReduceMotion;
                 _settings.OnboardingCompleted = true;
                 _settings.Save();
                 DialogResult = DialogResult.OK;
@@ -319,7 +326,7 @@ namespace Neck
 
         private static Button MakeButton(string text, Color color, int width)
         {
-            Button button = new Button
+            AnimatedButton button = new AnimatedButton
             {
                 Text = text,
                 Width = width,
@@ -331,6 +338,7 @@ namespace Neck
                 Cursor = Cursors.Hand
             };
             button.FlatAppearance.BorderSize = 0;
+            button.SetPalette(color);
             return button;
         }
 
@@ -344,6 +352,8 @@ namespace Neck
             button.FlatAppearance.BorderSize = 0;
             button.Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold);
             button.Cursor = Cursors.Hand;
+            AnimatedButton animated = button as AnimatedButton;
+            if (animated != null) animated.SetPalette(color);
         }
     }
 }

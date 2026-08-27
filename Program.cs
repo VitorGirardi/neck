@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.6.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.6.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.7.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.7.0.0")]
 
 namespace Neck
 {
@@ -82,15 +82,213 @@ namespace Neck
         public static readonly Font Small = new Font("Segoe UI", 9f, FontStyle.Regular);
     }
 
+    internal static class VisualEffects
+    {
+        public static bool ReduceMotion { get; set; }
+
+        public static Color Blend(Color from, Color to, double amount)
+        {
+            amount = Math.Max(0d, Math.Min(1d, amount));
+            return Color.FromArgb(
+                (int)(from.R + (to.R - from.R) * amount),
+                (int)(from.G + (to.G - from.G) * amount),
+                (int)(from.B + (to.B - from.B) * amount));
+        }
+
+        public static void FadeIn(Form form)
+        {
+            if (form == null || form.IsDisposed || ReduceMotion)
+            {
+                if (form != null && !form.IsDisposed) form.Opacity = 1d;
+                return;
+            }
+            form.Opacity = 0.90d;
+            Timer timer = new Timer { Interval = 16 };
+            timer.Tick += delegate
+            {
+                if (form.IsDisposed || form.Disposing)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    return;
+                }
+                form.Opacity = Math.Min(1d, form.Opacity + 0.035d);
+                if (form.Opacity >= 1d)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                }
+            };
+            timer.Start();
+        }
+    }
+
+    internal sealed class AnimatedButton : Button
+    {
+        private readonly Timer _timer = new Timer();
+        private Color _baseColor = Theme.Blue;
+        private Color _hoverColor = Color.FromArgb(29, 78, 216);
+        private Color _targetColor = Theme.Blue;
+        private bool _hovered;
+        private bool _pressed;
+        private bool _attentionPulse;
+        private double _pulsePhase;
+
+        public bool AttentionPulse
+        {
+            get { return _attentionPulse; }
+            set
+            {
+                _attentionPulse = value;
+                if (value && !VisualEffects.ReduceMotion) _timer.Start();
+                else if (!_hovered && !_pressed)
+                {
+                    _targetColor = _baseColor;
+                    BackColor = _baseColor;
+                    _timer.Stop();
+                }
+            }
+        }
+
+        public AnimatedButton()
+        {
+            DoubleBuffered = true;
+            _timer.Interval = 30;
+            _timer.Tick += Animate;
+        }
+
+        public void SetPalette(Color baseColor)
+        {
+            _baseColor = baseColor;
+            _hoverColor = VisualEffects.Blend(baseColor, Color.White, 0.14d);
+            _targetColor = baseColor;
+            BackColor = baseColor;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _hovered = true;
+            MoveTo(_hoverColor);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hovered = false;
+            _pressed = false;
+            MoveTo(_baseColor);
+        }
+
+        protected override void OnMouseDown(MouseEventArgs mevent)
+        {
+            base.OnMouseDown(mevent);
+            _pressed = true;
+            MoveTo(VisualEffects.Blend(_baseColor, Color.Black, 0.12d));
+        }
+
+        protected override void OnMouseUp(MouseEventArgs mevent)
+        {
+            base.OnMouseUp(mevent);
+            _pressed = false;
+            MoveTo(_hovered ? _hoverColor : _baseColor);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _timer.Dispose();
+            base.Dispose(disposing);
+        }
+
+        private void MoveTo(Color color)
+        {
+            _targetColor = color;
+            if (VisualEffects.ReduceMotion)
+                BackColor = color;
+            else
+                _timer.Start();
+        }
+
+        private void Animate(object sender, EventArgs e)
+        {
+            Color target = _targetColor;
+            if (_attentionPulse && !_hovered && !_pressed && !VisualEffects.ReduceMotion)
+            {
+                _pulsePhase += 0.10d;
+                double light = 0.06d + (Math.Sin(_pulsePhase) + 1d) * 0.045d;
+                target = VisualEffects.Blend(_baseColor, Color.White, light);
+            }
+            BackColor = VisualEffects.Blend(BackColor, target, 0.24d);
+            if (!_attentionPulse && Math.Abs(BackColor.R - target.R) < 2 && Math.Abs(BackColor.G - target.G) < 2 && Math.Abs(BackColor.B - target.B) < 2)
+            {
+                BackColor = target;
+                _timer.Stop();
+            }
+        }
+    }
+
+    internal sealed class ActivityBar : Control
+    {
+        private readonly Timer _timer = new Timer();
+        private int _offset;
+        private bool _running;
+
+        public bool Running
+        {
+            get { return _running; }
+            set
+            {
+                _running = value;
+                if (value && !VisualEffects.ReduceMotion) _timer.Start();
+                else _timer.Stop();
+                Invalidate();
+            }
+        }
+
+        public ActivityBar()
+        {
+            DoubleBuffered = true;
+            Height = 5;
+            _timer.Interval = 30;
+            _timer.Tick += delegate { _offset = (_offset + 12) % Math.Max(1, Width + 180); Invalidate(); };
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            e.Graphics.Clear(Theme.Border);
+            if (!_running) return;
+            if (VisualEffects.ReduceMotion)
+            {
+                using (SolidBrush brush = new SolidBrush(Theme.Blue)) e.Graphics.FillRectangle(brush, ClientRectangle);
+                return;
+            }
+            int width = Math.Max(150, ClientSize.Width / 4);
+            int left = _offset - 180;
+            using (LinearGradientBrush brush = new LinearGradientBrush(
+                new Rectangle(left, 0, width, Math.Max(1, Height)),
+                VisualEffects.Blend(Theme.Blue, Color.White, 0.35d), Theme.Cyan, LinearGradientMode.Horizontal))
+                e.Graphics.FillRectangle(brush, left, 0, width, Height);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _timer.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
     internal sealed class RoundedPanel : Panel
     {
         public int CornerRadius { get; set; }
         public Color OutlineColor { get; set; }
+        public Color GradientColor { get; set; }
 
         public RoundedPanel()
         {
             CornerRadius = 18;
             OutlineColor = Theme.Border;
+            GradientColor = Color.Empty;
             DoubleBuffered = true;
             Resize += delegate { UpdateShape(); };
         }
@@ -128,6 +326,19 @@ namespace Neck
                 e.Graphics.DrawPath(pen, path);
             }
         }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            if (GradientColor.IsEmpty)
+            {
+                base.OnPaintBackground(e);
+                return;
+            }
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (GraphicsPath path = BuildPath(new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1))))
+            using (LinearGradientBrush brush = new LinearGradientBrush(ClientRectangle, BackColor, GradientColor, LinearGradientMode.Horizontal))
+                e.Graphics.FillPath(brush, path);
+        }
     }
 
     internal sealed class MainForm : Form
@@ -137,19 +348,19 @@ namespace Neck
         private readonly Label _lastRunValue = new Label();
         private readonly Label _recommendation = new Label();
         private readonly Label _analysisValue = new Label();
-        private readonly ProgressBar _progress = new ProgressBar();
+        private readonly ActivityBar _progress = new ActivityBar();
         private readonly RichTextBox _log = new RichTextBox();
         private readonly Button _analyzeButton = new Button();
-        private readonly Button _runButton = new Button();
-        private readonly Button _advancedButton = new Button();
+        private readonly Button _runButton = new AnimatedButton();
+        private readonly Button _advancedButton = new AnimatedButton();
         private readonly Button _bootButton = new Button();
         private readonly Button _driversButton = new Button();
-        private readonly Button _guardButton = new Button();
+        private readonly AnimatedButton _guardButton = new AnimatedButton();
         private readonly Button _meetingButton = new Button();
         private readonly Button _reportsButton = new Button();
         private readonly Button _settingsButton = new Button();
         private readonly Button _planButton = new Button();
-        private readonly Button _toolsButton = new Button();
+        private readonly Button _toolsButton = new AnimatedButton();
         private readonly Label _guardBadge = new Label();
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
@@ -207,6 +418,8 @@ namespace Neck
             _componentsCheck.Checked = true;
             _drivesCheck.Checked = true;
 
+            _guardSettings = GuardSettings.Load();
+            VisualEffects.ReduceMotion = _guardSettings.ReduceMotion;
             BuildInterface();
             InitializeGuardMonitoring();
             UpdateSystemStatus();
@@ -243,6 +456,7 @@ namespace Neck
                 };
             }
             Shown += delegate { CaptureGuardSample(); };
+            Shown += delegate { if (!startHidden) VisualEffects.FadeIn(this); };
             if (startHidden)
             {
                 ShowInTaskbar = false;
@@ -480,7 +694,8 @@ namespace Neck
 
         private Control BuildGuardCard()
         {
-            Panel card = MakeCard(new Padding(28));
+            RoundedPanel card = MakeCard(new Padding(28));
+            card.GradientColor = Color.FromArgb(247, 250, 255);
             card.Margin = new Padding(0, 0, 0, 0);
             _guardBadge.Text = "ANALISANDO";
             _guardBadge.AutoSize = false;
@@ -593,7 +808,8 @@ namespace Neck
 
         private Control BuildToolsStrip()
         {
-            Panel card = MakeCard(new Padding(22));
+            RoundedPanel card = MakeCard(new Padding(22));
+            card.GradientColor = Color.FromArgb(249, 251, 255);
             card.Margin = new Padding(0, 0, 0, 0);
             Label title = new Label
             {
@@ -628,7 +844,7 @@ namespace Neck
 
         private void InitializeGuardMonitoring()
         {
-            _guardSettings = GuardSettings.Load();
+            if (_guardSettings == null) _guardSettings = GuardSettings.Load();
             _guardSamples = _guardHistory.LoadLast24Hours();
             _guardHistory.Compact(_guardSamples);
             _backgroundCheck.Checked = _guardSettings.ContinueInTray;
@@ -748,6 +964,7 @@ namespace Neck
             if (_startupMenuItem != null) _startupMenuItem.Checked = StartupManager.IsEnabled();
             if (_notificationsMenuItem != null) _notificationsMenuItem.Checked = _guardSettings.Notifications;
             if (_fullscreenMenuItem != null) _fullscreenMenuItem.Checked = _guardSettings.SilenceFullscreen;
+            VisualEffects.ReduceMotion = _guardSettings.ReduceMotion;
         }
 
         private async Task ShowPersonalPlanAsync()
@@ -883,6 +1100,7 @@ namespace Neck
 
         private void HideToTray(string message)
         {
+            _guardButton.AttentionPulse = false;
             Hide();
             _trayIcon.Visible = true;
             _trayIcon.ShowBalloonTip(3500, "Neck continua trabalhando", message, ToolTipIcon.Info);
@@ -894,6 +1112,7 @@ namespace Neck
             Show();
             WindowState = FormWindowState.Normal;
             Activate();
+            UpdateGuardView(_healthSnapshot);
         }
 
         private void CaptureGuardSample()
@@ -973,7 +1192,7 @@ namespace Neck
             };
             _progress.Dock = DockStyle.Bottom;
             _progress.Height = 6;
-            _progress.Style = ProgressBarStyle.Continuous;
+            _progress.Running = false;
             _log.Dock = DockStyle.Fill;
             _log.BorderStyle = BorderStyle.None;
             _log.BackColor = Color.White;
@@ -988,7 +1207,7 @@ namespace Neck
             return card;
         }
 
-        private static Panel MakeCard(Padding padding)
+        private static RoundedPanel MakeCard(Padding padding)
         {
             RoundedPanel panel = new RoundedPanel
             {
@@ -1060,6 +1279,8 @@ namespace Neck
             button.Cursor = Cursors.Hand;
             button.Margin = new Padding(0, 0, 10, 8);
             button.UseVisualStyleBackColor = false;
+            AnimatedButton animated = button as AnimatedButton;
+            if (animated != null) animated.SetPalette(color);
             button.Resize += delegate
             {
                 if (button.Width < 4 || button.Height < 4) return;
@@ -1163,6 +1384,7 @@ namespace Neck
                 _guardBadge.BackColor = Theme.GreenSoft;
                 _guardBadge.ForeColor = Theme.Green;
             }
+            _guardButton.AttentionPulse = snapshot.Level == HealthLevel.Critical && !FocusModeManager.IsActive && Visible && WindowState != FormWindowState.Minimized;
 
             string turbo = FocusModeManager.IsActive
                 ? " Acelerando " + FocusModeManager.ActiveDisplayName + " por mais " + Math.Max(1, (int)Math.Ceiling(FocusModeManager.Remaining.TotalMinutes)) + " min."
@@ -1457,8 +1679,7 @@ namespace Neck
             _guardButton.Enabled = !busy;
             _meetingButton.Enabled = !busy;
             _toolsButton.Enabled = !busy;
-            _progress.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
-            _progress.MarqueeAnimationSpeed = busy ? 25 : 0;
+            _progress.Running = busy;
             _progress.Visible = busy;
             if (!string.IsNullOrEmpty(status)) AppendLog(status);
             Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
@@ -1540,6 +1761,7 @@ namespace Neck
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
             SelectedChoice = ToolHubChoice.None;
             BuildInterface(continueInTray, activity);
+            Shown += delegate { VisualEffects.FadeIn(this); };
         }
 
         private void BuildInterface(bool continueInTray, string activity)
@@ -1587,12 +1809,12 @@ namespace Neck
             _continueInTray.Font = Theme.Small;
             _continueInTray.ForeColor = Theme.Muted;
             _continueInTray.Location = new Point(29, 15);
-            Button preferences = new Button();
+            Button preferences = new AnimatedButton();
             ConfigureToolButton(preferences, "Preferências", Theme.NavySoft, 130);
             preferences.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             preferences.Location = new Point(footer.Width - 286, 20);
             preferences.Click += delegate { Choose(ToolHubChoice.Preferences); };
-            Button close = new Button();
+            Button close = new AnimatedButton();
             ConfigureToolButton(close, "Voltar", Theme.Blue, 120);
             close.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             close.Location = new Point(footer.Width - 146, 20);
@@ -1650,10 +1872,36 @@ namespace Neck
                 Cursor = Cursors.Hand
             };
             EventHandler select = delegate { Choose(choice); };
+            EventHandler enter = delegate
+            {
+                card.BackColor = Color.FromArgb(248, 250, 255);
+                card.OutlineColor = accent;
+                stripe.Width = 9;
+                heading.ForeColor = accent;
+                card.Invalidate();
+            };
+            EventHandler leave = delegate
+            {
+                Point pointer = card.PointToClient(Cursor.Position);
+                if (card.ClientRectangle.Contains(pointer)) return;
+                card.BackColor = Color.White;
+                card.OutlineColor = Theme.Border;
+                stripe.Width = 6;
+                heading.ForeColor = Theme.Text;
+                card.Invalidate();
+            };
             card.Click += select;
             stripe.Click += select;
             heading.Click += select;
             detail.Click += select;
+            card.MouseEnter += enter;
+            stripe.MouseEnter += enter;
+            heading.MouseEnter += enter;
+            detail.MouseEnter += enter;
+            card.MouseLeave += leave;
+            stripe.MouseLeave += leave;
+            heading.MouseLeave += leave;
+            detail.MouseLeave += leave;
             card.Controls.Add(detail);
             card.Controls.Add(heading);
             card.Controls.Add(stripe);
@@ -1678,6 +1926,8 @@ namespace Neck
             button.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
             button.Cursor = Cursors.Hand;
             button.UseVisualStyleBackColor = false;
+            AnimatedButton animated = button as AnimatedButton;
+            if (animated != null) animated.SetPalette(color);
         }
     }
 
