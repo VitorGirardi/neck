@@ -25,7 +25,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $files = @(
     (Join-Path $OutputDirectory 'Neck.exe'),
-    (Join-Path $OutputDirectory 'Neck-Setup-1.8.0.exe')
+    (Join-Path $OutputDirectory 'Neck-Setup-1.9.0.exe')
 )
 foreach ($file in $files) {
     if (-not (Test-Path -LiteralPath $file)) { throw "Artefato não encontrado: $file" }

@@ -107,12 +107,15 @@ namespace Neck
         private readonly Label _result = new Label();
         private readonly Button _focus = new Button();
         private readonly Button _advanced = new Button();
+        private readonly Timer _outcomeTimer = new Timer();
+        private readonly string _recommendedProcessName;
         private List<SosCandidate> _candidates = new List<SosCandidate>();
         private bool _closing;
         private bool _busy;
 
-        public SosForm()
+        public SosForm(string recommendedProcessName = null)
         {
+            _recommendedProcessName = recommendedProcessName;
             Text = "Acelerar aplicativo — Neck";
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(820, 680);
@@ -123,6 +126,14 @@ namespace Neck
             _applicationIcons.ColorDepth = ColorDepth.Depth32Bit;
             _applicationIcons.ImageSize = new Size(20, 20);
             BuildInterface();
+            _outcomeTimer.Interval = 2000;
+            _outcomeTimer.Tick += delegate
+            {
+                OptimizationOutcome outcome = OptimizationOutcomeMonitor.Refresh();
+                if (outcome == null) return;
+                _result.Text = outcome.Summary;
+                if (outcome.Complete) _outcomeTimer.Stop();
+            };
             FormClosing += delegate(object sender, FormClosingEventArgs e)
             {
                 if (_busy)
@@ -133,7 +144,12 @@ namespace Neck
                 }
                 _closing = true;
             };
-            FormClosed += delegate { _applicationIcons.Dispose(); };
+            FormClosed += delegate
+            {
+                _outcomeTimer.Stop();
+                _outcomeTimer.Dispose();
+                _applicationIcons.Dispose();
+            };
             Shown += delegate { RefreshSnapshot(); };
         }
 
@@ -257,7 +273,9 @@ namespace Neck
             if (_closing || IsDisposed) return;
             string selectedName = _applications.SelectedItems.Count == 1
                 ? ((_applications.SelectedItems[0].Tag as SosCandidate) ?? new SosCandidate()).ProcessName
-                : FocusModeManager.ActiveProcessName;
+                : !string.IsNullOrWhiteSpace(FocusModeManager.ActiveProcessName)
+                    ? FocusModeManager.ActiveProcessName
+                    : _recommendedProcessName;
             MemoryStatus status = SystemInfo.GetMemoryStatus();
             _memory.Text = status.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% da memória em uso     |     " +
                            MainForm.FormatBytes((long)status.AvailableBytes) + " disponíveis";
@@ -272,11 +290,25 @@ namespace Neck
                 item.SubItems.Add(MainForm.FormatBytes(candidate.MemoryBytes));
                 string state = FocusModeManager.IsTarget(candidate.ProcessName)
                     ? FocusModeManager.GetStateLabel(candidate.ProcessName)
-                    : EfficiencyModeManager.IsActive(candidate.ProcessName) ? "Usando menos recursos" : "Disponível";
+                    : EfficiencyModeManager.IsActive(candidate.ProcessName) ? "Usando menos recursos"
+                    : string.Equals(candidate.ProcessName, _recommendedProcessName, StringComparison.OrdinalIgnoreCase)
+                        ? "Recomendado pelo Neck" : "Disponível";
                 item.SubItems.Add(state);
+                if (string.Equals(candidate.ProcessName, _recommendedProcessName, StringComparison.OrdinalIgnoreCase))
+                {
+                    item.BackColor = Theme.BlueSoft;
+                    item.Font = new Font(_applications.Font, FontStyle.Bold);
+                }
                 _applications.Items.Add(item);
             }
             SelectProcess(selectedName);
+            if (!_outcomeTimer.Enabled && !FocusModeManager.IsActive && !string.IsNullOrWhiteSpace(_recommendedProcessName))
+            {
+                SosCandidate recommended = _candidates.FirstOrDefault(item =>
+                    string.Equals(item.ProcessName, _recommendedProcessName, StringComparison.OrdinalIgnoreCase));
+                if (recommended != null)
+                    _result.Text = "Recomendado: " + recommended.DisplayName + " concentra o maior uso no gargalo atual. Você continua no controle.";
+            }
             UpdateSelectionState();
         }
 
@@ -318,6 +350,8 @@ namespace Neck
                 try
                 {
                     await Task.Run(delegate { FocusModeManager.Stop(); });
+                    OptimizationOutcomeMonitor.Cancel(candidate.ProcessName);
+                    _outcomeTimer.Stop();
                     if (!_closing && !IsDisposed) _result.Text = candidate.DisplayName + " voltou ao funcionamento normal.";
                 }
                 finally
@@ -344,11 +378,18 @@ namespace Neck
             SetBusy(true, "Preparando " + candidate.DisplayName + "...");
             try
             {
-                await Task.Run(delegate { FocusModeManager.Start(candidate.ProcessName, candidate.DisplayName, 60); });
+                MemoryStatus memoryBefore = SystemInfo.GetMemoryStatus();
+                long appMemoryBefore = ProcessFamilyInspector.GetMetrics(candidate.ProcessName).WorkingSetBytes;
+                FocusModeResult modeResult = null;
+                await Task.Run(delegate { modeResult = FocusModeManager.Start(candidate.ProcessName, candidate.DisplayName, 60); });
                 if (_closing || IsDisposed) return;
-                _result.Text = FocusModeManager.IsTarget(candidate.ProcessName)
-                    ? candidate.DisplayName + " está pronto. Volte ao aplicativo e use normalmente; o Neck cuidará do desempenho."
-                    : "O Windows não permitiu preparar esse aplicativo agora.";
+                if (FocusModeManager.IsTarget(candidate.ProcessName))
+                {
+                    OptimizationOutcomeMonitor.Begin(candidate.ProcessName, candidate.DisplayName, modeResult, memoryBefore, appMemoryBefore);
+                    _result.Text = "Aceleração ativa. O Neck está medindo o resultado observado por alguns segundos...";
+                    _outcomeTimer.Start();
+                }
+                else _result.Text = "O Windows não permitiu preparar esse aplicativo agora.";
             }
             catch (Exception ex)
             {

@@ -20,6 +20,7 @@ namespace Neck
 
     internal sealed class ResourceProcess
     {
+        public string ProcessName;
         public string DisplayName;
         public int ProcessCount;
         public long MemoryBytes;
@@ -91,7 +92,7 @@ namespace Neck
                         ResourceProcess item;
                         if (!grouped.TryGetValue(name, out item))
                         {
-                            item = new ResourceProcess { DisplayName = FriendlyProcessName(name) };
+                            item = new ResourceProcess { ProcessName = name, DisplayName = FriendlyProcessName(name) };
                             grouped.Add(name, item);
                         }
                         item.ProcessCount++;

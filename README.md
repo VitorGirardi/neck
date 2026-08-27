@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Cuide do Windows sem complicação.</strong><br>
-  Diagnóstico claro, manutenção segura e prioridades personalizadas para computadores lentos ou sobrecarregados.
+  Detecta o gargalo, recomenda uma única ação e acompanha o resultado sem colocar seus arquivos em risco.
 </p>
 
 <p align="center">
@@ -67,9 +67,10 @@ A animação ocorre por um intervalo curto após cada diagnóstico e não perman
 
 | Recurso | O que faz | Proteção principal |
 | --- | --- | --- |
+| **Gargalo Guiado** | Distingue pressão de memória, CPU e armazenamento e recomenda a ação mais útil naquele momento. | Explica o motivo e mantém a confirmação com o usuário. |
+| **Monitor Inteligente** | Ajusta o intervalo de leitura conforme a pressão, confirma persistência e reconhece a recuperação. | Não limpa, fecha ou altera aplicativos automaticamente. |
 | **Meu Plano Neck** | Cruza RAM, disco, temporários, inicialização e Windows Update para escolher três prioridades. | Não executa nenhuma ação automaticamente. |
 | **Neck Guard** | Mostra a saúde do computador, CPU, RAM e os maiores consumidores de memória. | Diagnóstico somente leitura. |
-| **Guard contínuo** | Monitora a cada 30 segundos e alerta apenas sobre pressão persistente de CPU ou RAM. | Histórico local limitado às últimas 24 horas. |
 | **Acelerar aplicativo** | Alterna automaticamente entre mais desempenho em uso e menor consumo em segundo plano. | Um único botão, duração de uma hora e restauração automática. |
 | **Neck Boot** | Explica o que inicia com o Windows e quais itens opcionais merecem revisão. | Encaminha mudanças para a tela oficial do Windows. |
 | **Modo Reunião** | Verifica o computador e impede suspensão durante uma apresentação. | Temporário, reversível e sem manutenção concorrente. |
@@ -84,6 +85,19 @@ Em vez de apresentar dezenas de métricas, o plano personalizado transforma o di
 ![Meu Plano Neck com três prioridades](assets/screenshots/neck-plan.png)
 
 O plano pode encaminhar para Acelerar aplicativo, limpeza segura, Neck Boot, diagnóstico ou Windows Update. Confirmações e proteções continuam valendo em todas as etapas.
+
+## Gargalo Guiado e Monitor Inteligente
+
+O cartão principal agora funciona como uma orientação única, não como um painel cheio de decisões. A cada leitura, o Neck classifica o gargalo predominante:
+
+- **Memória:** mostra o aplicativo que concentra o maior uso e já o destaca na tela de aceleração, com seu ícone local.
+- **CPU:** encaminha para a escolha do aplicativo que precisa responder primeiro.
+- **Armazenamento:** oferece a limpeza segura como primeira ação, sem incluir Lixeira ou manutenção administrativa.
+- **Sem gargalo:** informa que o fluxo está normal e mantém a aceleração disponível como ação opcional.
+
+O monitor trabalha de forma adaptativa: verifica a cada 60 segundos quando o computador está fluindo, a cada 30 segundos durante atenção e a cada 15 segundos em situação crítica. Um alerta só é liberado depois de três leituras consecutivas de pressão. Depois, duas leituras estáveis confirmam a recuperação e o intervalo volta ao normal.
+
+Essas leituras e decisões acontecem localmente. O monitor não fecha processos, não executa limpeza e não modifica o Windows por conta própria.
 
 ## Acelerar um aplicativo
 
@@ -100,6 +114,8 @@ O Neck cuida das mudanças sozinho:
 - **Quando fica em segundo plano:** após 15 segundos, passa a usar menos CPU, energia e memória física.
 - **Quando você volta:** recebe prioridade novamente em até 2 segundos.
 - **Depois de uma hora ou ao clicar em Parar:** todas as configurações anteriores são restauradas.
+
+Após a ativação, o Neck compara a memória disponível e o uso físico da família do aplicativo durante 18 segundos. O resultado informa o que realmente foi observado — inclusive quando o uso permaneceu semelhante — e quantos processos receberam a configuração. Ele não transforma essa leitura em uma promessa artificial de velocidade.
 
 A tela principal mostra apenas o nome, o uso de memória e uma situação compreensível, como **Disponível**, **Mais rápido agora** ou **Economizando memória**. Fechamento do aplicativo, Gerenciador de Tarefas e controle manual de segundo plano ficam em **Mais opções**.
 
@@ -139,7 +155,7 @@ A implementação utiliza as APIs documentadas [`SetPriorityClass`](https://lear
 - Não usa “limpeza de RAM” artificial nem encerra processos em massa.
 - Não aplica o Neck Adaptive a componentes críticos do Windows nem ao próprio Neck.
 - Não usa prioridade Alta ou Tempo real no Neck Turbo e não altera o plano de energia.
-- Não confunde RAM estacionada com memória definitivamente liberada e apresenta o resultado como estimativa.
+- Não confunde RAM estacionada com memória definitivamente liberada e apresenta somente o resultado observado.
 - Não aplica ajustes genéricos no Registro para prometer desempenho.
 - Não apaga documentos, fotos, downloads, senhas ou dados de navegadores.
 - Não esvazia a Lixeira sem uma seleção explícita.
@@ -157,11 +173,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.8.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.9.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.8.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.9.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -219,6 +235,7 @@ O comando produz o instalador, o executável portátil e os respectivos checksum
 Program.cs                 Interface principal e manutenção segura
 SystemMonitoring.cs        Diagnóstico de CPU, memória, disco e reunião
 GuardMonitoring.cs         Monitoramento contínuo, histórico e bandeja
+BottleneckGuidance.cs      Gargalo Guiado, monitor adaptativo e medição de resultado
 SosMode.cs                 Alívio seguro de sobrecarga
 EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
 TurboMode.cs               Prioridade de foco temporária e reversível
@@ -262,6 +279,9 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Neck Adaptive com foco, EcoQoS e prioridade de memória
 - [x] RAM Park e otimização por família de processos
 - [x] Neck Turbo e detecção de pressão persistente de CPU
+- [x] Gargalo Guiado com recomendação única e aplicativo destacado
+- [x] Monitor Inteligente adaptativo com confirmação de pressão e recuperação
+- [x] Medição honesta do resultado antes/depois da aceleração
 - [ ] Assinatura digital dos binários
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface

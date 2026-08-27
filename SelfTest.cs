@@ -243,6 +243,60 @@ namespace Neck
                 }
                 if (new GuardPressureDetector().Evaluate(syntheticCpu).Kind != GuardAlertKind.CpuPressure)
                     throw new InvalidOperationException("Pressão persistente de CPU não detectada.");
+                HealthSnapshot guidedMemory = new HealthSnapshot
+                {
+                    Level = HealthLevel.Warning,
+                    CpuPercent = 45,
+                    Memory = new MemoryStatus { PercentUsed = 82 },
+                    DiskFreeBytes = 100L * 1024 * 1024 * 1024,
+                    DiskTotalBytes = 256L * 1024 * 1024 * 1024,
+                    TopProcesses = new System.Collections.Generic.List<ResourceProcess>
+                    {
+                        new ResourceProcess { ProcessName = "NeckGuidedApp", DisplayName = "Aplicativo guiado", MemoryBytes = 2L * 1024 * 1024 * 1024 }
+                    }
+                };
+                BottleneckAdvice guidedAdvice = BottleneckAdvisor.Analyze(guidedMemory);
+                if (guidedAdvice.Kind != BottleneckKind.Memory || guidedAdvice.ProcessName != "NeckGuidedApp")
+                    throw new InvalidOperationException("O Gargalo Guiado não recomendou o maior consumidor de memória.");
+                HealthSnapshot guidedDisk = new HealthSnapshot
+                {
+                    Level = HealthLevel.Critical,
+                    CpuPercent = 20,
+                    Memory = new MemoryStatus { PercentUsed = 40 },
+                    DiskFreeBytes = 1024L * 1024 * 1024,
+                    DiskTotalBytes = 256L * 1024 * 1024 * 1024
+                };
+                if (BottleneckAdvisor.Analyze(guidedDisk).Kind != BottleneckKind.Disk)
+                    throw new InvalidOperationException("O Gargalo Guiado não priorizou armazenamento crítico.");
+                HealthSnapshot guidedCpu = new HealthSnapshot
+                {
+                    Level = HealthLevel.Warning,
+                    CpuPercent = 92,
+                    Memory = new MemoryStatus { PercentUsed = 50 },
+                    DiskFreeBytes = 100L * 1024 * 1024 * 1024,
+                    DiskTotalBytes = 256L * 1024 * 1024 * 1024
+                };
+                if (BottleneckAdvisor.Analyze(guidedCpu).Kind != BottleneckKind.Cpu)
+                    throw new InvalidOperationException("O Gargalo Guiado não identificou pressão de CPU.");
+                SmartGuardMonitor smartMonitor = new SmartGuardMonitor();
+                smartMonitor.Evaluate(guidedMemory);
+                smartMonitor.Evaluate(guidedMemory);
+                SmartMonitorDecision confirmedPressure = smartMonitor.Evaluate(guidedMemory);
+                if (confirmedPressure.State != SmartMonitorState.Confirmed || !confirmedPressure.PressureConfirmed)
+                    throw new InvalidOperationException("O monitor inteligente alertou sem confirmar três leituras.");
+                smartMonitor.Evaluate(new HealthSnapshot { Level = HealthLevel.Stable });
+                SmartMonitorDecision recoveredFlow = smartMonitor.Evaluate(new HealthSnapshot { Level = HealthLevel.Stable });
+                if (!recoveredFlow.RecoveryConfirmed || recoveredFlow.NextIntervalMilliseconds != 60000)
+                    throw new InvalidOperationException("O monitor inteligente não confirmou a recuperação do fluxo.");
+                OptimizationOutcome syntheticOutcome = new OptimizationOutcome
+                {
+                    Complete = true,
+                    AvailableBefore = 2L * 1024 * 1024 * 1024,
+                    AvailableAfter = 3L * 1024 * 1024 * 1024,
+                    ProcessesChanged = 2
+                };
+                if (!syntheticOutcome.Summary.StartsWith("Resultado observado:", StringComparison.Ordinal))
+                    throw new InvalidOperationException("A medição de resultado não produziu um resumo verificável.");
                 using (GuardHistoryForm history = new GuardHistoryForm(synthetic, System.IO.Path.GetTempPath()))
                 {
                     history.ShowInTaskbar = false;
@@ -272,7 +326,8 @@ namespace Neck
                 TestEfficiencyModeRoundTrip();
                 TestTurboModeRoundTrip();
                 TestFocusModeRoundTrip();
-                using (SosForm sos = new SosForm())
+                string guidedProcess = sosCandidates.Count == 0 ? null : sosCandidates[0].ProcessName;
+                using (SosForm sos = new SosForm(guidedProcess))
                 {
                     sos.ShowInTaskbar = false;
                     sos.StartPosition = FormStartPosition.Manual;

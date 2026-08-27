@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.8.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.8.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.9.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.9.0.0")]
 
 namespace Neck
 {
@@ -467,6 +467,8 @@ namespace Neck
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
         private readonly Label _activityStatus = new Label();
+        private readonly Label _actionTitle = new Label();
+        private readonly Label _actionHelp = new Label();
         private readonly FlowIndicator _flowIndicator = new FlowIndicator();
         private readonly CheckBox _backgroundCheck = new CheckBox();
         private readonly CheckBox _tempCheck = new CheckBox();
@@ -482,6 +484,7 @@ namespace Neck
         private Icon _trayStableIcon;
         private readonly GuardHistoryStore _guardHistory = new GuardHistoryStore();
         private readonly GuardPressureDetector _guardDetector = new GuardPressureDetector();
+        private readonly SmartGuardMonitor _smartMonitor = new SmartGuardMonitor();
         private GuardSettings _guardSettings;
         private ToolStripMenuItem _startupMenuItem;
         private ToolStripMenuItem _notificationsMenuItem;
@@ -499,6 +502,8 @@ namespace Neck
         private DateTime _lastHistoryCompactUtc = DateTime.UtcNow;
         private DateTime _lastAlertUtc = DateTime.MinValue;
         private GuardAlertKind _lastAlertKind = GuardAlertKind.None;
+        private BottleneckAdvice _currentAdvice;
+        private DateTime _lastOutcomeShownUtc = DateTime.MinValue;
 
         private static readonly string DataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neck");
@@ -531,7 +536,7 @@ namespace Neck
             _statusTimer.Interval = 3000;
             _statusTimer.Tick += delegate { if (!_busy) UpdateSystemStatus(); };
             _statusTimer.Start();
-            _guardMonitorTimer.Interval = 30000;
+            _guardMonitorTimer.Interval = 60000;
             _guardMonitorTimer.Tick += delegate { CaptureGuardSample(); };
             _guardMonitorTimer.Start();
             _adaptiveTimer.Interval = 2000;
@@ -543,6 +548,13 @@ namespace Neck
                     string focusBefore = FocusModeManager.ActiveDisplayName;
                     EfficiencyModeManager.RefreshAdaptiveModes();
                     FocusModeManager.Refresh();
+                    OptimizationOutcome outcome = OptimizationOutcomeMonitor.Refresh();
+                    if (outcome != null && outcome.Complete && outcome.StartedUtc > _lastOutcomeShownUtc)
+                    {
+                        _lastOutcomeShownUtc = outcome.StartedUtc;
+                        _activityStatus.Text = outcome.Summary;
+                        if (!Visible) _trayIcon.ShowBalloonTip(4500, "Resultado da aceleração", outcome.Summary, ToolTipIcon.Info);
+                    }
                     if (!string.IsNullOrWhiteSpace(focusBefore) && string.IsNullOrWhiteSpace(FocusModeManager.ActiveDisplayName))
                         _trayIcon.ShowBalloonTip(3000, "Aceleração concluída", "O tempo terminou e o aplicativo voltou ao funcionamento normal.", ToolTipIcon.Info);
                 }
@@ -817,24 +829,18 @@ namespace Neck
             _guardProcess.Location = new Point(29, 148);
 
             Panel actionArea = new Panel { Dock = DockStyle.Right, Width = 310, BackColor = Color.White, Padding = new Padding(24, 20, 24, 16) };
-            Label actionTitle = new Label
-            {
-                Dock = DockStyle.Top,
-                Height = 40,
-                Text = "Algum aplicativo está travando?",
-                Font = new Font("Bahnschrift", 12f, FontStyle.Bold),
-                ForeColor = Theme.Text,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            Label actionHelp = new Label
-            {
-                Dock = DockStyle.Top,
-                Height = 38,
-                Text = "Escolha o aplicativo importante e o Neck cuida do restante.",
-                Font = Theme.Small,
-                ForeColor = Theme.Muted,
-                TextAlign = ContentAlignment.TopCenter
-            };
+            _actionTitle.Dock = DockStyle.Top;
+            _actionTitle.Height = 40;
+            _actionTitle.Text = "Analisando o fluxo do computador...";
+            _actionTitle.Font = new Font("Bahnschrift", 12f, FontStyle.Bold);
+            _actionTitle.ForeColor = Theme.Text;
+            _actionTitle.TextAlign = ContentAlignment.MiddleCenter;
+            _actionHelp.Dock = DockStyle.Top;
+            _actionHelp.Height = 52;
+            _actionHelp.Text = "O Neck indicará a ação mais útil agora.";
+            _actionHelp.Font = Theme.Small;
+            _actionHelp.ForeColor = Theme.Muted;
+            _actionHelp.TextAlign = ContentAlignment.TopCenter;
             ConfigureButton(_guardButton, "Acelerar um aplicativo", Theme.Blue, 244);
             _guardButton.Dock = DockStyle.Top;
             _guardButton.Height = 48;
@@ -842,15 +848,25 @@ namespace Neck
             ConfigureButton(_meetingButton, "Modo reunião", Theme.Blue, 1);
             _meetingButton.Visible = false;
             _meetingButton.Click += delegate { ToggleMeetingMode(); };
-            _guardButton.Click += delegate
+            _guardButton.Click += async delegate
             {
-                OpenSos();
+                if (_currentAdvice != null && _currentAdvice.Kind == BottleneckKind.Disk)
+                {
+                    _tempCheck.Checked = true;
+                    _reportsCheck.Checked = true;
+                    _recycleCheck.Checked = false;
+                    _componentsCheck.Checked = false;
+                    _healthCheck.Checked = false;
+                    _drivesCheck.Checked = false;
+                    await RunMaintenanceAsync();
+                }
+                else OpenSos();
             };
             actionArea.Controls.Add(_guardButton);
-            actionArea.Controls.Add(actionHelp);
+            actionArea.Controls.Add(_actionHelp);
             _flowIndicator.Dock = DockStyle.Top;
             actionArea.Controls.Add(_flowIndicator);
-            actionArea.Controls.Add(actionTitle);
+            actionArea.Controls.Add(_actionTitle);
 
             TableLayoutPanel metrics = new TableLayoutPanel
             {
@@ -1036,14 +1052,13 @@ namespace Neck
             _trayIcon.BalloonTipClicked += delegate
             {
                 ShowFromTray();
-                OpenSos();
             };
         }
 
         private void OpenSos()
         {
             if (_closing || IsDisposed || _busy) return;
-            using (SosForm form = new SosForm()) form.ShowDialog(this);
+            using (SosForm form = new SosForm(_currentAdvice == null ? null : _currentAdvice.ProcessName)) form.ShowDialog(this);
             UpdateSystemStatus();
             UpdateGuardView(_healthSnapshot);
         }
@@ -1229,7 +1244,12 @@ namespace Neck
                     _lastHistoryCompactUtc = DateTime.UtcNow;
                 }
                 UpdateTrayState(snapshot);
-                ShowGuardAlertIfNeeded(_guardDetector.Evaluate(_guardSamples));
+                SmartMonitorDecision monitoring = _smartMonitor.Evaluate(snapshot);
+                _guardMonitorTimer.Interval = monitoring.NextIntervalMilliseconds;
+                if (!_busy) _activityStatus.Text = monitoring.StatusMessage;
+                if (monitoring.State == SmartMonitorState.Confirmed)
+                    ShowGuardAlertIfNeeded(_guardDetector.Evaluate(_guardSamples));
+                if (monitoring.RecoveryConfirmed) ShowRecoveryNotification();
             }
             catch { }
         }
@@ -1245,7 +1265,7 @@ namespace Neck
                 if (protectedStatus != null) protectedStatus.Text = "Modo Reunião • protegido até " + _meetingEndsAt.ToString("HH:mm");
                 return;
             }
-            string state = snapshot.Level == HealthLevel.Critical ? "Crítico" : snapshot.Level == HealthLevel.Warning ? "Atenção" : "Estável";
+            string state = snapshot.Level == HealthLevel.Critical ? "Gargalo" : snapshot.Level == HealthLevel.Warning ? "Atenção" : "Fluindo bem";
             _trayIcon.Icon = snapshot.Level == HealthLevel.Critical ? SystemIcons.Error :
                              snapshot.Level == HealthLevel.Warning ? SystemIcons.Warning :
                              _trayStableIcon;
@@ -1264,8 +1284,18 @@ namespace Neck
             if (alert.Kind == _lastAlertKind && DateTime.UtcNow - _lastAlertUtc < TimeSpan.FromMinutes(30)) return;
             _lastAlertKind = alert.Kind;
             _lastAlertUtc = DateTime.UtcNow;
-            _trayIcon.ShowBalloonTip(6000, alert.Title, alert.Message + " Clique para escolher um aplicativo para acelerar.",
+            string nextStep = alert.Kind == GuardAlertKind.LowDisk
+                ? " Clique para ver a limpeza segura recomendada."
+                : " Clique para ver a recomendação do Neck.";
+            _trayIcon.ShowBalloonTip(6000, alert.Title, alert.Message + nextStep,
                 alert.Kind == GuardAlertKind.LowDisk || alert.Kind == GuardAlertKind.CpuPressure ? ToolTipIcon.Warning : ToolTipIcon.Info);
+        }
+
+        private void ShowRecoveryNotification()
+        {
+            if (!_guardSettings.Notifications || _meetingActive || _guardSettings.SilentUntilUtc > DateTime.UtcNow) return;
+            if (_guardSettings.SilenceFullscreen && SystemInfo.IsForegroundWindowFullScreen()) return;
+            _trayIcon.ShowBalloonTip(4000, "Fluxo normalizado", "O monitor inteligente confirmou que a pressão voltou ao nível normal.", ToolTipIcon.Info);
         }
 
         internal void ForceCloseForTesting()
@@ -1500,6 +1530,11 @@ namespace Neck
             _guardProcess.Text = (top == null
                 ? "Nenhum processo pôde ser analisado."
                 : "Maior uso: " + top.DisplayName + "  •  " + FormatBytes(top.MemoryBytes)) + adaptive;
+
+            _currentAdvice = BottleneckAdvisor.Analyze(snapshot);
+            _actionTitle.Text = _currentAdvice.Title;
+            _actionHelp.Text = _currentAdvice.Explanation;
+            _guardButton.Text = _currentAdvice.ActionText;
         }
 
         private void ToggleMeetingMode()
