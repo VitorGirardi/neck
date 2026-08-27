@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.7.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.7.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.7.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.7.1.0")]
 
 namespace Neck
 {
@@ -282,13 +282,11 @@ namespace Neck
     {
         public int CornerRadius { get; set; }
         public Color OutlineColor { get; set; }
-        public Color GradientColor { get; set; }
 
         public RoundedPanel()
         {
             CornerRadius = 18;
             OutlineColor = Theme.Border;
-            GradientColor = Color.Empty;
             DoubleBuffered = true;
             Resize += delegate { UpdateShape(); };
         }
@@ -327,18 +325,6 @@ namespace Neck
             }
         }
 
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            if (GradientColor.IsEmpty)
-            {
-                base.OnPaintBackground(e);
-                return;
-            }
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = BuildPath(new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1))))
-            using (LinearGradientBrush brush = new LinearGradientBrush(ClientRectangle, BackColor, GradientColor, LinearGradientMode.Horizontal))
-                e.Graphics.FillPath(brush, path);
-        }
     }
 
     internal sealed class MainForm : Form
@@ -598,9 +584,9 @@ namespace Neck
             };
             Label description = new Label
             {
-                Text = "Remove temporários antigos sem tocar em documentos, senhas ou downloads.",
+                Text = "Remove temporários antigos. Documentos, senhas e downloads ficam intactos.",
                 AutoSize = false,
-                Size = new Size(400, 44),
+                Size = new Size(440, 40),
                 Font = Theme.Body,
                 ForeColor = Theme.Muted,
                 Location = new Point(25, 91)
@@ -661,9 +647,9 @@ namespace Neck
             };
             Label description = new Label
             {
-                Text = "Verifica o Windows e recomenda os cuidados mensais mais importantes.",
+                Text = "Verifica o Windows e recomenda os cuidados mais importantes.",
                 AutoSize = false,
-                Size = new Size(400, 44),
+                Size = new Size(440, 40),
                 Font = Theme.Body,
                 ForeColor = Theme.Muted,
                 Location = new Point(25, 91)
@@ -695,7 +681,6 @@ namespace Neck
         private Control BuildGuardCard()
         {
             RoundedPanel card = MakeCard(new Padding(28));
-            card.GradientColor = Color.FromArgb(247, 250, 255);
             card.Margin = new Padding(0, 0, 0, 0);
             _guardBadge.Text = "ANALISANDO";
             _guardBadge.AutoSize = false;
@@ -785,22 +770,27 @@ namespace Neck
 
         private static Control BuildInlineMetric(string caption, Label value)
         {
-            Panel panel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background };
+            Panel panel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background, Margin = Padding.Empty };
             Label name = new Label
             {
                 Text = caption,
                 AutoSize = false,
-                Size = new Size(150, 19),
-                Location = new Point(14, 8),
+                Size = new Size(270, 19),
+                Location = new Point(0, 3),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold),
-                ForeColor = Theme.Muted
+                ForeColor = Theme.Muted,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Margin = Padding.Empty
             };
             value.AutoSize = false;
-            value.Size = new Size(110, 25);
-            value.Location = new Point(165, 22);
-            value.TextAlign = ContentAlignment.MiddleRight;
+            value.Size = new Size(270, 25);
+            value.Location = new Point(0, 23);
+            value.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            value.TextAlign = ContentAlignment.MiddleCenter;
             value.Font = new Font("Segoe UI Semibold", 13f, FontStyle.Bold);
             value.ForeColor = Theme.Text;
+            value.Margin = Padding.Empty;
             panel.Controls.Add(name);
             panel.Controls.Add(value);
             return panel;
@@ -809,7 +799,6 @@ namespace Neck
         private Control BuildToolsStrip()
         {
             RoundedPanel card = MakeCard(new Padding(22));
-            card.GradientColor = Color.FromArgb(249, 251, 255);
             card.Margin = new Padding(0, 0, 0, 0);
             Label title = new Label
             {
@@ -1795,12 +1784,12 @@ namespace Neck
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             for (int row = 0; row < 3; row++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
-            grid.Controls.Add(CreateTool("Meu plano", "Três prioridades escolhidas para este computador.", ToolHubChoice.Plan, Theme.Blue), 0, 0);
-            grid.Controls.Add(CreateTool(_meetingActive ? "Encerrar modo reunião" : "Modo reunião", "Evita suspensão durante chamadas e apresentações.", ToolHubChoice.Meeting, Theme.Cyan), 1, 0);
-            grid.Controls.Add(CreateTool("Inicialização", "Veja o que abre junto com o Windows.", ToolHubChoice.Startup, Theme.NavySoft), 0, 1);
-            grid.Controls.Add(CreateTool("Diagnóstico", "Detalhes de CPU, memória e armazenamento.", ToolHubChoice.Diagnostic, Theme.NavySoft), 1, 1);
-            grid.Controls.Add(CreateTool("Drivers", "Confira atualizações pelas fontes oficiais.", ToolHubChoice.Drivers, Theme.NavySoft), 0, 2);
-            grid.Controls.Add(CreateTool("Histórico", "Consulte alertas e relatórios anteriores.", ToolHubChoice.History, Theme.NavySoft), 1, 2);
+            grid.Controls.Add(CreateTool("Meu plano", "Três prioridades escolhidas para este computador.", ToolHubChoice.Plan), 0, 0);
+            grid.Controls.Add(CreateTool(_meetingActive ? "Encerrar modo reunião" : "Modo reunião", "Evita suspensão durante chamadas e apresentações.", ToolHubChoice.Meeting), 1, 0);
+            grid.Controls.Add(CreateTool("Inicialização", "Veja o que abre junto com o Windows.", ToolHubChoice.Startup), 0, 1);
+            grid.Controls.Add(CreateTool("Diagnóstico", "Detalhes de CPU, memória e armazenamento.", ToolHubChoice.Diagnostic), 1, 1);
+            grid.Controls.Add(CreateTool("Drivers", "Confira atualizações pelas fontes oficiais.", ToolHubChoice.Drivers), 0, 2);
+            grid.Controls.Add(CreateTool("Histórico", "Consulte alertas e relatórios anteriores.", ToolHubChoice.History), 1, 2);
 
             Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 86, BackColor = Color.White, Padding = new Padding(28, 14, 28, 14) };
             _continueInTray.Text = "Continuar protegendo na bandeja ao fechar";
@@ -1838,7 +1827,7 @@ namespace Neck
             CancelButton = close;
         }
 
-        private Control CreateTool(string title, string description, ToolHubChoice choice, Color accent)
+        private Control CreateTool(string title, string description, ToolHubChoice choice)
         {
             RoundedPanel card = new RoundedPanel
             {
@@ -1849,14 +1838,13 @@ namespace Neck
                 CornerRadius = 16,
                 Cursor = Cursors.Hand
             };
-            Panel stripe = new Panel { Dock = DockStyle.Left, Width = 6, BackColor = accent, Cursor = Cursors.Hand };
             Label heading = new Label
             {
                 Text = title,
                 AutoSize = false,
-                Height = 32,
+                Height = 42,
                 Dock = DockStyle.Top,
-                Padding = new Padding(20, 11, 10, 0),
+                Padding = new Padding(24, 15, 16, 0),
                 Font = new Font("Segoe UI Semibold", 13f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 Cursor = Cursors.Hand
@@ -1866,7 +1854,7 @@ namespace Neck
                 Text = description,
                 AutoSize = false,
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20, 12, 18, 8),
+                Padding = new Padding(24, 8, 20, 12),
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
                 Cursor = Cursors.Hand
@@ -1874,10 +1862,7 @@ namespace Neck
             EventHandler select = delegate { Choose(choice); };
             EventHandler enter = delegate
             {
-                card.BackColor = Color.FromArgb(248, 250, 255);
-                card.OutlineColor = accent;
-                stripe.Width = 9;
-                heading.ForeColor = accent;
+                card.BackColor = Color.FromArgb(248, 250, 252);
                 card.Invalidate();
             };
             EventHandler leave = delegate
@@ -1885,26 +1870,19 @@ namespace Neck
                 Point pointer = card.PointToClient(Cursor.Position);
                 if (card.ClientRectangle.Contains(pointer)) return;
                 card.BackColor = Color.White;
-                card.OutlineColor = Theme.Border;
-                stripe.Width = 6;
-                heading.ForeColor = Theme.Text;
                 card.Invalidate();
             };
             card.Click += select;
-            stripe.Click += select;
             heading.Click += select;
             detail.Click += select;
             card.MouseEnter += enter;
-            stripe.MouseEnter += enter;
             heading.MouseEnter += enter;
             detail.MouseEnter += enter;
             card.MouseLeave += leave;
-            stripe.MouseLeave += leave;
             heading.MouseLeave += leave;
             detail.MouseLeave += leave;
             card.Controls.Add(detail);
             card.Controls.Add(heading);
-            card.Controls.Add(stripe);
             return card;
         }
 

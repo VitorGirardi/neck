@@ -49,6 +49,19 @@ namespace Neck
                         preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
                         Console.WriteLine("UIPreview=" + previewPath);
                     }
+                    form.Size = form.MinimumSize;
+                    for (int i = 0; i < 4; i++)
+                    {
+                        Application.DoEvents();
+                        Thread.Sleep(25);
+                    }
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(form.Width, form.Height))
+                    {
+                        form.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, form.Width, form.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.UI.Minimum.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("UIMinimumPreview=" + previewPath);
+                    }
                     form.ForceCloseForTesting();
                 }
                 using (ToolsHubForm tools = new ToolsHubForm(true, false, "Tudo pronto. O Neck está acompanhando o computador."))

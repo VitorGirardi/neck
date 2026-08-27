@@ -137,11 +137,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.7.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.7.1.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.7.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.7.1.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
