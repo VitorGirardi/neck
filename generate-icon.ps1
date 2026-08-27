@@ -33,17 +33,22 @@ $path.AddArc(172, 172, 72, 72, 0, 90)
 $path.AddArc(12, 172, 72, 72, 90, 90)
 $path.CloseFigure()
 
-$navy = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 15, 23, 42))
-$cyan = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 6, 182, 212))
+$navy = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 11, 19, 36))
+$cyan = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 14, 165, 168), 18)
 $white = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::White)
-$font = [System.Drawing.Font]::new('Segoe UI Semibold', 132, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
 
 $graphics.FillPath($navy, $path)
-$graphics.FillRectangle($cyan, 28, 42, 18, 172)
-$format = [System.Drawing.StringFormat]::new()
-$format.Alignment = [System.Drawing.StringAlignment]::Center
-$format.LineAlignment = [System.Drawing.StringAlignment]::Center
-$graphics.DrawString('N', $font, $white, [System.Drawing.RectangleF]::new(34, 20, 194, 210), $format)
+$cyan.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+$cyan.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+$top = [System.Drawing.Drawing2D.GraphicsPath]::new()
+$bottom = [System.Drawing.Drawing2D.GraphicsPath]::new()
+$top.AddBezier(45, 66, 91, 66, 87, 108, 128, 108)
+$top.AddBezier(128, 108, 169, 108, 165, 66, 211, 66)
+$bottom.AddBezier(45, 190, 91, 190, 87, 148, 128, 148)
+$bottom.AddBezier(128, 148, 169, 148, 165, 190, 211, 190)
+$graphics.DrawPath($cyan, $top)
+$graphics.DrawPath($cyan, $bottom)
+$graphics.FillEllipse($white, 115, 115, 26, 26)
 
 $handle = $bitmap.GetHicon()
 try {
@@ -52,8 +57,8 @@ try {
     try { $icon.Save($stream) } finally { $stream.Dispose() }
 } finally {
     [NeckIconNative]::DestroyIcon($handle) | Out-Null
-    $format.Dispose()
-    $font.Dispose()
+    $top.Dispose()
+    $bottom.Dispose()
     $white.Dispose()
     $cyan.Dispose()
     $navy.Dispose()

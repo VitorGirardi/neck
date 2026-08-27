@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.7.1.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.7.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.8.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.8.0.0")]
 
 namespace Neck
 {
@@ -65,21 +65,137 @@ namespace Neck
     {
         public static readonly Color Background = Color.FromArgb(246, 248, 252);
         public static readonly Color Card = Color.White;
-        public static readonly Color Navy = Color.FromArgb(15, 23, 42);
+        public static readonly Color Navy = Color.FromArgb(11, 19, 36);
         public static readonly Color NavySoft = Color.FromArgb(51, 65, 85);
         public static readonly Color Blue = Color.FromArgb(37, 99, 235);
         public static readonly Color BlueSoft = Color.FromArgb(239, 246, 255);
-        public static readonly Color Cyan = Color.FromArgb(6, 182, 212);
+        public static readonly Color Cyan = Color.FromArgb(14, 165, 168);
+        public static readonly Color FlowSoft = Color.FromArgb(240, 253, 250);
         public static readonly Color Green = Color.FromArgb(5, 150, 105);
         public static readonly Color GreenSoft = Color.FromArgb(236, 253, 245);
         public static readonly Color Amber = Color.FromArgb(217, 119, 6);
         public static readonly Color Text = Color.FromArgb(30, 41, 59);
         public static readonly Color Muted = Color.FromArgb(100, 116, 139);
         public static readonly Color Border = Color.FromArgb(226, 232, 240);
-        public static readonly Font Title = new Font("Segoe UI Semibold", 25f, FontStyle.Bold);
-        public static readonly Font Heading = new Font("Segoe UI Semibold", 15f, FontStyle.Bold);
+        public static readonly Font Title = new Font("Bahnschrift", 25f, FontStyle.Bold);
+        public static readonly Font Heading = new Font("Bahnschrift", 15f, FontStyle.Bold);
+        public static readonly Font Brand = new Font("Bahnschrift", 23f, FontStyle.Bold);
         public static readonly Font Body = new Font("Segoe UI", 10f, FontStyle.Regular);
         public static readonly Font Small = new Font("Segoe UI", 9f, FontStyle.Regular);
+    }
+
+    internal sealed class FlowMark : Control
+    {
+        public FlowMark()
+        {
+            SetStyle(ControlStyles.SupportsTransparentBackColor, true);
+            DoubleBuffered = true;
+            Size = new Size(50, 50);
+            BackColor = Color.Transparent;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            Rectangle bounds = new Rectangle(0, 0, Width - 1, Height - 1);
+            using (GraphicsPath background = RoundedRect(bounds, 14))
+            using (SolidBrush brush = new SolidBrush(Theme.Cyan))
+                e.Graphics.FillPath(brush, background);
+            using (Pen flow = new Pen(Color.White, 3.6f))
+            {
+                flow.StartCap = LineCap.Round;
+                flow.EndCap = LineCap.Round;
+                using (GraphicsPath top = new GraphicsPath())
+                using (GraphicsPath bottom = new GraphicsPath())
+                {
+                    top.AddBezier(9, 14, 18, 14, 18, 22, 25, 22);
+                    top.AddBezier(25, 22, 32, 22, 32, 14, 41, 14);
+                    bottom.AddBezier(9, 36, 18, 36, 18, 28, 25, 28);
+                    bottom.AddBezier(25, 28, 32, 28, 32, 36, 41, 36);
+                    e.Graphics.DrawPath(flow, top);
+                    e.Graphics.DrawPath(flow, bottom);
+                }
+            }
+        }
+
+        private static GraphicsPath RoundedRect(Rectangle bounds, int radius)
+        {
+            int diameter = radius * 2;
+            GraphicsPath path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
+    internal sealed class FlowIndicator : Control
+    {
+        private readonly Timer _timer = new Timer();
+        private HealthLevel _level = HealthLevel.Stable;
+        private float _phase;
+        private int _frames;
+
+        public FlowIndicator()
+        {
+            SetStyle(ControlStyles.SupportsTransparentBackColor, true);
+            DoubleBuffered = true;
+            Height = 34;
+            BackColor = Color.Transparent;
+            _timer.Interval = 40;
+            _timer.Tick += delegate
+            {
+                _phase += 0.045f;
+                _frames++;
+                Invalidate();
+                if (_frames >= 36) _timer.Stop();
+            };
+        }
+
+        public void SetLevel(HealthLevel level)
+        {
+            _level = level;
+            _frames = 0;
+            _phase = 0f;
+            if (!VisualEffects.ReduceMotion && Visible) _timer.Start();
+            else _timer.Stop();
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            Color color = _level == HealthLevel.Critical ? Color.FromArgb(220, 70, 70) :
+                          _level == HealthLevel.Warning ? Theme.Amber : Theme.Cyan;
+            float middle = Width / 2f;
+            using (Pen channel = new Pen(VisualEffects.Blend(color, Color.White, 0.45d), 2f))
+            using (GraphicsPath upper = new GraphicsPath())
+            using (GraphicsPath lower = new GraphicsPath())
+            {
+                channel.StartCap = channel.EndCap = LineCap.Round;
+                upper.AddBezier(8, 8, middle - 30, 8, middle - 24, 14, middle, 14);
+                upper.AddBezier(middle, 14, middle + 24, 14, middle + 30, 8, Width - 8, 8);
+                lower.AddBezier(8, Height - 8, middle - 30, Height - 8, middle - 24, Height - 14, middle, Height - 14);
+                lower.AddBezier(middle, Height - 14, middle + 24, Height - 14, middle + 30, Height - 8, Width - 8, Height - 8);
+                e.Graphics.DrawPath(channel, upper);
+                e.Graphics.DrawPath(channel, lower);
+            }
+            float progress = VisualEffects.ReduceMotion ? 0.74f : _phase;
+            float x = 10 + (Width - 20) * Math.Min(1f, progress);
+            float distance = Math.Abs(x - middle) / Math.Max(1f, middle);
+            float y = Height / 2f + (float)Math.Sin(progress * Math.PI * 5) * Math.Max(1f, distance * 4f);
+            using (SolidBrush dot = new SolidBrush(color)) e.Graphics.FillEllipse(dot, x - 4, y - 4, 8, 8);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _timer.Dispose();
+            base.Dispose(disposing);
+        }
     }
 
     internal static class VisualEffects
@@ -351,6 +467,7 @@ namespace Neck
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
         private readonly Label _activityStatus = new Label();
+        private readonly FlowIndicator _flowIndicator = new FlowIndicator();
         private readonly CheckBox _backgroundCheck = new CheckBox();
         private readonly CheckBox _tempCheck = new CheckBox();
         private readonly CheckBox _reportsCheck = new CheckBox();
@@ -485,28 +602,16 @@ namespace Neck
                 Padding = new Padding(30, 16, 30, 14)
             };
 
-            RoundedPanel mark = new RoundedPanel
+            FlowMark mark = new FlowMark
             {
-                Size = new Size(50, 50),
-                Location = new Point(31, 22),
-                BackColor = Theme.Cyan,
-                OutlineColor = Theme.Cyan,
-                CornerRadius = 15
+                Location = new Point(31, 22)
             };
-            mark.Controls.Add(new Label
-            {
-                Dock = DockStyle.Fill,
-                Text = "N",
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
-                ForeColor = Color.White
-            });
 
             Label title = new Label
             {
                 AutoSize = true,
                 Text = "Neck",
-                Font = new Font("Segoe UI Semibold", 23f, FontStyle.Bold),
+                Font = Theme.Brand,
                 ForeColor = Color.White,
                 Location = new Point(99, 15)
             };
@@ -694,7 +799,7 @@ namespace Neck
             {
                 Text = "Seu computador agora",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
+                Font = new Font("Bahnschrift", 21f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 Location = new Point(27, 58)
             };
@@ -711,20 +816,20 @@ namespace Neck
             _guardProcess.ForeColor = Theme.Text;
             _guardProcess.Location = new Point(29, 148);
 
-            Panel actionArea = new Panel { Dock = DockStyle.Right, Width = 310, BackColor = Color.White, Padding = new Padding(24, 42, 24, 24) };
+            Panel actionArea = new Panel { Dock = DockStyle.Right, Width = 310, BackColor = Color.White, Padding = new Padding(24, 20, 24, 16) };
             Label actionTitle = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 48,
+                Height = 40,
                 Text = "Algum aplicativo está travando?",
-                Font = new Font("Segoe UI Semibold", 12f, FontStyle.Bold),
+                Font = new Font("Bahnschrift", 12f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             Label actionHelp = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 43,
+                Height = 38,
                 Text = "Escolha o aplicativo importante e o Neck cuida do restante.",
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
@@ -743,6 +848,8 @@ namespace Neck
             };
             actionArea.Controls.Add(_guardButton);
             actionArea.Controls.Add(actionHelp);
+            _flowIndicator.Dock = DockStyle.Top;
+            actionArea.Controls.Add(_flowIndicator);
             actionArea.Controls.Add(actionTitle);
 
             TableLayoutPanel metrics = new TableLayoutPanel
@@ -1357,22 +1464,29 @@ namespace Neck
             }
             if (snapshot.Level == HealthLevel.Critical)
             {
-                _guardBadge.Text = "CRÍTICO";
+                _guardBadge.Text = "GARGALO DETECTADO";
+                _guardBadge.Width = 142;
                 _guardBadge.BackColor = Color.FromArgb(254, 226, 226);
                 _guardBadge.ForeColor = Color.Firebrick;
+                _guardButton.Text = "Resolver gargalo";
             }
             else if (snapshot.Level == HealthLevel.Warning)
             {
                 _guardBadge.Text = "ATENÇÃO";
+                _guardBadge.Width = 108;
                 _guardBadge.BackColor = Color.FromArgb(255, 247, 237);
                 _guardBadge.ForeColor = Theme.Amber;
+                _guardButton.Text = "Acelerar um aplicativo";
             }
             else
             {
-                _guardBadge.Text = "ESTÁVEL";
-                _guardBadge.BackColor = Theme.GreenSoft;
-                _guardBadge.ForeColor = Theme.Green;
+                _guardBadge.Text = "FLUINDO BEM";
+                _guardBadge.Width = 118;
+                _guardBadge.BackColor = Theme.FlowSoft;
+                _guardBadge.ForeColor = Theme.Cyan;
+                _guardButton.Text = "Acelerar um aplicativo";
             }
+            _flowIndicator.SetLevel(snapshot.Level);
             _guardButton.AttentionPulse = snapshot.Level == HealthLevel.Critical && !FocusModeManager.IsActive && Visible && WindowState != FormWindowState.Minimized;
 
             string turbo = FocusModeManager.IsActive
@@ -1433,6 +1547,7 @@ namespace Neck
             _guardBadge.ForeColor = Theme.Cyan;
             _guardMessage.Text = "Reunião protegida por mais " + minutes + " min. Manutenções estão pausadas.";
             _guardProcess.Text = "A tela e o computador não entrarão em suspensão.";
+            _flowIndicator.SetLevel(HealthLevel.Stable);
             _meetingButton.Text = "Encerrar modo";
             _meetingButton.BackColor = Theme.Cyan;
             _recommendation.Text = "MODO REUNIÃO  •  até " + _meetingEndsAt.ToString("HH:mm");
@@ -2270,8 +2385,8 @@ namespace Neck
         {
             Text = "Manutenção completa — Neck";
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(760, 690);
-            MinimumSize = new Size(720, 650);
+            Size = new Size(820, 720);
+            MinimumSize = new Size(760, 680);
             BackColor = Theme.Background;
             Font = Theme.Body;
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
@@ -2287,18 +2402,18 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Navy };
             header.Controls.Add(new Label
             {
-                Text = "Escolha o que o Neck deve fazer",
+                Text = "O que você quer melhorar?",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
+                Font = new Font("Bahnschrift", 21f, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(28, 20)
             });
             header.Controls.Add(new Label
             {
-                Text = "Nada será executado até você confirmar na próxima tela.",
+                Text = "As opções mais seguras já estão marcadas. Você revisará tudo antes de iniciar.",
                 AutoSize = true,
                 Font = Theme.Body,
                 ForeColor = Color.FromArgb(186, 199, 218),
@@ -2318,24 +2433,21 @@ namespace Neck
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
 
-            Panel safeCard = CreateOptionCard("Limpeza", "Arquivos dispensáveis e antigos", Theme.Blue);
-            Panel systemCard = CreateOptionCard("Sistema", "Ferramentas nativas do Windows", Theme.Green);
+            Panel safeCard = CreateOptionCard("Liberar espaço", "Arquivos que o computador não precisa mais");
+            Panel systemCard = CreateOptionCard("Cuidar do Windows", "Verificações e otimização do sistema");
             safeCard.Margin = new Padding(0, 0, 10, 0);
             systemCard.Margin = new Padding(10, 0, 0, 0);
 
             FlowLayoutPanel safeList = OptionList();
-            ConfigureOption(_temp, "Temporários seguros", "Preserva arquivos recentes e ignora itens em uso.");
-            ConfigureOption(_reports, "Relatórios de erro antigos", "Remove dumps e relatórios com mais de 14 dias.");
-            ConfigureOption(_recycle, "Esvaziar Lixeira", "Apaga definitivamente o conteúdo atual da Lixeira.");
-            _recycle.ForeColor = Theme.Amber;
-            safeList.Controls.AddRange(new Control[] { _temp, _reports, _recycle });
+            safeList.Controls.Add(CreateOptionRow(_temp, "Arquivos temporários", "Remove apenas arquivos antigos e preserva itens em uso.", false));
+            safeList.Controls.Add(CreateOptionRow(_reports, "Relatórios de erro", "Apaga diagnósticos do Windows com mais de 14 dias.", false));
+            safeList.Controls.Add(CreateOptionRow(_recycle, "Esvaziar a Lixeira", "Remove definitivamente o que já foi enviado para a Lixeira.", true));
             safeCard.Controls.Add(safeList);
 
             FlowLayoutPanel systemList = OptionList();
-            ConfigureOption(_components, "Componentes do Windows", "Remove versões substituídas usando DISM.");
-            ConfigureOption(_health, "Verificar integridade", "Executa DISM ScanHealth e SFC VerifyOnly.");
-            ConfigureOption(_drives, "Otimizar unidade", "Usa TRIM para SSD ou desfragmentação para HD.");
-            systemList.Controls.AddRange(new Control[] { _components, _health, _drives });
+            systemList.Controls.Add(CreateOptionRow(_components, "Limpar atualizações antigas", "Remove versões do Windows que já foram substituídas.", false));
+            systemList.Controls.Add(CreateOptionRow(_health, "Verificar o Windows", "Procura arquivos do sistema corrompidos ou inconsistentes.", false));
+            systemList.Controls.Add(CreateOptionRow(_drives, "Otimizar armazenamento", "Escolhe automaticamente o cuidado correto para SSD ou HD.", false));
             systemCard.Controls.Add(systemList);
 
             FlowLayoutPanel footer = new FlowLayoutPanel
@@ -2344,10 +2456,10 @@ namespace Neck
                 FlowDirection = FlowDirection.RightToLeft,
                 Padding = new Padding(0, 13, 0, 0)
             };
-            Button run = new Button { Text = "Continuar", DialogResult = DialogResult.OK };
-            Button cancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel };
-            ConfigureDialogButton(run, Theme.Blue, 150);
-            ConfigureDialogButton(cancel, Theme.NavySoft, 118);
+            Button run = new AnimatedButton { Text = "Revisar e iniciar", DialogResult = DialogResult.OK };
+            Button cancel = new AnimatedButton { Text = "Voltar", DialogResult = DialogResult.Cancel };
+            ConfigureDialogButton(run, Theme.Blue, 172);
+            ConfigureDialogButton(cancel, Theme.NavySoft, 110);
             footer.Controls.Add(run);
             footer.Controls.Add(cancel);
             AcceptButton = run;
@@ -2361,7 +2473,7 @@ namespace Neck
             Controls.Add(header);
         }
 
-        private static Panel CreateOptionCard(string title, string subtitle, Color accent)
+        private static Panel CreateOptionCard(string title, string subtitle)
         {
             RoundedPanel card = new RoundedPanel
             {
@@ -2369,7 +2481,7 @@ namespace Neck
                 BackColor = Color.White,
                 OutlineColor = Theme.Border,
                 CornerRadius = 16,
-                Padding = new Padding(20, 78, 20, 18)
+                Padding = new Padding(16, 78, 16, 14)
             };
             card.Controls.Add(new Label
             {
@@ -2384,7 +2496,7 @@ namespace Neck
                 Text = subtitle,
                 AutoSize = true,
                 Font = Theme.Small,
-                ForeColor = accent,
+                ForeColor = Theme.Muted,
                 Location = new Point(22, 51)
             });
             return card;
@@ -2402,18 +2514,59 @@ namespace Neck
             };
         }
 
-        private static void ConfigureOption(CheckBox box, string title, string description)
+        private static Control CreateOptionRow(CheckBox box, string title, string description, bool warning)
         {
+            RoundedPanel row = new RoundedPanel
+            {
+                Size = new Size(300, 100),
+                Margin = new Padding(0, 0, 0, 8),
+                BackColor = Color.White,
+                OutlineColor = Theme.Border,
+                CornerRadius = 12,
+                Cursor = Cursors.Hand
+            };
+            box.Text = string.Empty;
             box.AutoSize = false;
-            box.Width = 295;
-            box.Height = 98;
-            box.Text = title + Environment.NewLine + description;
-            box.Font = Theme.Body;
-            box.ForeColor = Theme.Text;
-            box.CheckAlign = ContentAlignment.TopLeft;
-            box.TextAlign = ContentAlignment.TopLeft;
-            box.Padding = new Padding(2, 5, 2, 2);
-            box.Margin = new Padding(0, 0, 0, 6);
+            box.Size = new Size(24, 24);
+            box.Location = new Point(17, 34);
+            box.CheckAlign = ContentAlignment.MiddleCenter;
+            box.Cursor = Cursors.Hand;
+            Label heading = new Label
+            {
+                Text = title,
+                AutoSize = false,
+                Size = new Size(234, 25),
+                Location = new Point(52, 15),
+                Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
+                ForeColor = warning ? Theme.Amber : Theme.Text,
+                Cursor = Cursors.Hand
+            };
+            Label detail = new Label
+            {
+                Text = description,
+                AutoSize = false,
+                Size = new Size(234, 48),
+                Location = new Point(52, 42),
+                Font = Theme.Small,
+                ForeColor = Theme.Muted,
+                Cursor = Cursors.Hand
+            };
+            Action refresh = delegate
+            {
+                row.BackColor = box.Checked ? Theme.FlowSoft : Color.White;
+                row.OutlineColor = box.Checked ? VisualEffects.Blend(Theme.Cyan, Color.White, 0.25d) : Theme.Border;
+                row.Invalidate();
+            };
+            EventHandler toggle = delegate { box.Checked = !box.Checked; };
+            row.Click += toggle;
+            heading.Click += toggle;
+            detail.Click += toggle;
+            box.CheckedChanged += delegate { refresh(); };
+            row.Controls.Add(box);
+            row.Controls.Add(heading);
+            row.Controls.Add(detail);
+            refresh();
+            return row;
         }
 
         private static void ConfigureDialogButton(Button button, Color color, int width)
@@ -2427,6 +2580,8 @@ namespace Neck
             button.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
             button.Margin = new Padding(10, 0, 0, 0);
             button.Cursor = Cursors.Hand;
+            AnimatedButton animated = button as AnimatedButton;
+            if (animated != null) animated.SetPalette(color);
         }
     }
 

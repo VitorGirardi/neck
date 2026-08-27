@@ -49,6 +49,18 @@ Assim, nenhuma ferramenta foi removida: as ações mais importantes aparecem pri
 
 As interações usam movimentos curtos e leves: janelas aparecem suavemente, botões respondem ao mouse e ao clique, cartões destacam o destino selecionado e tarefas exibem uma barra de atividade fluida. O botão principal pulsa somente diante de uma condição crítica e todas as animações contínuas param quando o Neck vai para a bandeja. A opção **Reduzir animações**, nas Preferências, mantém os realces sem movimento.
 
+## Identidade Neck Flow
+
+O nome Neck vem de **bottleneck**: um gargalo que limita o fluxo do computador. A identidade visual transforma essa ideia em uma linguagem funcional:
+
+- o símbolo mostra um canal que estreita e volta a abrir;
+- os estados usam **Fluindo bem**, **Atenção** e **Gargalo detectado**;
+- a animação da tela principal representa o fluxo passando pelo ponto de restrição;
+- [Bahnschrift](https://learn.microsoft.com/typography/font-list/bahnschrift), fonte técnica incluída no Windows 10 e 11, identifica títulos e métricas; Segoe UI preserva a leitura dos textos;
+- ciano representa o fluxo do Neck, âmbar indica restrição e verde confirma ações concluídas.
+
+A animação ocorre por um intervalo curto após cada diagnóstico e não permanece consumindo recursos na bandeja.
+
 ![Central de ferramentas secundárias do Neck](assets/screenshots/neck-tools.png)
 
 ## Principais recursos
@@ -91,7 +103,15 @@ O Neck cuida das mudanças sozinho:
 
 A tela principal mostra apenas o nome, o uso de memória e uma situação compreensível, como **Disponível**, **Mais rápido agora** ou **Economizando memória**. Fechamento do aplicativo, Gerenciador de Tarefas e controle manual de segundo plano ficam em **Mais opções**.
 
+Os ícones exibidos na lista são extraídos dos executáveis locais, como no Gerenciador de Tarefas. Nenhum ícone é baixado e aplicações protegidas usam um símbolo neutro.
+
 ![Escolha simples de aplicativo no Neck](assets/screenshots/neck-sos.png)
+
+## Manutenção guiada
+
+As tarefas de manutenção aparecem em linhas inteiras clicáveis, com checkbox alinhado, explicações em linguagem comum e destaque apenas para opções selecionadas. Termos como DISM, SFC e TRIM continuam na implementação, mas não são exigidos para entender a escolha.
+
+![Manutenção guiada do Neck](assets/screenshots/neck-maintenance.png)
 
 <details>
 <summary>Ver os controles avançados separados da experiência principal</summary>
@@ -137,11 +157,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.7.1.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.8.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.7.1.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.8.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -236,6 +256,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Aceleração com um botão e opções técnicas separadas
 - [x] Tela inicial guiada e central separada para ferramentas ocasionais
 - [x] Animações leves, estados interativos e opção de redução de movimento
+- [x] Identidade Neck Flow, ícones locais e manutenção guiada
 - [x] Instalador, preferências e checksums
 - [x] Neck Boot e Meu Plano Neck
 - [x] Neck Adaptive com foco, EcoQoS e prioridade de memória

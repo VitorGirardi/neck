@@ -16,6 +16,7 @@ namespace Neck
         public int ProcessCount;
         public int VisibleWindows;
         public long MemoryBytes;
+        public string ExecutablePath;
     }
 
     internal sealed class SosCloseResult
@@ -58,6 +59,11 @@ namespace Neck
                         }
                         candidate.ProcessCount++;
                         candidate.MemoryBytes += Math.Max(0, process.WorkingSet64);
+                        if (string.IsNullOrWhiteSpace(candidate.ExecutablePath))
+                        {
+                            try { candidate.ExecutablePath = process.MainModule.FileName; }
+                            catch { }
+                        }
                         if (process.MainWindowHandle != IntPtr.Zero) candidate.VisibleWindows++;
                     }
                     catch { }
@@ -96,6 +102,7 @@ namespace Neck
     internal sealed class SosForm : Form
     {
         private readonly ListView _applications = new ListView();
+        private readonly ImageList _applicationIcons = new ImageList();
         private readonly Label _memory = new Label();
         private readonly Label _result = new Label();
         private readonly Button _focus = new Button();
@@ -113,6 +120,8 @@ namespace Neck
             BackColor = Theme.Background;
             Font = Theme.Body;
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+            _applicationIcons.ColorDepth = ColorDepth.Depth32Bit;
+            _applicationIcons.ImageSize = new Size(20, 20);
             BuildInterface();
             FormClosing += delegate(object sender, FormClosingEventArgs e)
             {
@@ -124,6 +133,7 @@ namespace Neck
                 }
                 _closing = true;
             };
+            FormClosed += delegate { _applicationIcons.Dispose(); };
             Shown += delegate { RefreshSnapshot(); };
         }
 
@@ -145,7 +155,7 @@ namespace Neck
             {
                 Text = "Qual aplicativo precisa ficar mais rápido?",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 20f, FontStyle.Bold),
+                Font = new Font("Bahnschrift", 20f, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(138, 20)
             });
@@ -198,6 +208,7 @@ namespace Neck
             _applications.ForeColor = Theme.Text;
             _applications.Font = new Font("Segoe UI", 10.5f);
             _applications.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+            _applications.SmallImageList = _applicationIcons;
             _applications.Columns.Add("Aplicativo", 365);
             _applications.Columns.Add("Uso de memória", 155, HorizontalAlignment.Right);
             _applications.Columns.Add("Situação", 205);
@@ -248,7 +259,7 @@ namespace Neck
                 ? ((_applications.SelectedItems[0].Tag as SosCandidate) ?? new SosCandidate()).ProcessName
                 : FocusModeManager.ActiveProcessName;
             MemoryStatus status = SystemInfo.GetMemoryStatus();
-            _memory.Text = status.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% da memória em uso     •     " +
+            _memory.Text = status.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% da memória em uso     |     " +
                            MainForm.FormatBytes((long)status.AvailableBytes) + " disponíveis";
             _memory.ForeColor = status.PercentUsed >= 90 ? Color.Firebrick : status.PercentUsed >= 75 ? Theme.Amber : Theme.Green;
 
@@ -256,7 +267,8 @@ namespace Neck
             _applications.Items.Clear();
             foreach (SosCandidate candidate in _candidates)
             {
-                ListViewItem item = new ListViewItem(candidate.DisplayName) { Tag = candidate };
+                string imageKey = EnsureApplicationIcon(candidate);
+                ListViewItem item = new ListViewItem(candidate.DisplayName) { Tag = candidate, ImageKey = imageKey };
                 item.SubItems.Add(MainForm.FormatBytes(candidate.MemoryBytes));
                 string state = FocusModeManager.IsTarget(candidate.ProcessName)
                     ? FocusModeManager.GetStateLabel(candidate.ProcessName)
@@ -266,6 +278,32 @@ namespace Neck
             }
             SelectProcess(selectedName);
             UpdateSelectionState();
+        }
+
+        private string EnsureApplicationIcon(SosCandidate candidate)
+        {
+            string key = string.IsNullOrWhiteSpace(candidate.ProcessName) ? "__default" : candidate.ProcessName.ToLowerInvariant();
+            if (_applicationIcons.Images.ContainsKey(key)) return key;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(candidate.ExecutablePath))
+                {
+                    using (Icon icon = Icon.ExtractAssociatedIcon(candidate.ExecutablePath))
+                    {
+                        if (icon != null)
+                        {
+                            using (Bitmap bitmap = icon.ToBitmap()) _applicationIcons.Images.Add(key, bitmap);
+                            return key;
+                        }
+                    }
+                }
+            }
+            catch { }
+            if (!_applicationIcons.Images.ContainsKey("__default"))
+            {
+                using (Bitmap bitmap = SystemIcons.Application.ToBitmap()) _applicationIcons.Images.Add("__default", bitmap);
+            }
+            return "__default";
         }
 
         private async Task ToggleFocusAsync()

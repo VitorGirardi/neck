@@ -170,6 +170,15 @@ namespace Neck
                         preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
                         Console.WriteLine("AdvancedPreview=" + previewPath);
                     }
+                    options.Size = options.MinimumSize;
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(options.Width, options.Height))
+                    {
+                        options.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, options.Width, options.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Advanced.Minimum.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("AdvancedMinimumPreview=" + previewPath);
+                    }
                     options.Close();
                 }
                 using (DiagnosticForm diagnostic = new DiagnosticForm(health))
