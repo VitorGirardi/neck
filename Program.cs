@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.5.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.5.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.6.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.6.0.0")]
 
 namespace Neck
 {
@@ -149,9 +149,11 @@ namespace Neck
         private readonly Button _reportsButton = new Button();
         private readonly Button _settingsButton = new Button();
         private readonly Button _planButton = new Button();
+        private readonly Button _toolsButton = new Button();
         private readonly Label _guardBadge = new Label();
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
+        private readonly Label _activityStatus = new Label();
         private readonly CheckBox _backgroundCheck = new CheckBox();
         private readonly CheckBox _tempCheck = new CheckBox();
         private readonly CheckBox _reportsCheck = new CheckBox();
@@ -194,8 +196,8 @@ namespace Neck
         {
             Text = "Neck";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(1040, 740);
-            Size = new Size(1120, 790);
+            MinimumSize = new Size(980, 720);
+            Size = new Size(1080, 770);
             BackColor = Theme.Background;
             Font = Theme.Body;
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
@@ -278,15 +280,15 @@ namespace Neck
             Panel header = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 108,
+                Height = 96,
                 BackColor = Theme.Navy,
-                Padding = new Padding(30, 18, 30, 16)
+                Padding = new Padding(30, 16, 30, 14)
             };
 
             RoundedPanel mark = new RoundedPanel
             {
-                Size = new Size(54, 54),
-                Location = new Point(31, 24),
+                Size = new Size(50, 50),
+                Location = new Point(31, 22),
                 BackColor = Theme.Cyan,
                 OutlineColor = Theme.Cyan,
                 CornerRadius = 15
@@ -296,7 +298,7 @@ namespace Neck
                 Dock = DockStyle.Fill,
                 Text = "N",
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI Semibold", 23f, FontStyle.Bold),
+                Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
                 ForeColor = Color.White
             });
 
@@ -304,49 +306,37 @@ namespace Neck
             {
                 AutoSize = true,
                 Text = "Neck",
-                Font = Theme.Title,
+                Font = new Font("Segoe UI Semibold", 23f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(101, 18)
+                Location = new Point(99, 15)
             };
             Label subtitle = new Label
             {
                 AutoSize = true,
-                Text = "Cuide do Windows sem complicação",
+                Text = "Deixe seu computador mais leve, sem complicação",
                 Font = Theme.Body,
                 ForeColor = Color.FromArgb(186, 199, 218),
-                Location = new Point(105, 62)
+                Location = new Point(102, 57)
             };
-            _recommendation.AutoSize = false;
-            _recommendation.Size = new Size(258, 44);
-            _recommendation.TextAlign = ContentAlignment.MiddleCenter;
-            _recommendation.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
-            _recommendation.ForeColor = Color.White;
-            _recommendation.BackColor = Theme.NavySoft;
-            _recommendation.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _recommendation.Location = new Point(ClientSize.Width - 292, 31);
-            ConfigureButton(_settingsButton, "Preferências", Theme.NavySoft, 126);
-            _settingsButton.Height = 44;
-            _settingsButton.Location = new Point(ClientSize.Width - 430, 31);
-            _settingsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _settingsButton.Click += delegate { ShowPreferences(false); };
-            ConfigureButton(_planButton, "Meu plano", Theme.Blue, 118);
-            _planButton.Height = 44;
-            _planButton.Location = new Point(ClientSize.Width - 560, 31);
-            _planButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _planButton.Click += async delegate { await ShowPersonalPlanAsync(); };
-            header.Resize += delegate
+
+            Label promise = new Label
             {
-                _recommendation.Left = header.ClientSize.Width - _recommendation.Width - 32;
-                _settingsButton.Left = _recommendation.Left - _settingsButton.Width - 12;
-                _planButton.Left = _settingsButton.Left - _planButton.Width - 12;
+                AutoSize = false,
+                Size = new Size(245, 40),
+                Text = "SEGURO  •  REVERSÍVEL  •  LOCAL",
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(191, 219, 254),
+                BackColor = Color.FromArgb(30, 41, 59),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Location = new Point(ClientSize.Width - 278, 27)
             };
+            header.Resize += delegate { promise.Left = header.ClientSize.Width - promise.Width - 30; };
 
             header.Controls.Add(mark);
             header.Controls.Add(title);
             header.Controls.Add(subtitle);
-            header.Controls.Add(_planButton);
-            header.Controls.Add(_settingsButton);
-            header.Controls.Add(_recommendation);
+            header.Controls.Add(promise);
             return header;
         }
 
@@ -356,85 +346,69 @@ namespace Neck
             {
                 Dock = DockStyle.Fill,
                 BackColor = Theme.Background,
-                Padding = new Padding(26, 18, 26, 24),
+                Padding = new Padding(24, 18, 24, 22),
                 ColumnCount = 2,
                 RowCount = 3
             };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 124f));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 272f));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 250f));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 220f));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
-            Control summary = BuildSummaryCard();
-            body.SetColumnSpan(summary, 2);
-            body.Controls.Add(summary, 0, 0);
+            Control guard = BuildGuardCard();
+            body.SetColumnSpan(guard, 2);
+            body.Controls.Add(guard, 0, 0);
             body.Controls.Add(BuildQuickCard(), 0, 1);
             body.Controls.Add(BuildDeepCard(), 1, 1);
-            body.Controls.Add(BuildGuardCard(), 0, 2);
-            body.Controls.Add(BuildActivityCard(), 1, 2);
+            Control tools = BuildToolsStrip();
+            body.SetColumnSpan(tools, 2);
+            body.Controls.Add(tools, 0, 2);
             return body;
-        }
-
-        private Control BuildSummaryCard()
-        {
-            Panel card = MakeCard(new Padding(18, 14, 18, 12));
-            card.Margin = new Padding(0, 0, 0, 14);
-            TableLayoutPanel grid = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 4,
-                RowCount = 2,
-                BackColor = Color.White
-            };
-            for (int i = 0; i < 4; i++) grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 58));
-            AddMetric(grid, 0, "MEMÓRIA EM USO", _memoryValue);
-            AddMetric(grid, 1, "ESPAÇO LIVRE", _diskValue);
-            AddMetric(grid, 2, "LIMPEZA DISPONÍVEL", _analysisValue);
-            AddMetric(grid, 3, "ÚLTIMO CUIDADO", _lastRunValue);
-            card.Controls.Add(grid);
-            return card;
         }
 
         private Control BuildQuickCard()
         {
             Panel card = MakeCard(new Padding(24));
-            card.Margin = new Padding(0, 0, 10, 14);
+            card.Margin = new Padding(0, 12, 9, 12);
 
-            Label badge = CreateBadge("RECOMENDADO", Theme.BlueSoft, Theme.Blue);
-            badge.Location = new Point(24, 22);
+            Label badge = CreateBadge("SEGURO", Theme.BlueSoft, Theme.Blue);
+            badge.Location = new Point(24, 20);
             Label title = new Label
             {
-                Text = "Limpeza rápida",
+                Text = "Limpar arquivos",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 19f, FontStyle.Bold),
+                Font = new Font("Segoe UI Semibold", 17f, FontStyle.Bold),
                 ForeColor = Theme.Text,
-                Location = new Point(23, 60)
+                Location = new Point(23, 54)
             };
             Label description = new Label
             {
-                Text = "Remove apenas temporários antigos e relatórios de erro. Seus documentos, senhas e downloads ficam intactos.",
+                Text = "Remove temporários antigos sem tocar em documentos, senhas ou downloads.",
                 AutoSize = false,
-                Size = new Size(430, 58),
+                Size = new Size(400, 44),
                 Font = Theme.Body,
                 ForeColor = Theme.Muted,
-                Location = new Point(26, 105)
+                Location = new Point(25, 91)
             };
-            Label safe = new Label
+            Label available = new Label
             {
-                Text = "✓  Não fecha programas    ✓  Não reinicia o PC",
+                Text = "Disponível para limpar:",
                 AutoSize = true,
                 Font = Theme.Small,
-                ForeColor = Theme.Green,
-                Location = new Point(25, 166)
+                ForeColor = Theme.Muted,
+                Location = new Point(25, 128)
             };
+            _analysisValue.Text = "Analisando…";
+            _analysisValue.AutoSize = true;
+            _analysisValue.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+            _analysisValue.ForeColor = Theme.Text;
+            _analysisValue.Location = new Point(159, 126);
 
-            ConfigureButton(_analyzeButton, "Analisar agora", Theme.NavySoft, 142);
-            ConfigureButton(_runButton, "Fazer limpeza segura", Theme.Blue, 218);
-            _analyzeButton.Location = new Point(24, 202);
-            _runButton.Location = new Point(176, 202);
+            ConfigureButton(_analyzeButton, "Analisar novamente", Theme.NavySoft, 1);
+            _analyzeButton.Visible = false;
+            ConfigureButton(_runButton, "Fazer limpeza segura", Theme.Blue, 214);
+            _runButton.Location = new Point(24, 150);
             _analyzeButton.Click += async delegate { await AnalyzeAsync(true); };
             _runButton.Click += async delegate
             {
@@ -450,8 +424,8 @@ namespace Neck
             card.Controls.Add(badge);
             card.Controls.Add(title);
             card.Controls.Add(description);
-            card.Controls.Add(safe);
-            card.Controls.Add(_analyzeButton);
+            card.Controls.Add(available);
+            card.Controls.Add(_analysisValue);
             card.Controls.Add(_runButton);
             return card;
         }
@@ -459,40 +433,38 @@ namespace Neck
         private Control BuildDeepCard()
         {
             Panel card = MakeCard(new Padding(24));
-            card.Margin = new Padding(10, 0, 0, 14);
+            card.Margin = new Padding(9, 12, 0, 12);
 
             Label badge = CreateBadge("MENSAL", Theme.GreenSoft, Theme.Green);
-            badge.Location = new Point(24, 22);
+            badge.Location = new Point(24, 20);
             Label title = new Label
             {
-                Text = "Manutenção completa",
+                Text = "Revisar o computador",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 19f, FontStyle.Bold),
+                Font = new Font("Segoe UI Semibold", 17f, FontStyle.Bold),
                 ForeColor = Theme.Text,
-                Location = new Point(23, 60)
+                Location = new Point(23, 54)
             };
             Label description = new Label
             {
-                Text = "Reúne as ferramentas nativas do Windows para componentes, integridade e otimização da unidade.",
+                Text = "Verifica o Windows e recomenda os cuidados mensais mais importantes.",
                 AutoSize = false,
-                Size = new Size(430, 50),
+                Size = new Size(400, 44),
                 Font = Theme.Body,
                 ForeColor = Theme.Muted,
-                Location = new Point(26, 105)
+                Location = new Point(25, 91)
             };
-            Label included = new Label
-            {
-                Text = "Componentes  •  DISM/SFC  •  TRIM ou desfragmentação",
-                AutoSize = true,
-                Font = Theme.Small,
-                ForeColor = Theme.Muted,
-                Location = new Point(25, 166)
-            };
-            ConfigureButton(_advancedButton, "Escolher tarefas", Theme.Green, 190);
-            _advancedButton.Location = new Point(24, 202);
+            _recommendation.AutoSize = false;
+            _recommendation.Size = new Size(310, 25);
+            _recommendation.TextAlign = ContentAlignment.MiddleLeft;
+            _recommendation.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
+            _recommendation.ForeColor = Theme.Green;
+            _recommendation.BackColor = Color.White;
+            _recommendation.Location = new Point(25, 126);
+            _lastRunValue.Visible = false;
+            ConfigureButton(_advancedButton, "Começar revisão", Theme.Green, 190);
+            _advancedButton.Location = new Point(24, 150);
             _advancedButton.Click += async delegate { await ShowAdvancedAndRunAsync(); };
-            ConfigureButton(_bootButton, "Neck Boot", Theme.NavySoft, 132);
-            _bootButton.Location = new Point(224, 202);
             _bootButton.Click += delegate
             {
                 using (StartupAppsForm form = new StartupAppsForm()) form.ShowDialog(this);
@@ -501,16 +473,15 @@ namespace Neck
             card.Controls.Add(badge);
             card.Controls.Add(title);
             card.Controls.Add(description);
-            card.Controls.Add(included);
+            card.Controls.Add(_recommendation);
             card.Controls.Add(_advancedButton);
-            card.Controls.Add(_bootButton);
             return card;
         }
 
         private Control BuildGuardCard()
         {
-            Panel card = MakeCard(new Padding(22));
-            card.Margin = new Padding(0, 0, 10, 0);
+            Panel card = MakeCard(new Padding(28));
+            card.Margin = new Padding(0, 0, 0, 0);
             _guardBadge.Text = "ANALISANDO";
             _guardBadge.AutoSize = false;
             _guardBadge.Size = new Size(108, 25);
@@ -518,63 +489,140 @@ namespace Neck
             _guardBadge.ForeColor = Theme.Blue;
             _guardBadge.TextAlign = ContentAlignment.MiddleCenter;
             _guardBadge.Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold);
-            _guardBadge.Location = new Point(22, 17);
+            _guardBadge.Location = new Point(28, 24);
             Label title = new Label
             {
-                Text = "Neck Guard",
+                Text = "Seu computador agora",
                 AutoSize = true,
-                Font = Theme.Heading,
+                Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
                 ForeColor = Theme.Text,
-                Location = new Point(22, 49)
+                Location = new Point(27, 58)
             };
             _guardMessage.Text = "Procurando sinais de sobrecarga...";
             _guardMessage.AutoSize = false;
-            _guardMessage.Size = new Size(450, 38);
-            _guardMessage.Font = Theme.Small;
+            _guardMessage.Size = new Size(570, 43);
+            _guardMessage.Font = Theme.Body;
             _guardMessage.ForeColor = Theme.Muted;
-            _guardMessage.Location = new Point(23, 77);
+            _guardMessage.Location = new Point(30, 103);
             _guardProcess.Text = "Maior uso de memória: calculando";
             _guardProcess.AutoSize = false;
-            _guardProcess.Size = new Size(285, 24);
+            _guardProcess.Size = new Size(600, 26);
             _guardProcess.Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold);
             _guardProcess.ForeColor = Theme.Text;
-            _guardProcess.Location = new Point(23, 112);
-            _backgroundCheck.Text = "Continuar na bandeja";
-            _backgroundCheck.AutoSize = false;
-            _backgroundCheck.Size = new Size(172, 26);
-            _backgroundCheck.Location = new Point(318, 108);
-            _backgroundCheck.Font = Theme.Small;
-            _backgroundCheck.ForeColor = Theme.Muted;
-            _backgroundCheck.Cursor = Cursors.Hand;
+            _guardProcess.Location = new Point(29, 148);
 
-            ConfigureButton(_guardButton, "Acelerar app", Theme.Blue, 145);
-            ConfigureButton(_meetingButton, "Reunião", Theme.NavySoft, 105);
-            ConfigureButton(_driversButton, "Drivers", Theme.NavySoft, 82);
-            ConfigureButton(_reportsButton, "Histórico", Theme.NavySoft, 96);
-            _guardButton.Location = new Point(22, 142);
-            _meetingButton.Location = new Point(177, 142);
-            _driversButton.Location = new Point(292, 142);
-            _reportsButton.Location = new Point(384, 142);
+            Panel actionArea = new Panel { Dock = DockStyle.Right, Width = 310, BackColor = Color.White, Padding = new Padding(24, 42, 24, 24) };
+            Label actionTitle = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 48,
+                Text = "Algum aplicativo está travando?",
+                Font = new Font("Segoe UI Semibold", 12f, FontStyle.Bold),
+                ForeColor = Theme.Text,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            Label actionHelp = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 43,
+                Text = "Escolha o aplicativo importante e o Neck cuida do restante.",
+                Font = Theme.Small,
+                ForeColor = Theme.Muted,
+                TextAlign = ContentAlignment.TopCenter
+            };
+            ConfigureButton(_guardButton, "Acelerar um aplicativo", Theme.Blue, 244);
+            _guardButton.Dock = DockStyle.Top;
+            _guardButton.Height = 48;
+            _guardButton.Margin = new Padding(8, 0, 8, 0);
+            ConfigureButton(_meetingButton, "Modo reunião", Theme.Blue, 1);
+            _meetingButton.Visible = false;
             _meetingButton.Click += delegate { ToggleMeetingMode(); };
             _guardButton.Click += delegate
             {
                 OpenSos();
             };
-            _driversButton.Click += delegate { using (DriverCenterForm form = new DriverCenterForm()) form.ShowDialog(this); };
-            _reportsButton.Click += delegate
+            actionArea.Controls.Add(_guardButton);
+            actionArea.Controls.Add(actionHelp);
+            actionArea.Controls.Add(actionTitle);
+
+            TableLayoutPanel metrics = new TableLayoutPanel
             {
-                using (GuardHistoryForm form = new GuardHistoryForm(_guardSamples.ToList(), ReportDirectory)) form.ShowDialog(this);
+                Location = new Point(28, 177),
+                Size = new Size(570, 55),
+                ColumnCount = 2,
+                RowCount = 1,
+                BackColor = Theme.Background,
+                Padding = new Padding(4)
             };
+            metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            metrics.Controls.Add(BuildInlineMetric("MEMÓRIA EM USO", _memoryValue), 0, 0);
+            metrics.Controls.Add(BuildInlineMetric("ESPAÇO LIVRE", _diskValue), 1, 0);
 
             card.Controls.Add(_guardBadge);
             card.Controls.Add(title);
             card.Controls.Add(_guardMessage);
             card.Controls.Add(_guardProcess);
-            card.Controls.Add(_backgroundCheck);
-            card.Controls.Add(_meetingButton);
-            card.Controls.Add(_guardButton);
-            card.Controls.Add(_driversButton);
-            card.Controls.Add(_reportsButton);
+            card.Controls.Add(metrics);
+            card.Controls.Add(actionArea);
+            return card;
+        }
+
+        private static Control BuildInlineMetric(string caption, Label value)
+        {
+            Panel panel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background };
+            Label name = new Label
+            {
+                Text = caption,
+                AutoSize = false,
+                Size = new Size(150, 19),
+                Location = new Point(14, 8),
+                Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold),
+                ForeColor = Theme.Muted
+            };
+            value.AutoSize = false;
+            value.Size = new Size(110, 25);
+            value.Location = new Point(165, 22);
+            value.TextAlign = ContentAlignment.MiddleRight;
+            value.Font = new Font("Segoe UI Semibold", 13f, FontStyle.Bold);
+            value.ForeColor = Theme.Text;
+            panel.Controls.Add(name);
+            panel.Controls.Add(value);
+            return panel;
+        }
+
+        private Control BuildToolsStrip()
+        {
+            Panel card = MakeCard(new Padding(22));
+            card.Margin = new Padding(0, 0, 0, 0);
+            Label title = new Label
+            {
+                Text = "Precisa de outra coisa?",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 12.5f, FontStyle.Bold),
+                ForeColor = Theme.Text,
+                Location = new Point(24, 18)
+            };
+            _activityStatus.Text = "Tudo pronto. O Neck continua acompanhando o computador.";
+            _activityStatus.AutoSize = false;
+            _activityStatus.Size = new Size(650, 24);
+            _activityStatus.Font = Theme.Small;
+            _activityStatus.ForeColor = Theme.Muted;
+            _activityStatus.Location = new Point(25, 48);
+            _progress.Dock = DockStyle.Bottom;
+            _progress.Height = 5;
+            _progress.Visible = false;
+            _log.Visible = false;
+            ConfigureButton(_toolsButton, "Mais ferramentas", Theme.NavySoft, 190);
+            _toolsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _toolsButton.Location = new Point(800, 29);
+            _toolsButton.Click += async delegate { await ShowToolsHubAsync(); };
+            card.Resize += delegate { _toolsButton.Left = card.ClientSize.Width - _toolsButton.Width - 24; };
+            card.Controls.Add(title);
+            card.Controls.Add(_activityStatus);
+            card.Controls.Add(_toolsButton);
+            card.Controls.Add(_progress);
+            card.Controls.Add(_log);
             return card;
         }
 
@@ -760,6 +808,41 @@ namespace Neck
             {
                 using (DiagnosticForm form = new DiagnosticForm(health ?? SystemInfo.GetHealthSnapshot())) form.ShowDialog(this);
             }
+        }
+
+        private async Task ShowToolsHubAsync()
+        {
+            if (_closing || IsDisposed || _busy) return;
+            ToolHubChoice choice;
+            using (ToolsHubForm form = new ToolsHubForm(_backgroundCheck.Checked, _meetingActive, _activityStatus.Text))
+            {
+                form.ShowDialog(this);
+                _backgroundCheck.Checked = form.ContinueInTray;
+                choice = form.SelectedChoice;
+            }
+
+            if (choice == ToolHubChoice.Plan)
+                await ShowPersonalPlanAsync();
+            else if (choice == ToolHubChoice.Meeting)
+                ToggleMeetingMode();
+            else if (choice == ToolHubChoice.Startup)
+            {
+                using (StartupAppsForm form = new StartupAppsForm()) form.ShowDialog(this);
+            }
+            else if (choice == ToolHubChoice.Diagnostic)
+            {
+                using (DiagnosticForm form = new DiagnosticForm(_healthSnapshot ?? SystemInfo.GetHealthSnapshot())) form.ShowDialog(this);
+            }
+            else if (choice == ToolHubChoice.Drivers)
+            {
+                using (DriverCenterForm form = new DriverCenterForm()) form.ShowDialog(this);
+            }
+            else if (choice == ToolHubChoice.History)
+            {
+                using (GuardHistoryForm form = new GuardHistoryForm(_guardSamples.ToList(), ReportDirectory)) form.ShowDialog(this);
+            }
+            else if (choice == ToolHubChoice.Preferences)
+                ShowPreferences(false);
         }
 
         private void HandleMainFormClosing(object sender, FormClosingEventArgs e)
@@ -1142,7 +1225,8 @@ namespace Neck
             _meetingButton.Text = "Encerrar modo";
             _meetingButton.BackColor = Theme.Cyan;
             _recommendation.Text = "MODO REUNIÃO  •  até " + _meetingEndsAt.ToString("HH:mm");
-            _recommendation.BackColor = Color.FromArgb(14, 116, 144);
+            _recommendation.BackColor = Color.White;
+            _recommendation.ForeColor = Theme.Cyan;
         }
 
         private void DeactivateMeetingMode(string reason)
@@ -1155,7 +1239,8 @@ namespace Neck
             _runButton.Enabled = !_busy;
             _advancedButton.Enabled = !_busy;
             _bootButton.Enabled = !_busy;
-            _recommendation.BackColor = Theme.NavySoft;
+            _recommendation.BackColor = Color.White;
+            _recommendation.ForeColor = Theme.Green;
             LoadLastRun();
             UpdateGuardView(_healthSnapshot);
             AppendLog("MODO REUNIÃO — desativado. " + reason);
@@ -1371,8 +1456,10 @@ namespace Neck
             _planButton.Enabled = !busy;
             _guardButton.Enabled = !busy;
             _meetingButton.Enabled = !busy;
+            _toolsButton.Enabled = !busy;
             _progress.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
             _progress.MarqueeAnimationSpeed = busy ? 25 : 0;
+            _progress.Visible = busy;
             if (!string.IsNullOrEmpty(status)) AppendLog(status);
             Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
         }
@@ -1395,6 +1482,7 @@ namespace Neck
                 _log.AppendText("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + line + Environment.NewLine);
                 _log.SelectionStart = _log.TextLength;
                 _log.ScrollToCaret();
+                _activityStatus.Text = line;
             }
             catch (ObjectDisposedException) { }
         }
@@ -1417,6 +1505,179 @@ namespace Neck
         {
             try { Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true }); }
             catch (Exception ex) { MessageBox.Show("Não foi possível abrir:\n" + target + "\n\n" + ex.Message, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        }
+    }
+
+    internal enum ToolHubChoice
+    {
+        None,
+        Plan,
+        Meeting,
+        Startup,
+        Diagnostic,
+        Drivers,
+        History,
+        Preferences
+    }
+
+    internal sealed class ToolsHubForm : Form
+    {
+        private readonly CheckBox _continueInTray = new CheckBox();
+        private readonly bool _meetingActive;
+
+        public ToolHubChoice SelectedChoice { get; private set; }
+        public bool ContinueInTray { get { return _continueInTray.Checked; } }
+
+        public ToolsHubForm(bool continueInTray, bool meetingActive, string activity)
+        {
+            _meetingActive = meetingActive;
+            Text = "Mais ferramentas — Neck";
+            StartPosition = FormStartPosition.CenterParent;
+            Size = new Size(850, 650);
+            MinimumSize = new Size(780, 610);
+            BackColor = Theme.Background;
+            Font = Theme.Body;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+            SelectedChoice = ToolHubChoice.None;
+            BuildInterface(continueInTray, activity);
+        }
+
+        private void BuildInterface(bool continueInTray, string activity)
+        {
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Navy, Padding = new Padding(30, 20, 30, 16) };
+            header.Controls.Add(new Label
+            {
+                Text = "Mais ferramentas",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 23f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(30, 20)
+            });
+            header.Controls.Add(new Label
+            {
+                Text = "Recursos extras ficam aqui para não atrapalhar o que importa na tela inicial.",
+                AutoSize = true,
+                Font = Theme.Body,
+                ForeColor = Color.FromArgb(191, 203, 220),
+                Location = new Point(33, 69)
+            });
+
+            TableLayoutPanel grid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 22, 24, 14),
+                ColumnCount = 2,
+                RowCount = 3,
+                BackColor = Theme.Background
+            };
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            for (int row = 0; row < 3; row++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
+            grid.Controls.Add(CreateTool("Meu plano", "Três prioridades escolhidas para este computador.", ToolHubChoice.Plan, Theme.Blue), 0, 0);
+            grid.Controls.Add(CreateTool(_meetingActive ? "Encerrar modo reunião" : "Modo reunião", "Evita suspensão durante chamadas e apresentações.", ToolHubChoice.Meeting, Theme.Cyan), 1, 0);
+            grid.Controls.Add(CreateTool("Inicialização", "Veja o que abre junto com o Windows.", ToolHubChoice.Startup, Theme.NavySoft), 0, 1);
+            grid.Controls.Add(CreateTool("Diagnóstico", "Detalhes de CPU, memória e armazenamento.", ToolHubChoice.Diagnostic, Theme.NavySoft), 1, 1);
+            grid.Controls.Add(CreateTool("Drivers", "Confira atualizações pelas fontes oficiais.", ToolHubChoice.Drivers, Theme.NavySoft), 0, 2);
+            grid.Controls.Add(CreateTool("Histórico", "Consulte alertas e relatórios anteriores.", ToolHubChoice.History, Theme.NavySoft), 1, 2);
+
+            Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 86, BackColor = Color.White, Padding = new Padding(28, 14, 28, 14) };
+            _continueInTray.Text = "Continuar protegendo na bandeja ao fechar";
+            _continueInTray.Checked = continueInTray;
+            _continueInTray.AutoSize = true;
+            _continueInTray.Font = Theme.Small;
+            _continueInTray.ForeColor = Theme.Muted;
+            _continueInTray.Location = new Point(29, 15);
+            Button preferences = new Button();
+            ConfigureToolButton(preferences, "Preferências", Theme.NavySoft, 130);
+            preferences.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            preferences.Location = new Point(footer.Width - 286, 20);
+            preferences.Click += delegate { Choose(ToolHubChoice.Preferences); };
+            Button close = new Button();
+            ConfigureToolButton(close, "Voltar", Theme.Blue, 120);
+            close.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            close.Location = new Point(footer.Width - 146, 20);
+            close.Click += delegate { Close(); };
+            footer.Resize += delegate
+            {
+                close.Left = footer.ClientSize.Width - close.Width - 24;
+                preferences.Left = close.Left - preferences.Width - 10;
+            };
+            string status = string.IsNullOrWhiteSpace(activity) ? "Tudo pronto." : activity;
+            ToolTip tip = new ToolTip();
+            tip.SetToolTip(_continueInTray, status);
+            footer.Controls.Add(_continueInTray);
+            footer.Controls.Add(preferences);
+            footer.Controls.Add(close);
+
+            Controls.Add(grid);
+            Controls.Add(footer);
+            Controls.Add(header);
+            AcceptButton = close;
+            CancelButton = close;
+        }
+
+        private Control CreateTool(string title, string description, ToolHubChoice choice, Color accent)
+        {
+            RoundedPanel card = new RoundedPanel
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(8),
+                BackColor = Color.White,
+                OutlineColor = Theme.Border,
+                CornerRadius = 16,
+                Cursor = Cursors.Hand
+            };
+            Panel stripe = new Panel { Dock = DockStyle.Left, Width = 6, BackColor = accent, Cursor = Cursors.Hand };
+            Label heading = new Label
+            {
+                Text = title,
+                AutoSize = false,
+                Height = 32,
+                Dock = DockStyle.Top,
+                Padding = new Padding(20, 11, 10, 0),
+                Font = new Font("Segoe UI Semibold", 13f, FontStyle.Bold),
+                ForeColor = Theme.Text,
+                Cursor = Cursors.Hand
+            };
+            Label detail = new Label
+            {
+                Text = description,
+                AutoSize = false,
+                Dock = DockStyle.Fill,
+                Padding = new Padding(20, 12, 18, 8),
+                Font = Theme.Small,
+                ForeColor = Theme.Muted,
+                Cursor = Cursors.Hand
+            };
+            EventHandler select = delegate { Choose(choice); };
+            card.Click += select;
+            stripe.Click += select;
+            heading.Click += select;
+            detail.Click += select;
+            card.Controls.Add(detail);
+            card.Controls.Add(heading);
+            card.Controls.Add(stripe);
+            return card;
+        }
+
+        private void Choose(ToolHubChoice choice)
+        {
+            SelectedChoice = choice;
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+
+        private static void ConfigureToolButton(Button button, string text, Color color, int width)
+        {
+            button.Text = text;
+            button.Size = new Size(width, 42);
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0;
+            button.BackColor = color;
+            button.ForeColor = Color.White;
+            button.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
+            button.Cursor = Cursors.Hand;
+            button.UseVisualStyleBackColor = false;
         }
     }
 

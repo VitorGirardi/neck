@@ -36,6 +36,19 @@ Ele foi criado para quem quer responder três perguntas simples:
 2. O que posso fazer sem arriscar meus arquivos ou o Windows?
 3. Qual ação devo executar primeiro?
 
+## Uma tela inicial que aponta o caminho
+
+A página inicial foi organizada para qualquer pessoa entender por onde começar, mesmo sem conhecer termos técnicos:
+
+- **Acelerar um aplicativo** é a ação principal quando algo importante está travando.
+- **Limpar arquivos** remove somente temporários conhecidos e mostra antes quanto pode ser liberado.
+- **Revisar o computador** reúne os cuidados mensais do Windows em uma etapa separada.
+- **Mais ferramentas** guarda recursos ocasionais como Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
+
+Assim, nenhuma ferramenta foi removida: as ações mais importantes aparecem primeiro e os controles ocasionais ficam em uma segunda camada.
+
+![Central de ferramentas secundárias do Neck](assets/screenshots/neck-tools.png)
+
 ## Principais recursos
 
 | Recurso | O que faz | Proteção principal |
@@ -122,11 +135,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.5.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.6.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.5.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.6.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -219,6 +232,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Diagnóstico inteligente e histórico local
 - [x] Modo Reunião e monitoramento na bandeja
 - [x] Aceleração com um botão e opções técnicas separadas
+- [x] Tela inicial guiada e central separada para ferramentas ocasionais
 - [x] Instalador, preferências e checksums
 - [x] Neck Boot e Meu Plano Neck
 - [x] Neck Adaptive com foco, EcoQoS e prioridade de memória

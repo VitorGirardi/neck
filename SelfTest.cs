@@ -51,6 +51,22 @@ namespace Neck
                     }
                     form.ForceCloseForTesting();
                 }
+                using (ToolsHubForm tools = new ToolsHubForm(true, false, "Tudo pronto. O Neck está acompanhando o computador."))
+                {
+                    tools.ShowInTaskbar = false;
+                    tools.StartPosition = FormStartPosition.Manual;
+                    tools.Location = new System.Drawing.Point(-32000, -32000);
+                    tools.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(tools.Width, tools.Height))
+                    {
+                        tools.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, tools.Width, tools.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Tools.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("ToolsPreview=" + previewPath);
+                    }
+                    tools.Close();
+                }
                 if (!UpdateChecker.RepositoryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("O verificador de atualizações não aponta para HTTPS.");
                 string parsedStartupPath = StartupAnalyzer.ExtractExecutablePath("\"C:\\Program Files\\Aplicativo\\app.exe\" --background");
