@@ -16,6 +16,7 @@ namespace Neck
         public int ProcessCount;
         public int VisibleWindows;
         public long MemoryBytes;
+        public double CpuPercent;
         public string ExecutablePath;
     }
 
@@ -40,6 +41,19 @@ namespace Neck
         }
 
         public static List<SosCandidate> GetCandidates()
+        {
+            return InspectCandidates().OrderByDescending(item => item.MemoryBytes).Take(12).ToList();
+        }
+
+        internal static List<SosCandidate> GetFocusShieldCandidates()
+        {
+            return InspectCandidates()
+                .OrderByDescending(item => item.CpuPercent >= 12d ? 100000d + item.CpuPercent : item.MemoryBytes / (1024d * 1024d))
+                .Take(16)
+                .ToList();
+        }
+
+        private static List<SosCandidate> InspectCandidates()
         {
             Dictionary<string, SosCandidate> grouped = new Dictionary<string, SosCandidate>(StringComparer.OrdinalIgnoreCase);
             string current = Process.GetCurrentProcess().ProcessName;
@@ -75,8 +89,9 @@ namespace Neck
                 ProcessFamilyMetrics family = ProcessFamilyInspector.GetMetrics(candidate.ProcessName);
                 if (family.ProcessCount > candidate.ProcessCount) candidate.ProcessCount = family.ProcessCount;
                 if (family.WorkingSetBytes > candidate.MemoryBytes) candidate.MemoryBytes = family.WorkingSetBytes;
+                candidate.CpuPercent = ProcessFamilyCpuTracker.Measure(candidate.ProcessName, family.ProcessorTimeTicks);
             }
-            return visible.OrderByDescending(item => item.MemoryBytes).Take(12).ToList();
+            return visible;
         }
 
         public static SosCloseResult RequestGracefulClose(string processName)
@@ -370,7 +385,8 @@ namespace Neck
                 ? " A aceleração atual de " + FocusModeManager.ActiveDisplayName + " será substituída."
                 : string.Empty;
             string explanation = candidate.DisplayName + " ficará mais rápido quando você estiver usando a janela." + replacing + "\n\n" +
-                                 "Quando ele ficar em segundo plano, o Neck reduzirá seu consumo. Depois de uma hora, tudo volta ao normal automaticamente.\n\n" +
+                                 "Se houver pressão, o Escudo de Foco poderá reduzir temporariamente até três aplicativos pesados que estejam em segundo plano. Aplicativos dedicados conhecidos de comunicação, áudio e vídeo ficam protegidos.\n\n" +
+                                 "Ao trocar de janela, o Escudo restaura os concorrentes e reduz o consumo de " + candidate.DisplayName + ". Depois de uma hora, tudo volta ao normal automaticamente.\n\n" +
                                  "Nenhuma janela, documento ou arquivo será fechado.";
             if (MessageBox.Show(explanation, "Acelerar " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK) return;

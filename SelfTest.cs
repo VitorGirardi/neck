@@ -326,6 +326,7 @@ namespace Neck
                 TestEfficiencyModeRoundTrip();
                 TestTurboModeRoundTrip();
                 TestFocusModeRoundTrip();
+                TestFocusShieldRoundTrip();
                 string guidedProcess = sosCandidates.Count == 0 ? null : sosCandidates[0].ProcessName;
                 using (SosForm sos = new SosForm(guidedProcess))
                 {
@@ -531,6 +532,86 @@ namespace Neck
             {
                 FocusModeManager.Stop();
                 EfficiencyModeManager.Restore("NeckFocusProbe");
+                if (probe != null)
+                {
+                    try { if (!probe.HasExited) probe.Kill(); }
+                    catch { }
+                    probe.Dispose();
+                }
+                try { if (System.IO.File.Exists(probePath)) System.IO.File.Delete(probePath); }
+                catch { }
+            }
+        }
+
+        private static void TestFocusShieldRoundTrip()
+        {
+            string probePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NeckShieldProbe.exe");
+            System.Diagnostics.Process probe = null;
+            try
+            {
+                System.Collections.Generic.List<SosCandidate> selectionInput = new System.Collections.Generic.List<SosCandidate>
+                {
+                    new SosCandidate { ProcessName = "TargetApp", VisibleWindows = 1, MemoryBytes = 2L * 1024 * 1024 * 1024 },
+                    new SosCandidate { ProcessName = "WhatsApp", VisibleWindows = 1, MemoryBytes = 2L * 1024 * 1024 * 1024 },
+                    new SosCandidate { ProcessName = "SmallApp", VisibleWindows = 1, MemoryBytes = 100L * 1024 * 1024 },
+                    new SosCandidate { ProcessName = "HeavyApp", VisibleWindows = 1, MemoryBytes = 900L * 1024 * 1024 }
+                };
+                System.Collections.Generic.List<SosCandidate> selected = FocusShieldManager.SelectCandidates(
+                    selectionInput, "TargetApp", new MemoryStatus { PercentUsed = 82 });
+                if (selected.Count != 1 || selected[0].ProcessName != "HeavyApp")
+                    throw new InvalidOperationException("O Escudo de Foco não respeitou alvo, sensibilidade e tamanho mínimo.");
+                if (FocusShieldManager.SelectCandidates(selectionInput, "TargetApp", new MemoryStatus { PercentUsed = 60 }).Count != 0)
+                    throw new InvalidOperationException("O Escudo de Foco foi ativado sem pressão de memória.");
+                selectionInput.Add(new SosCandidate
+                {
+                    ProcessName = "CpuHeavyApp",
+                    VisibleWindows = 1,
+                    MemoryBytes = 120L * 1024 * 1024,
+                    CpuPercent = 24
+                });
+                System.Collections.Generic.List<SosCandidate> cpuSelected = FocusShieldManager.SelectCandidates(
+                    selectionInput, "TargetApp", new MemoryStatus { PercentUsed = 60 });
+                if (cpuSelected.Count != 1 || cpuSelected[0].ProcessName != "CpuHeavyApp")
+                    throw new InvalidOperationException("O Escudo de Foco não reagiu a um concorrente pesado de CPU.");
+
+                System.IO.File.Copy(Application.ExecutablePath, probePath, true);
+                probe = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = probePath,
+                    Arguments = "--efficiency-helper",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                Thread.Sleep(500);
+                probe.Refresh();
+                System.Diagnostics.ProcessPriorityClass originalPriority = probe.PriorityClass;
+                FocusShieldResult activated = FocusShieldManager.RefreshForTesting("NeckFocusProbe", true,
+                    new[]
+                    {
+                        new SosCandidate
+                        {
+                            ProcessName = "NeckShieldProbe",
+                            DisplayName = "Concorrente de teste",
+                            VisibleWindows = 1,
+                            MemoryBytes = 800L * 1024 * 1024
+                        }
+                    },
+                    new MemoryStatus { PercentUsed = 82 }, DateTime.UtcNow);
+                probe.Refresh();
+                if (activated.ApplicationsShielded != 1 || !EfficiencyModeManager.IsActive("NeckShieldProbe") ||
+                    probe.PriorityClass != System.Diagnostics.ProcessPriorityClass.BelowNormal)
+                    throw new InvalidOperationException("O Escudo de Foco não reduziu o concorrente em segundo plano.");
+                FocusShieldManager.RefreshForTesting("NeckFocusProbe", false, null, new MemoryStatus(), DateTime.UtcNow.AddSeconds(1));
+                probe.Refresh();
+                if (FocusShieldManager.ActiveCount != 0 || EfficiencyModeManager.IsActive("NeckShieldProbe") ||
+                    probe.PriorityClass != originalPriority)
+                    throw new InvalidOperationException("O Escudo de Foco não restaurou o concorrente ao perder o foco.");
+                Console.WriteLine("FocusShieldRoundTrip=OK");
+            }
+            finally
+            {
+                FocusShieldManager.Stop();
+                EfficiencyModeManager.Restore("NeckShieldProbe");
                 if (probe != null)
                 {
                     try { if (!probe.HasExited) probe.Kill(); }

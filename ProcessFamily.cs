@@ -10,6 +10,7 @@ namespace Neck
     {
         public int ProcessCount;
         public long WorkingSetBytes;
+        public long ProcessorTimeTicks;
     }
 
     internal static class ProcessFamilyInspector
@@ -28,6 +29,7 @@ namespace Neck
                     {
                         metrics.ProcessCount++;
                         metrics.WorkingSetBytes += Math.Max(0, process.WorkingSet64);
+                        metrics.ProcessorTimeTicks += Math.Max(0, process.TotalProcessorTime.Ticks);
                     }
                     catch { }
                 }
@@ -184,6 +186,53 @@ namespace Neck
 
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
             public string ExecutableFile;
+        }
+    }
+
+    internal static class ProcessFamilyCpuTracker
+    {
+        private static readonly object SyncRoot = new object();
+        private static readonly Dictionary<string, CpuSample> Samples =
+            new Dictionary<string, CpuSample>(StringComparer.OrdinalIgnoreCase);
+
+        public static double Measure(string processName, long processorTimeTicks)
+        {
+            if (string.IsNullOrWhiteSpace(processName) || processorTimeTicks < 0) return 0d;
+            DateTime now = DateTime.UtcNow;
+            lock (SyncRoot)
+            {
+                CpuSample previous;
+                if (!Samples.TryGetValue(processName, out previous))
+                {
+                    Samples[processName] = new CpuSample { ProcessorTimeTicks = processorTimeTicks, SampledUtc = now };
+                    return 0d;
+                }
+                TimeSpan elapsed = now - previous.SampledUtc;
+                if (elapsed < TimeSpan.FromMilliseconds(500)) return previous.Percent;
+                long delta = processorTimeTicks - previous.ProcessorTimeTicks;
+                double percent = delta <= 0 || elapsed.Ticks <= 0
+                    ? 0d
+                    : delta * 100d / elapsed.Ticks / Math.Max(1, Environment.ProcessorCount);
+                percent = Math.Max(0d, Math.Min(100d, percent));
+                Samples[processName] = new CpuSample
+                {
+                    ProcessorTimeTicks = processorTimeTicks,
+                    SampledUtc = now,
+                    Percent = percent
+                };
+                foreach (string stale in new List<string>(Samples.Keys))
+                {
+                    if (now - Samples[stale].SampledUtc > TimeSpan.FromMinutes(10)) Samples.Remove(stale);
+                }
+                return percent;
+            }
+        }
+
+        private sealed class CpuSample
+        {
+            public long ProcessorTimeTicks;
+            public DateTime SampledUtc;
+            public double Percent;
         }
     }
 

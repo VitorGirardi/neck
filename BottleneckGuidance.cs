@@ -143,18 +143,31 @@ namespace Neck
         public string ProcessName;
         public string DisplayName;
         public DateTime StartedUtc;
+        public DateTime MeasurementStartedUtc;
         public long AvailableBefore;
         public long AvailableAfter;
         public long AppMemoryBefore;
         public long AppMemoryAfter;
         public int ProcessesChanged;
+        public int ShieldedApplications;
+        public bool MeasurementPaused;
+        public bool EndedBeforeMeasurement;
         public bool Complete;
 
         public string Summary
         {
             get
             {
-                if (!Complete) return "Medindo o resultado sem interromper o aplicativo...";
+                if (EndedBeforeMeasurement)
+                    return "A aceleração terminou antes de completar a medição. Nenhum ganho foi estimado.";
+                if (!Complete && MeasurementStartedUtc == DateTime.MinValue)
+                    return "Aceleração pronta. Volte ao aplicativo para o Neck medir o resultado durante o uso real.";
+                if (!Complete && MeasurementPaused)
+                    return "Medição pausada. Volte ao aplicativo acelerado para continuar.";
+                if (!Complete)
+                    return ShieldedApplications > 0
+                        ? "Escudo de Foco ativo em " + ShieldedApplications + " aplicativo(s) pesado(s) em segundo plano; medindo o resultado..."
+                        : "Medindo o resultado sem interromper o aplicativo...";
                 long availableDelta = AvailableAfter - AvailableBefore;
                 long appDelta = AppMemoryBefore - AppMemoryAfter;
                 string observed = availableDelta >= 50L * 1024 * 1024
@@ -162,7 +175,10 @@ namespace Neck
                     : appDelta >= 50L * 1024 * 1024
                         ? MainForm.FormatBytes(appDelta) + " a menos na memória física do aplicativo"
                         : "uso de memória geral permaneceu semelhante";
-                return "Resultado observado: " + observed + "; " + ProcessesChanged + " processo(s) configurado(s).";
+                string shield = ShieldedApplications > 0
+                    ? "; Escudo de Foco protegeu contra " + ShieldedApplications + " aplicativo(s) concorrente(s)"
+                    : string.Empty;
+                return "Resultado observado: " + observed + "; " + ProcessesChanged + " processo(s) do aplicativo configurado(s)" + shield + ".";
             }
         }
     }
@@ -193,7 +209,23 @@ namespace Neck
             lock (SyncRoot)
             {
                 if (_current == null || _current.Complete) return _current;
-                if (DateTime.UtcNow - _current.StartedUtc < TimeSpan.FromSeconds(18)) return _current;
+                bool targetActive = FocusModeManager.IsTarget(_current.ProcessName);
+                bool targetForeground = targetActive && TurboModeManager.IsForeground;
+                if (!targetActive)
+                {
+                    _current.EndedBeforeMeasurement = true;
+                    _current.Complete = true;
+                    return _current;
+                }
+                if (_current.MeasurementStartedUtc == DateTime.MinValue)
+                {
+                    if (!targetForeground) return _current;
+                    _current.MeasurementStartedUtc = DateTime.UtcNow;
+                }
+                _current.MeasurementPaused = !targetForeground;
+                if (_current.MeasurementPaused) return _current;
+                _current.ShieldedApplications = Math.Max(_current.ShieldedApplications, FocusShieldManager.ActiveCount);
+                if (DateTime.UtcNow - _current.MeasurementStartedUtc < TimeSpan.FromSeconds(18)) return _current;
                 MemoryStatus memory = SystemInfo.GetMemoryStatus();
                 ProcessFamilyMetrics family = ProcessFamilyInspector.GetMetrics(_current.ProcessName);
                 _current.AvailableAfter = (long)memory.AvailableBytes;

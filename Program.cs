@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.9.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.9.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.10.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.10.0.0")]
 
 namespace Neck
 {
@@ -1522,6 +1522,8 @@ namespace Neck
             string turbo = FocusModeManager.IsActive
                 ? " Acelerando " + FocusModeManager.ActiveDisplayName + " por mais " + Math.Max(1, (int)Math.Ceiling(FocusModeManager.Remaining.TotalMinutes)) + " min."
                 : string.Empty;
+            if (FocusShieldManager.ActiveCount > 0)
+                turbo += " Escudo de Foco ativo contra " + FocusShieldManager.ActiveCount + " concorrente(s).";
             _guardMessage.Text = snapshot.Summary + turbo;
             ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
             string adaptive = EfficiencyModeManager.ActiveCount > 0
@@ -1564,6 +1566,7 @@ namespace Neck
             }
 
             _meetingActive = true;
+            FocusShieldManager.SetSuspended(true);
             _meetingEndsAt = DateTime.Now.AddMinutes(Math.Max(15, durationMinutes));
             _analyzeButton.Enabled = false;
             _runButton.Enabled = false;
@@ -1594,6 +1597,7 @@ namespace Neck
         {
             NativeMethods.SetThreadExecutionState(NativeMethods.ES_CONTINUOUS);
             _meetingActive = false;
+            FocusShieldManager.SetSuspended(false);
             _meetingButton.Text = "Modo reunião";
             _meetingButton.BackColor = Theme.Blue;
             _analyzeButton.Enabled = !_busy;

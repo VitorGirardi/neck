@@ -69,6 +69,7 @@ A animação ocorre por um intervalo curto após cada diagnóstico e não perman
 | --- | --- | --- |
 | **Gargalo Guiado** | Distingue pressão de memória, CPU e armazenamento e recomenda a ação mais útil naquele momento. | Explica o motivo e mantém a confirmação com o usuário. |
 | **Monitor Inteligente** | Ajusta o intervalo de leitura conforme a pressão, confirma persistência e reconhece a recuperação. | Não limpa, fecha ou altera aplicativos automaticamente. |
+| **Escudo de Foco** | Reduz temporariamente a disputa de até três aplicativos pesados quando o aplicativo escolhido está em uso. | Só age sob pressão, protege comunicação e restaura ao trocar de janela. |
 | **Meu Plano Neck** | Cruza RAM, disco, temporários, inicialização e Windows Update para escolher três prioridades. | Não executa nenhuma ação automaticamente. |
 | **Neck Guard** | Mostra a saúde do computador, CPU, RAM e os maiores consumidores de memória. | Diagnóstico somente leitura. |
 | **Acelerar aplicativo** | Alterna automaticamente entre mais desempenho em uso e menor consumo em segundo plano. | Um único botão, duração de uma hora e restauração automática. |
@@ -111,11 +112,14 @@ Essa é a função principal do Neck. Ela foi desenhada para funcionar sem exigi
 O Neck cuida das mudanças sozinho:
 
 - **Enquanto você usa o aplicativo:** ele recebe prioridade para responder melhor.
+- **Se outros aplicativos estiverem disputando recursos:** o Escudo de Foco reduz temporariamente até três concorrentes pesados em segundo plano.
 - **Quando fica em segundo plano:** após 15 segundos, passa a usar menos CPU, energia e memória física.
 - **Quando você volta:** recebe prioridade novamente em até 2 segundos.
 - **Depois de uma hora ou ao clicar em Parar:** todas as configurações anteriores são restauradas.
 
-Após a ativação, o Neck compara a memória disponível e o uso físico da família do aplicativo durante 18 segundos. O resultado informa o que realmente foi observado — inclusive quando o uso permaneceu semelhante — e quantos processos receberam a configuração. Ele não transforma essa leitura em uma promessa artificial de velocidade.
+O Escudo de Foco considera memória e atividade recente de CPU. Ele só seleciona aplicativos com janela própria, nunca o aplicativo escolhido, e mantém uma lista conservadora de exceções para aplicativos dedicados conhecidos de comunicação, áudio, vídeo, transmissão e ferramentas do Windows. O Escudo fica suspenso durante o Modo Reunião. Ao trocar de janela, os concorrentes recuperam imediatamente suas configurações anteriores.
+
+Após a ativação, o Neck compara a memória disponível e o uso físico da família do aplicativo durante 18 segundos de uso real em primeiro plano. A contagem só começa quando você volta ao aplicativo e pausa se trocar de janela. O resultado informa o que realmente foi observado — inclusive quando o uso permaneceu semelhante — e quantos processos receberam a configuração. Ele não transforma essa leitura em uma promessa artificial de velocidade.
 
 A tela principal mostra apenas o nome, o uso de memória e uma situação compreensível, como **Disponível**, **Mais rápido agora** ou **Economizando memória**. Fechamento do aplicativo, Gerenciador de Tarefas e controle manual de segundo plano ficam em **Mais opções**.
 
@@ -139,10 +143,11 @@ As tarefas de manutenção aparecem em linhas inteiras clicáveis, com checkbox 
 
 ## Como funciona por dentro
 
-O botão Acelerar combina dois motores que continuam separados no código:
+O botão Acelerar combina três motores que continuam separados no código:
 
 - **Turbo:** enquanto uma janela da família está em primeiro plano, usa `ABOVE_NORMAL_PRIORITY_CLASS` para melhorar a resposta durante disputa por CPU.
 - **Adaptive:** em segundo plano, usa prioridade abaixo do normal, EcoQoS, baixa prioridade de memória e RAM Park.
+- **Escudo de Foco:** enquanto o alvo está em primeiro plano e existe pressão de RAM ou CPU, aplica o Adaptive somente a até três concorrentes elegíveis e restaura tudo ao perder o foco.
 
 A análise considera a **família inteira de processos**, inclusive filhos com nomes diferentes como `chrome`, `node` ou `msedgewebview2`. Subprocessos novos também são detectados. Cada valor anterior é preservado individualmente.
 
@@ -155,6 +160,7 @@ A implementação utiliza as APIs documentadas [`SetPriorityClass`](https://lear
 - Não usa “limpeza de RAM” artificial nem encerra processos em massa.
 - Não aplica o Neck Adaptive a componentes críticos do Windows nem ao próprio Neck.
 - Não usa prioridade Alta ou Tempo real no Neck Turbo e não altera o plano de energia.
+- Não aplica o Escudo de Foco sem pressão, em processos protegidos ou em aplicativos conhecidos de comunicação, áudio, vídeo e transmissão.
 - Não confunde RAM estacionada com memória definitivamente liberada e apresenta somente o resultado observado.
 - Não aplica ajustes genéricos no Registro para prometer desempenho.
 - Não apaga documentos, fotos, downloads, senhas ou dados de navegadores.
@@ -173,11 +179,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.9.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.10.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.9.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.10.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -239,7 +245,8 @@ BottleneckGuidance.cs      Gargalo Guiado, monitor adaptativo e medição de res
 SosMode.cs                 Alívio seguro de sobrecarga
 EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
 TurboMode.cs               Prioridade de foco temporária e reversível
-FocusMode.cs               Experiência simples que combina Turbo e Adaptive
+FocusMode.cs               Orquestra Turbo, Adaptive e Escudo de Foco
+FocusShield.cs             Proteção temporária contra concorrentes pesados
 ProcessFamily.cs           Descoberta de processos-filhos e RAM real da família
 StartupAnalysis.cs         Análise somente leitura da inicialização
 PersonalPlan.cs            Motor e interface das três prioridades
@@ -282,6 +289,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Gargalo Guiado com recomendação única e aplicativo destacado
 - [x] Monitor Inteligente adaptativo com confirmação de pressão e recuperação
 - [x] Medição honesta do resultado antes/depois da aceleração
+- [x] Escudo de Foco sensível a RAM e CPU, com restauração imediata
 - [ ] Assinatura digital dos binários
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface

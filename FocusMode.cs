@@ -45,7 +45,8 @@ namespace Neck
         public static string GetStateLabel(string processName)
         {
             if (!IsTarget(processName)) return "Disponível";
-            if (TurboModeManager.IsForeground) return "Mais rápido agora";
+            if (TurboModeManager.IsForeground)
+                return FocusShieldManager.ActiveCount > 0 ? "Mais rápido + escudo" : "Mais rápido agora";
             AdaptiveModeState adaptive = EfficiencyModeManager.GetState(processName);
             return adaptive == AdaptiveModeState.Optimized ? "Economizando memória" : "Pronto para acelerar";
         }
@@ -96,6 +97,7 @@ namespace Neck
                 if (_session == null) return;
                 TurboModeManager.Refresh();
                 if (!TurboModeManager.IsActive) FinishSession(NewResult(_session.ProcessName));
+                else FocusShieldManager.Refresh(_session.ProcessName, TurboModeManager.IsForeground);
             }
         }
 
@@ -111,6 +113,9 @@ namespace Neck
         {
             FocusModeSession session = _session;
             _session = null;
+            FocusShieldResult shield = FocusShieldManager.Stop();
+            result.AdaptiveProcessesChanged += shield.ProcessesChanged;
+            result.AccessErrors += shield.AccessErrors;
             if (session == null || !session.OwnsAdaptive) return;
             EfficiencyModeResult adaptive = EfficiencyModeManager.Restore(session.ProcessName);
             result.ProcessName = session.ProcessName;
