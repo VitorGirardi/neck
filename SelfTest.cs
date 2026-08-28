@@ -24,6 +24,13 @@ namespace Neck
                     throw new InvalidOperationException("O inventário de hardware não retornou um resumo válido.");
                 if (hardware.Temperatures.Any(item => item.Celsius < 5d || item.Celsius > 125d))
                     throw new InvalidOperationException("Uma temperatura de hardware fora do intervalo seguro foi aceita.");
+                BluetoothSnapshot bluetooth = BluetoothDoctor.Read();
+                if (bluetooth.CapturedUtc == DateTime.MinValue)
+                    throw new InvalidOperationException("O diagnóstico Bluetooth não registrou o horário da leitura.");
+                if (!BluetoothRepairEngine.IsSafeAdapterId(@"USB\VID_13D3&PID_3567\TESTE"))
+                    throw new InvalidOperationException("Um adaptador Bluetooth físico válido foi recusado.");
+                if (BluetoothRepairEngine.IsSafeAdapterId(@"BTHENUM\DEV_TESTE") || BluetoothRepairEngine.IsSafeAdapterId("USB\\TESTE\" MALICIOSO"))
+                    throw new InvalidOperationException("Um identificador Bluetooth não confiável foi aceito para reparo.");
                 System.Diagnostics.Stopwatch healthTimer = System.Diagnostics.Stopwatch.StartNew();
                 HealthSnapshot health = SystemInfo.GetHealthSnapshot();
                 healthTimer.Stop();
@@ -32,6 +39,7 @@ namespace Neck
                 MeetingPreflight meeting = SystemInfo.GetMeetingPreflight();
                 if (meeting.Checks.Count < 6) throw new InvalidOperationException("Checklist de reunião incompleto.");
                 if (ElevatedOperations.ParseTasks("health,drives").Length != 2) throw new InvalidOperationException("Plano elevado válido foi recusado.");
+                if (ElevatedOperations.ParseTasks("bluetooth").Length != 1) throw new InvalidOperationException("A cura Bluetooth não entrou na lista administrativa fechada.");
                 if (ElevatedOperations.ParseTasks("health,comando-invalido").Length != 0) throw new InvalidOperationException("Plano elevado inválido foi aceito.");
                 string startupCommand = StartupManager.BuildCommand(@"C:\Program Files\Neck\Neck.exe");
                 if (startupCommand != "\"C:\\Program Files\\Neck\\Neck.exe\" --background") throw new InvalidOperationException("Comando de inicialização inválido.");
@@ -122,6 +130,92 @@ namespace Neck
                         Console.WriteLine("HardwarePreview=" + previewPath);
                     }
                     hardwareForm.Close();
+                }
+                BluetoothSnapshot bluetoothPreview = new BluetoothSnapshot
+                {
+                    CapturedUtc = DateTime.UtcNow,
+                    KnownDeviceEntries = 4,
+                    PowerState = BluetoothPowerState.On,
+                    Adapters = new System.Collections.Generic.List<BluetoothAdapterInfo>
+                    {
+                        new BluetoothAdapterInfo
+                        {
+                            Name = "MediaTek Bluetooth Adapter",
+                            DeviceId = @"USB\VID_13D3&PID_3567\TESTE",
+                            Manufacturer = "MediaTek Inc.",
+                            DriverVersion = "1.3.17.166",
+                            DriverDate = new DateTime(2025, 5, 1),
+                            ErrorCode = 0,
+                            DriverBacked = true,
+                            SeenByWindows = true
+                        }
+                    },
+                    Services = new System.Collections.Generic.List<BluetoothServiceInfo>
+                    {
+                        new BluetoothServiceInfo { Name = "bthserv", DisplayName = "Serviço de Suporte a Bluetooth", State = "Running", StartMode = "Manual" },
+                        new BluetoothServiceInfo { Name = "DeviceAssociationService", DisplayName = "Associação de Dispositivo", State = "Running", StartMode = "Manual" }
+                    }
+                };
+                using (BluetoothDoctorForm bluetoothForm = new BluetoothDoctorForm(bluetoothPreview))
+                {
+                    bluetoothForm.ShowInTaskbar = false;
+                    bluetoothForm.StartPosition = FormStartPosition.Manual;
+                    bluetoothForm.Location = new System.Drawing.Point(-32000, -32000);
+                    bluetoothForm.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(bluetoothForm.Width, bluetoothForm.Height))
+                    {
+                        bluetoothForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, bluetoothForm.Width, bluetoothForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Bluetooth.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BluetoothPreview=" + previewPath);
+                    }
+                    bluetoothForm.Size = bluetoothForm.MinimumSize;
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(bluetoothForm.Width, bluetoothForm.Height))
+                    {
+                        bluetoothForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, bluetoothForm.Width, bluetoothForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Bluetooth.Minimum.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BluetoothMinimumPreview=" + previewPath);
+                    }
+                    bluetoothForm.Close();
+                }
+                bluetoothPreview.PowerState = BluetoothPowerState.Off;
+                using (BluetoothDoctorForm powerOffForm = new BluetoothDoctorForm(bluetoothPreview))
+                {
+                    powerOffForm.ShowInTaskbar = false;
+                    powerOffForm.StartPosition = FormStartPosition.Manual;
+                    powerOffForm.Location = new System.Drawing.Point(-32000, -32000);
+                    powerOffForm.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(powerOffForm.Width, powerOffForm.Height))
+                    {
+                        powerOffForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, powerOffForm.Width, powerOffForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Bluetooth.PowerOff.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BluetoothPowerOffPreview=" + previewPath);
+                    }
+                    powerOffForm.Close();
+                }
+                bluetoothPreview.PowerState = BluetoothPowerState.On;
+                bluetoothPreview.Adapters[0].ErrorCode = 43;
+                bluetoothPreview.Services[0].State = "Stopped";
+                using (BluetoothDoctorForm attentionForm = new BluetoothDoctorForm(bluetoothPreview))
+                {
+                    attentionForm.ShowInTaskbar = false;
+                    attentionForm.StartPosition = FormStartPosition.Manual;
+                    attentionForm.Location = new System.Drawing.Point(-32000, -32000);
+                    attentionForm.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(attentionForm.Width, attentionForm.Height))
+                    {
+                        attentionForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, attentionForm.Width, attentionForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Bluetooth.Attention.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BluetoothAttentionPreview=" + previewPath);
+                    }
+                    attentionForm.Close();
                 }
                 System.Collections.Generic.List<StartupEntry> startupEntries = StartupAnalyzer.Analyze();
                 using (StartupAppsForm startup = new StartupAppsForm(startupEntries))
@@ -401,6 +495,7 @@ namespace Neck
                 Console.WriteLine("ObservedProcessGroups=" + health.TopProcesses.Count);
                 Console.WriteLine("HealthScanMilliseconds=" + healthTimer.ElapsedMilliseconds);
                 Console.WriteLine("MeetingChecks=" + meeting.Checks.Count);
+                Console.WriteLine("BluetoothPowerState=" + bluetooth.PowerState);
                 Console.WriteLine("SyntheticGuardAlert=" + syntheticAlert.Kind);
                 Console.WriteLine("CpuPercent=" + health.CpuPercent.ToString("0.0"));
                 Console.WriteLine("SosVisibleCandidates=" + sosCandidates.Count);

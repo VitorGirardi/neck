@@ -115,6 +115,32 @@ Uma zona ACPI é identificada como temperatura do sistema e não como CPU ou GPU
 
 ![Hardware e sensores locais do Neck](assets/screenshots/neck-hardware.png)
 
+## Cura Bluetooth
+
+A **Cura Bluetooth** foi criada para a falha intermitente em que o botão de Bluetooth some, o rádio deixa de encontrar acessórios ou um dispositivo conhecido para de conectar. Ela fica em **Mais ferramentas**, fora da tela principal.
+
+Ao abrir a central, o Neck verifica localmente:
+
+- se o Windows ainda reconhece o adaptador Bluetooth físico;
+- o fabricante, a versão e a data do driver assinado;
+- o código de erro informado pelo Gerenciador de Dispositivos;
+- o Serviço de Suporte a Bluetooth e a associação de dispositivos.
+
+Quando o hardware está saudável e apenas a chave está desligada, o Neck abre a página oficial do Bluetooth no Windows. Nesse estado ele **não reinicia o driver**, não pede administrador e atualiza o diagnóstico quando você volta à central.
+
+Somente quando existe falha real no adaptador ou nos serviços, **Tentar corrigir agora** pede permissão de administrador e executa uma sequência fechada e auditável:
+
+1. interrompe temporariamente o Serviço de Suporte a Bluetooth;
+2. reinicia somente o adaptador físico validado pelo driver e pelo Windows;
+3. força uma nova detecção de hardware;
+4. restaura os serviços necessários e confirma o estado final.
+
+O reparo usa o [`PnPUtil`](https://learn.microsoft.com/windows-hardware/drivers/devtest/pnputil-command-syntax), ferramenta nativa recomendada pela Microsoft para reiniciar dispositivos e examinar alterações de hardware. O Neck não remove acessórios pareados, não apaga entradas do Registro, não desinstala drivers e não reinicia o computador. Fones, mouse ou teclado Bluetooth podem se desconectar por alguns segundos durante a cura.
+
+Se o rádio continuar indisponível, a central apresenta o ponto em que o reparo parou e oferece acesso às atualizações opcionais de driver do Windows.
+
+![Diagnóstico e cura segura do Bluetooth](assets/screenshots/neck-bluetooth.png)
+
 ## Acelerar um aplicativo
 
 Essa é a função principal do Neck. Ela foi desenhada para funcionar sem exigir conhecimento sobre CPU, prioridade ou gerenciamento de memória:
@@ -185,6 +211,8 @@ A implementação utiliza as APIs documentadas [`SetPriorityClass`](https://lear
 - Não armazena tokens ou credenciais do GitHub.
 - Não reinicia o computador automaticamente.
 - Não instala drivers automaticamente; utiliza Windows Update e páginas oficiais.
+- Não remove pareamentos nem desinstala drivers durante a Cura Bluetooth.
+- Reinicia somente um adaptador Bluetooth físico validado pelo inventário do Windows.
 - Mantém uma lista fechada de tarefas administrativas permitidas.
 - Salva relatórios de manutenção em `Documentos\Neck\Relatorios`.
 
@@ -195,11 +223,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.11.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.12.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.11.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.12.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -225,7 +253,7 @@ A internet é utilizada apenas quando você solicita uma verificação de versã
 
 ## Requisitos
 
-- Windows 10 ou Windows 11 de 64 bits
+- Windows 10 versão 2004 ou mais recente, ou Windows 11, ambos de 64 bits
 - .NET Framework 4.8
 - Aproximadamente 10 MB de espaço para instalação
 - Permissão de administrador somente para operações avançadas selecionadas
@@ -266,6 +294,9 @@ FocusShield.cs             Proteção temporária contra concorrentes pesados
 ProcessFamily.cs           Descoberta de processos-filhos e RAM real da família
 HardwareInfo.cs            Inventário local e fontes de temperatura
 HardwareForm.cs            Especificações e sensores em interface dedicada
+BluetoothDoctor.cs         Diagnóstico e motor de reparo seguro do Bluetooth
+BluetoothForm.cs           Central visual da Cura Bluetooth
+BluetoothRadio.cs          Leitura local do estado ligado/desligado do rádio
 StartupAnalysis.cs         Análise somente leitura da inicialização
 PersonalPlan.cs            Motor e interface das três prioridades
 ElevatedOperations.cs      Executor administrativo com lista fechada
@@ -309,6 +340,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Medição honesta do resultado antes/depois da aceleração
 - [x] Escudo de Foco sensível a RAM e CPU, com restauração imediata
 - [x] Inventário de hardware e temperaturas locais com fontes explícitas
+- [x] Cura Bluetooth com diagnóstico, reinício seletivo e nova detecção
 - [ ] Assinatura digital dos binários
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface

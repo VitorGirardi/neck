@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.11.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.11.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.12.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.12.0.0")]
 
 namespace Neck
 {
@@ -1213,6 +1213,10 @@ namespace Neck
             {
                 using (DriverCenterForm form = new DriverCenterForm()) form.ShowDialog(this);
             }
+            else if (choice == ToolHubChoice.Bluetooth)
+            {
+                using (BluetoothDoctorForm form = new BluetoothDoctorForm()) form.ShowDialog(this);
+            }
             else if (choice == ToolHubChoice.History)
             {
                 using (GuardHistoryForm form = new GuardHistoryForm(_guardSamples.ToList(), ReportDirectory)) form.ShowDialog(this);
@@ -2010,6 +2014,7 @@ namespace Neck
         Startup,
         Diagnostic,
         Drivers,
+        Bluetooth,
         History,
         Preferences
     }
@@ -2069,11 +2074,11 @@ namespace Neck
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             for (int row = 0; row < 3; row++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
             grid.Controls.Add(CreateTool("Meu plano", "Três prioridades escolhidas para este computador.", ToolHubChoice.Plan), 0, 0);
-            grid.Controls.Add(CreateTool(_meetingActive ? "Encerrar modo reunião" : "Modo reunião", "Evita suspensão durante chamadas e apresentações.", ToolHubChoice.Meeting), 1, 0);
-            grid.Controls.Add(CreateTool("Inicialização", "Veja o que abre junto com o Windows.", ToolHubChoice.Startup), 0, 1);
-            grid.Controls.Add(CreateTool("Diagnóstico", "Detalhes de CPU, memória e armazenamento.", ToolHubChoice.Diagnostic), 1, 1);
-            grid.Controls.Add(CreateTool("Drivers", "Confira atualizações pelas fontes oficiais.", ToolHubChoice.Drivers), 0, 2);
-            grid.Controls.Add(CreateTool("Histórico", "Consulte alertas e relatórios anteriores.", ToolHubChoice.History), 1, 2);
+            grid.Controls.Add(CreateTool("Cura Bluetooth", "Restaura a conexão sem apagar pareamentos.", ToolHubChoice.Bluetooth), 1, 0);
+            grid.Controls.Add(CreateTool(_meetingActive ? "Encerrar modo reunião" : "Modo reunião", "Evita suspensão durante chamadas e apresentações.", ToolHubChoice.Meeting), 0, 1);
+            grid.Controls.Add(CreateTool("Inicialização", "Veja o que abre junto com o Windows.", ToolHubChoice.Startup), 1, 1);
+            grid.Controls.Add(CreateTool("Diagnóstico", "Detalhes de CPU, memória e armazenamento.", ToolHubChoice.Diagnostic), 0, 2);
+            grid.Controls.Add(CreateTool("Drivers", "Confira atualizações pelas fontes oficiais.", ToolHubChoice.Drivers), 1, 2);
 
             Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 86, BackColor = Color.White, Padding = new Padding(28, 14, 28, 14) };
             _continueInTray.Text = "Continuar protegendo na bandeja ao fechar";
@@ -2082,6 +2087,15 @@ namespace Neck
             _continueInTray.Font = Theme.Small;
             _continueInTray.ForeColor = Theme.Muted;
             _continueInTray.Location = new Point(29, 15);
+            LinkLabel history = new LinkLabel
+            {
+                Text = "Histórico",
+                AutoSize = true,
+                Font = Theme.Small,
+                LinkColor = Theme.Blue,
+                Location = new Point(325, 17)
+            };
+            history.Click += delegate { Choose(ToolHubChoice.History); };
             Button preferences = new AnimatedButton();
             ConfigureToolButton(preferences, "Preferências", Theme.NavySoft, 130);
             preferences.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -2101,6 +2115,7 @@ namespace Neck
             ToolTip tip = new ToolTip();
             tip.SetToolTip(_continueInTray, status);
             footer.Controls.Add(_continueInTray);
+            footer.Controls.Add(history);
             footer.Controls.Add(preferences);
             footer.Controls.Add(close);
 

@@ -21,7 +21,7 @@ namespace Neck
     {
         private static readonly HashSet<string> AllowedTasks = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "components", "health", "drives", "restorepoint"
+            "components", "health", "drives", "restorepoint", "bluetooth"
         };
 
         private static string JobsDirectory
@@ -137,6 +137,13 @@ namespace Neck
                     string powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
                     AppendResult(output, "Ponto de restauração", ProcessRunner.Run(powershell,
                         "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + script + "\"", 180000), ref overallExit);
+                }
+                else if (task == "bluetooth")
+                {
+                    BluetoothRepairResult repair = BluetoothRepairEngine.Repair();
+                    output.AppendLine(repair.Output.Trim());
+                    output.AppendLine();
+                    if (repair.ExitCode != 0 && overallExit == 0) overallExit = repair.ExitCode;
                 }
             }
             return new ElevatedTaskResult { ExitCode = overallExit, Output = output.ToString() };
