@@ -1,10 +1,19 @@
 param(
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist'),
+    [switch]$SkipApplicationBuild
 )
 
 $ErrorActionPreference = 'Stop'
 
-& (Join-Path $PSScriptRoot 'build.ps1') -OutputDirectory $OutputDirectory
+if ($SkipApplicationBuild) {
+    $existingApplication = Join-Path $OutputDirectory 'Neck.exe'
+    if (-not (Test-Path -LiteralPath $existingApplication)) {
+        throw "O executável assinado não foi encontrado: $existingApplication"
+    }
+}
+else {
+    & (Join-Path $PSScriptRoot 'build.ps1') -OutputDirectory $OutputDirectory
+}
 
 $compilerCandidates = @(
     (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
@@ -27,10 +36,4 @@ $files = @(
     (Join-Path $OutputDirectory 'Neck.exe'),
     (Join-Path $OutputDirectory 'Neck-Setup-1.12.0.exe')
 )
-foreach ($file in $files) {
-    if (-not (Test-Path -LiteralPath $file)) { throw "Artefato não encontrado: $file" }
-    $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
-    $hashPath = $file + '.sha256'
-    Set-Content -LiteralPath $hashPath -Value ($hash + '  ' + (Split-Path -Leaf $file)) -Encoding ascii
-    Get-Item -LiteralPath $file, $hashPath | Select-Object FullName, Length, LastWriteTime
-}
+& (Join-Path $PSScriptRoot 'write-checksums.ps1') -Path $files

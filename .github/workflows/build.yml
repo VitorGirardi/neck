@@ -33,6 +33,10 @@ jobs:
         shell: pwsh
         run: ./build-installer.ps1
 
+      - name: Verify unsigned package structure
+        shell: pwsh
+        run: ./verify-package.ps1 -AllowUnsigned
+
       - name: Upload Windows package
         uses: actions/upload-artifact@v7.0.1
         with:

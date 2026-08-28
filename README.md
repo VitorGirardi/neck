@@ -14,6 +14,7 @@
   <a href="https://github.com/VitorGirardi/neck/releases/latest"><img src="https://img.shields.io/github/v/release/VitorGirardi/neck?display_name=tag&sort=semver" alt="Última versão"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white" alt="Windows 10 e 11">
   <img src="https://img.shields.io/badge/.NET%20Framework-4.8-512BD4" alt=".NET Framework 4.8">
+  <a href="CODE_SIGNING_POLICY.md"><img src="https://img.shields.io/badge/assinatura-em%20prepara%C3%A7%C3%A3o-F0A23B" alt="Assinatura digital em preparação"></a>
 </p>
 
 <p align="center">
@@ -22,6 +23,10 @@
   <a href="#instalação">Como instalar</a>
   ·
   <a href="#segurança-por-padrão">Proteções</a>
+  ·
+  <a href="PRIVACY.md">Privacidade</a>
+  ·
+  <a href="CODE_SIGNING_POLICY.md">Assinatura</a>
 </p>
 
 ![Tela principal do Neck](assets/screenshots/neck-dashboard.png)
@@ -237,11 +242,35 @@ Get-FileHash .\Neck-Setup-1.12.0.exe -Algorithm SHA256
 Baixe `Neck.exe` na mesma release e execute-o diretamente. Nenhuma instalação é necessária. As preferências e o histórico continuam armazenados no perfil local do Windows.
 
 > [!IMPORTANT]
-> Os binários ainda não possuem assinatura digital. Até que o projeto tenha um certificado de assinatura de código, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+> Os binários da versão 1.12.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+
+## Assinatura digital
+
+O repositório está preparado para solicitar assinatura gratuita de código para projeto open source pela [SignPath Foundation](https://signpath.org/). A [política de assinatura](CODE_SIGNING_POLICY.md) documenta responsáveis, origem dos artefatos, algoritmos, validação e resposta a incidentes.
+
+A cadeia preparada não permite assinar apenas a embalagem e deixar o aplicativo interno sem proteção:
+
+1. os autotestes rodam em uma máquina Windows limpa;
+2. o `Neck.exe` é compilado e enviado à SignPath;
+3. o instalador é montado contendo esse executável já assinado;
+4. o instalador também é assinado;
+5. o workflow exige publicador esperado, timestamp e `Status: Valid` antes de recalcular os checksums.
+
+O workflow de assinatura é manual e permanece inativo sem as credenciais oficiais. Tokens e chaves não ficam no código; a chave privada permanece no HSM do provedor. Até a aprovação, o badge e esta seção continuam dizendo **em preparação**. A ativação começa pelo [formulário oficial da SignPath Foundation](https://signpath.org/apply.html); os secrets e variables necessários estão listados na [política de assinatura](CODE_SIGNING_POLICY.md#ativação-depois-da-aprovação).
+
+Para verificar uma futura release assinada:
+
+```powershell
+Get-AuthenticodeSignature .\Neck.exe | Format-List Status,SignerCertificate,TimeStamperCertificate
+```
+
+Consulte também a [política de segurança](SECURITY.md) e a [política de privacidade completa](PRIVACY.md).
 
 ## Privacidade
 
 O Neck não possui telemetria e não envia métricas do computador para servidores externos.
+
+A descrição completa do tráfego iniciado pelo usuário, dos dados locais e da exclusão dessas informações está em [PRIVACY.md](PRIVACY.md).
 
 Dados mantidos localmente:
 
@@ -279,6 +308,8 @@ Para gerar o instalador, instale o [Inno Setup 6](https://jrsoftware.org/isinfo.
 
 O comando produz o instalador, o executável portátil e os respectivos checksums SHA-256. Cada push e pull request para `main` também executa os autotestes, compila o aplicativo e gera os artefatos no GitHub Actions.
 
+O workflow manual `.github/workflows/sign-release.yml` implementa a cadeia em duas fases para SignPath. Ele só funciona depois da aprovação do projeto e da configuração descrita em [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md); builds comuns continuam unsigned e são identificados dessa forma pela verificação de pacote.
+
 ## Estrutura do projeto
 
 ```text
@@ -302,7 +333,11 @@ PersonalPlan.cs            Motor e interface das três prioridades
 ElevatedOperations.cs      Executor administrativo com lista fechada
 PreferencesAndUpdates.cs   Preferências e consulta manual de versão
 SelfTest.cs                Testes funcionais e verificações visuais
+verify-package.ps1         Confere versão, checksums e estado de assinatura
+verify-authenticode.ps1    Exige assinatura, publicador e timestamp válidos
+write-checksums.ps1        Recalcula SHA-256 após o último estágio do pacote
 installer/Neck.iss         Definição do instalador para Windows
+.github/workflows/         Build comum e assinatura SignPath condicionada
 ```
 
 ## Como contribuir
@@ -315,6 +350,8 @@ Relatos de bugs, ideias e pull requests são bem-vindos.
 - Execute `.\test.ps1` antes de enviar um pull request.
 
 Use as [issues do GitHub](https://github.com/VitorGirardi/neck/issues) para bugs e sugestões. Para uma vulnerabilidade que não deve ser divulgada publicamente, utilize o recurso **Report a vulnerability** na aba Security do repositório quando ele estiver disponível.
+
+Contribuições também devem respeitar a [política de segurança](SECURITY.md), a [privacidade](PRIVACY.md) e a [política de assinatura](CODE_SIGNING_POLICY.md).
 
 ## Limites honestos
 
@@ -341,9 +378,14 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Escudo de Foco sensível a RAM e CPU, com restauração imediata
 - [x] Inventário de hardware e temperaturas locais com fontes explícitas
 - [x] Cura Bluetooth com diagnóstico, reinício seletivo e nova detecção
-- [ ] Assinatura digital dos binários
+- [x] Políticas, validação e pipeline de assinatura em duas fases
+- [ ] Aprovação SignPath e primeira release com Authenticode válido
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface
+
+## Licença
+
+O Neck é software open source distribuído sob a [licença MIT](LICENSE).
 
 ---
 
