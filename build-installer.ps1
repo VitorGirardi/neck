@@ -34,6 +34,6 @@ if ($LASTEXITCODE -ne 0) {
 
 $files = @(
     (Join-Path $OutputDirectory 'Neck.exe'),
-    (Join-Path $OutputDirectory 'Neck-Setup-1.17.1.exe')
+    (Join-Path $OutputDirectory 'Neck-Setup-1.17.2.exe')
 )
 & (Join-Path $PSScriptRoot 'write-checksums.ps1') -Path $files

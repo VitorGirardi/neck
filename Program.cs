@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.17.1.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.17.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.17.2.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.17.2.0")]
 
 namespace Neck
 {
@@ -2607,6 +2607,7 @@ namespace Neck
             card.Controls.Add(detail);
             card.Controls.Add(heading);
             card.Controls.Add(icon);
+            icon.BringToFront();
             return card;
         }
 

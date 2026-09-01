@@ -94,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@v7.0.1
         with:
           name: neck-installer-unsigned-${{ github.sha }}
-          path: dist/Neck-Setup-1.17.1.exe
+          path: dist/Neck-Setup-1.17.2.exe
           if-no-files-found: error
 
       - name: Sign installer with SignPath
@@ -115,10 +115,10 @@ jobs:
         env:
           EXPECTED_SIGNER: ${{ vars.SIGNPATH_EXPECTED_SUBJECT }}
         run: |
-          $matches = @(Get-ChildItem -LiteralPath signed-installer -Filter Neck-Setup-1.17.1.exe -File -Recurse)
+          $matches = @(Get-ChildItem -LiteralPath signed-installer -Filter Neck-Setup-1.17.2.exe -File -Recurse)
           if ($matches.Count -ne 1) { throw "Esperado um instalador assinado; encontrados: $($matches.Count)" }
-          Copy-Item -LiteralPath $matches[0].FullName -Destination dist/Neck-Setup-1.17.1.exe -Force
-          ./write-checksums.ps1 -Path dist/Neck.exe, dist/Neck-Setup-1.17.1.exe | Out-Host
+          Copy-Item -LiteralPath $matches[0].FullName -Destination dist/Neck-Setup-1.17.2.exe -Force
+          ./write-checksums.ps1 -Path dist/Neck.exe, dist/Neck-Setup-1.17.2.exe | Out-Host
           $subject = if ([string]::IsNullOrWhiteSpace($env:EXPECTED_SIGNER)) { 'SignPath Foundation' } else { $env:EXPECTED_SIGNER }
           ./verify-package.ps1 -ExpectedSigner $subject -RequireTimestamp
 
@@ -129,6 +129,6 @@ jobs:
           path: |
             dist/Neck.exe
             dist/Neck.exe.sha256
-            dist/Neck-Setup-1.17.1.exe
-            dist/Neck-Setup-1.17.1.exe.sha256
+            dist/Neck-Setup-1.17.2.exe
+            dist/Neck-Setup-1.17.2.exe.sha256
           if-no-files-found: error
