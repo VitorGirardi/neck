@@ -261,10 +261,13 @@ namespace Neck
                 WrapContents = false,
                 Padding = new Padding(0, 12, 0, 0)
             };
-            ConfigureButton(_focus, "Acelerar por 1 hora", Theme.Blue, 260);
-            ConfigureButton(_advanced, "Mais opções", Theme.NavySoft, 150);
+            ConfigureButton(_focus, "Acelerar por 1 hora", Theme.Lime, 260);
+            _focus.ForeColor = Theme.Ink;
+            ConfigureButton(_advanced, "Mais opções", Theme.FlowSoft, 150);
+            _advanced.ForeColor = Theme.Ink;
             Button back = new Button();
-            ConfigureButton(back, "Voltar", Color.FromArgb(100, 116, 139), 110);
+            ConfigureButton(back, "Voltar", Theme.FlowSoft, 110);
+            back.ForeColor = Theme.Ink;
             _focus.Enabled = false;
             _advanced.Enabled = false;
             _focus.Click += async delegate { await ToggleFocusAsync(); };
@@ -449,7 +452,8 @@ namespace Neck
             SosCandidate candidate = selected ? _applications.SelectedItems[0].Tag as SosCandidate : null;
             bool active = candidate != null && FocusModeManager.IsTarget(candidate.ProcessName);
             _focus.Text = active ? "Parar aceleração" : "Acelerar por 1 hora";
-            _focus.BackColor = active ? Theme.Amber : Theme.Blue;
+            _focus.BackColor = active ? Theme.Amber : Theme.Lime;
+            _focus.ForeColor = Theme.Ink;
         }
 
         private void SelectProcess(string processName)
@@ -532,16 +536,19 @@ namespace Neck
             _status.TextAlign = ContentAlignment.MiddleLeft;
             _status.ForeColor = Theme.Text;
 
-            ConfigureButton(_adaptive, "Reduzir em segundo plano", Theme.Green, 220);
+            ConfigureButton(_adaptive, "Reduzir em segundo plano", Theme.Lime, 220);
+            _adaptive.ForeColor = Theme.Ink;
             _adaptive.Location = new Point(28, 150);
             Button closeApp = new Button();
             ConfigureButton(closeApp, "Pedir para fechar", Color.FromArgb(185, 28, 28), 160);
             closeApp.Location = new Point(260, 150);
             Button manager = new Button();
-            ConfigureButton(manager, "Gerenciador de Tarefas", Theme.NavySoft, 220);
+            ConfigureButton(manager, "Gerenciador de Tarefas", Theme.FlowSoft, 220);
+            manager.ForeColor = Theme.Ink;
             manager.Location = new Point(28, 210);
             Button back = new Button();
-            ConfigureButton(back, "Voltar", Color.FromArgb(100, 116, 139), 120);
+            ConfigureButton(back, "Voltar", Theme.FlowSoft, 120);
+            back.ForeColor = Theme.Ink;
             back.Location = new Point(260, 210);
 
             _adaptive.Click += async delegate { await ToggleAdaptiveAsync(); };
@@ -608,7 +615,8 @@ namespace Neck
             bool adaptive = EfficiencyModeManager.IsActive(_candidate.ProcessName);
             _adaptive.Enabled = !_busy && !focus;
             _adaptive.Text = adaptive && !focus ? "Parar redução" : "Reduzir em segundo plano";
-            _adaptive.BackColor = adaptive && !focus ? Theme.Amber : Theme.Green;
+            _adaptive.BackColor = adaptive && !focus ? Theme.Amber : Theme.Lime;
+            _adaptive.ForeColor = Theme.Ink;
             _status.Text = focus
                 ? "O modo Acelerar está cuidando automaticamente deste aplicativo."
                 : adaptive ? "O aplicativo está usando menos recursos em segundo plano." : "Nenhuma opção avançada está ativa.";

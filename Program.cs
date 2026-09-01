@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.17.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.17.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.17.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.17.1.0")]
 
 namespace Neck
 {
@@ -198,26 +198,36 @@ namespace Neck
         {
             base.OnPaint(e);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            Color color = _level == HealthLevel.Critical ? Color.FromArgb(220, 70, 70) :
-                          _level == HealthLevel.Warning ? Theme.Amber : Theme.Cyan;
+            Color state = _level == HealthLevel.Critical ? Theme.Coral :
+                          _level == HealthLevel.Warning ? Theme.Amber : Theme.Green;
             float middle = Width / 2f;
-            using (Pen channel = new Pen(VisualEffects.Blend(color, Color.White, 0.45d), 2f))
+            float centerY = Height / 2f;
+            using (Pen channel = new Pen(VisualEffects.Blend(Theme.Ink, Theme.FlowSoft, 0.70d), 2.2f))
+            using (Pen flow = new Pen(Theme.Lime, 4.2f))
             using (GraphicsPath upper = new GraphicsPath())
             using (GraphicsPath lower = new GraphicsPath())
+            using (SolidBrush arrow = new SolidBrush(Theme.Lime))
             {
                 channel.StartCap = channel.EndCap = LineCap.Round;
-                upper.AddBezier(8, 8, middle - 30, 8, middle - 24, 14, middle, 14);
-                upper.AddBezier(middle, 14, middle + 24, 14, middle + 30, 8, Width - 8, 8);
-                lower.AddBezier(8, Height - 8, middle - 30, Height - 8, middle - 24, Height - 14, middle, Height - 14);
-                lower.AddBezier(middle, Height - 14, middle + 24, Height - 14, middle + 30, Height - 8, Width - 8, Height - 8);
+                upper.AddBezier(8, 7, middle - 38, 7, middle - 25, centerY - 7, middle, centerY - 7);
+                upper.AddBezier(middle, centerY - 7, middle + 25, centerY - 7, middle + 38, 7, Width - 8, 7);
+                lower.AddBezier(8, Height - 7, middle - 38, Height - 7, middle - 25, centerY + 7, middle, centerY + 7);
+                lower.AddBezier(middle, centerY + 7, middle + 25, centerY + 7, middle + 38, Height - 7, Width - 8, Height - 7);
                 e.Graphics.DrawPath(channel, upper);
                 e.Graphics.DrawPath(channel, lower);
+                flow.StartCap = LineCap.Round;
+                flow.EndCap = LineCap.Round;
+                e.Graphics.DrawLine(flow, 12, centerY, Width - 27, centerY);
+                e.Graphics.FillPolygon(arrow, new[]
+                {
+                    new PointF(Width - 34, centerY - 8),
+                    new PointF(Width - 12, centerY),
+                    new PointF(Width - 34, centerY + 8)
+                });
             }
             float progress = VisualEffects.ReduceMotion ? 0.74f : _phase;
-            float x = 10 + (Width - 20) * Math.Min(1f, progress);
-            float distance = Math.Abs(x - middle) / Math.Max(1f, middle);
-            float y = Height / 2f + (float)Math.Sin(progress * Math.PI * 5) * Math.Max(1f, distance * 4f);
-            using (SolidBrush dot = new SolidBrush(color)) e.Graphics.FillEllipse(dot, x - 4, y - 4, 8, 8);
+            float x = 14 + (Width - 48) * Math.Min(1f, progress);
+            using (SolidBrush dot = new SolidBrush(state)) e.Graphics.FillEllipse(dot, x - 4, centerY - 4, 8, 8);
         }
 
         protected override void Dispose(bool disposing)
@@ -300,6 +310,11 @@ namespace Neck
             DoubleBuffered = true;
             _timer.Interval = 30;
             _timer.Tick += Animate;
+        }
+
+        public override void NotifyDefault(bool value)
+        {
+            base.NotifyDefault(false);
         }
 
         public void SetPalette(Color baseColor)
@@ -757,33 +772,38 @@ namespace Neck
 
         private Control BuildQuickCard()
         {
-            Panel card = MakeCard(new Padding(24));
+            RoundedPanel card = MakeCard(Padding.Empty);
             card.Margin = new Padding(0, 10, 9, 10);
-
-            Label eyebrow = new Label
+            TableLayoutPanel layout = new TableLayoutPanel
             {
-                Text = "CUIDADO RÁPIDO",
-                AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
-                ForeColor = Theme.Blue,
-                Location = new Point(24, 18)
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(22, 15, 18, 15),
+                BackColor = Theme.Card
             };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62f));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+            Panel content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Card, Margin = Padding.Empty };
+            Label eyebrow = new Label { Text = "Quando precisar", AutoSize = true, Font = Theme.Small, ForeColor = Theme.Blue, Location = new Point(0, 0) };
             Label title = new Label
             {
                 Text = "Liberar espaço",
                 AutoSize = true,
                 Font = new Font("Segoe UI Variable Display", 16f, FontStyle.Bold),
                 ForeColor = Theme.Text,
-                Location = new Point(23, 39)
+                Location = new Point(-1, 22)
             };
             Label description = new Label
             {
-                Text = "Remove apenas arquivos temporários antigos.",
+                Text = "Remove temporários antigos sem tocar nos seus arquivos.",
                 AutoSize = false,
-                Size = new Size(420, 30),
+                Size = new Size(280, 36),
                 Font = Theme.Body,
                 ForeColor = Theme.Muted,
-                Location = new Point(25, 72)
+                Location = new Point(1, 55)
             };
             Label available = new Label
             {
@@ -791,19 +811,20 @@ namespace Neck
                 AutoSize = true,
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
-                Location = new Point(25, 112)
+                Location = new Point(1, 99)
             };
             _analysisValue.Text = "Analisando…";
             _analysisValue.AutoSize = true;
             _analysisValue.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
             _analysisValue.ForeColor = Theme.Text;
-            _analysisValue.Location = new Point(99, 110);
+            _analysisValue.Location = new Point(75, 97);
 
             ConfigureButton(_analyzeButton, "Analisar novamente", Theme.NavySoft, 1);
             _analyzeButton.Visible = false;
-            ConfigureButton(_runButton, "Limpar com segurança", Theme.Blue, 194);
-            _runButton.Location = new Point(290, 96);
-            _runButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            ConfigureButton(_runButton, "Limpar arquivos", Theme.Lime, 172);
+            _runButton.Size = new Size(172, 46);
+            _runButton.Anchor = AnchorStyles.None;
+            _runButton.ForeColor = Theme.Ink;
             _analyzeButton.Click += async delegate { await AnalyzeAsync(true); };
             _runButton.Click += async delegate
             {
@@ -816,121 +837,179 @@ namespace Neck
                 await RunMaintenanceAsync();
             };
 
-            card.Resize += delegate { _runButton.Left = card.ClientSize.Width - _runButton.Width - 24; };
-            card.Controls.Add(eyebrow);
-            card.Controls.Add(title);
-            card.Controls.Add(description);
-            card.Controls.Add(available);
-            card.Controls.Add(_analysisValue);
-            card.Controls.Add(_runButton);
+            content.Resize += delegate { description.Width = Math.Max(120, content.ClientSize.Width - 6); };
+            content.Controls.Add(eyebrow);
+            content.Controls.Add(title);
+            content.Controls.Add(description);
+            content.Controls.Add(available);
+            content.Controls.Add(_analysisValue);
+            layout.Controls.Add(content, 0, 0);
+            layout.Controls.Add(_runButton, 1, 0);
+            card.Controls.Add(layout);
             return card;
         }
 
         private Control BuildDeepCard()
         {
-            Panel card = MakeCard(new Padding(24));
+            RoundedPanel card = MakeCard(Padding.Empty);
             card.Margin = new Padding(9, 10, 0, 10);
-
-            Label eyebrow = new Label
+            TableLayoutPanel layout = new TableLayoutPanel
             {
-                Text = "UMA VEZ POR MÊS",
-                AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
-                ForeColor = Theme.Green,
-                Location = new Point(24, 18)
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(22, 15, 18, 15),
+                BackColor = Theme.Card
             };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 64f));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+            Panel content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Card, Margin = Padding.Empty };
+            Label eyebrow = new Label { Text = "Cuidado mensal", AutoSize = true, Font = Theme.Small, ForeColor = Theme.Green, Location = new Point(0, 0) };
             Label title = new Label
             {
                 Text = "Cuidado completo",
                 AutoSize = true,
                 Font = new Font("Segoe UI Variable Display", 16f, FontStyle.Bold),
                 ForeColor = Theme.Text,
-                Location = new Point(23, 39)
+                Location = new Point(-1, 22)
             };
             Label description = new Label
             {
-                Text = "Confere o Windows e sugere apenas o que faz sentido.",
+                Text = "Revê o Windows e mostra só o que vale a pena.",
                 AutoSize = false,
-                Size = new Size(420, 30),
+                Size = new Size(280, 36),
                 Font = Theme.Body,
                 ForeColor = Theme.Muted,
-                Location = new Point(25, 72)
+                Location = new Point(1, 55)
             };
             _recommendation.AutoSize = false;
-            _recommendation.Size = new Size(260, 25);
+            _recommendation.Size = new Size(280, 25);
             _recommendation.TextAlign = ContentAlignment.MiddleLeft;
             _recommendation.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
             _recommendation.ForeColor = Theme.Green;
             _recommendation.BackColor = Color.Transparent;
-            _recommendation.Location = new Point(25, 108);
+            _recommendation.Location = new Point(1, 97);
             _lastRunValue.Visible = false;
-            ConfigureButton(_advancedButton, "Revisar agora", Theme.Green, 164);
-            _advancedButton.Location = new Point(305, 96);
-            _advancedButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            ConfigureButton(_advancedButton, "Revisar agora", Theme.Lime, 160);
+            _advancedButton.Size = new Size(160, 46);
+            _advancedButton.Anchor = AnchorStyles.None;
+            _advancedButton.ForeColor = Theme.Ink;
             _advancedButton.Click += async delegate { await ShowAdvancedAndRunAsync(); };
             _bootButton.Click += delegate
             {
                 using (StartupAppsForm form = new StartupAppsForm()) form.ShowDialog(this);
             };
 
-            card.Resize += delegate { _advancedButton.Left = card.ClientSize.Width - _advancedButton.Width - 24; };
-            card.Controls.Add(eyebrow);
-            card.Controls.Add(title);
-            card.Controls.Add(description);
-            card.Controls.Add(_recommendation);
-            card.Controls.Add(_advancedButton);
+            content.Resize += delegate
+            {
+                description.Width = Math.Max(120, content.ClientSize.Width - 6);
+                _recommendation.Width = Math.Max(120, content.ClientSize.Width - 6);
+            };
+            content.Controls.Add(eyebrow);
+            content.Controls.Add(title);
+            content.Controls.Add(description);
+            content.Controls.Add(_recommendation);
+            layout.Controls.Add(content, 0, 0);
+            layout.Controls.Add(_advancedButton, 1, 0);
+            card.Controls.Add(layout);
             return card;
         }
 
         private Control BuildGuardCard()
         {
-            RoundedPanel card = MakeCard(new Padding(30));
+            RoundedPanel card = MakeCard(Padding.Empty);
             card.Margin = new Padding(0, 0, 0, 0);
             card.CornerRadius = 24;
+            TableLayoutPanel shell = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(16, 14, 16, 14),
+                BackColor = Theme.Card
+            };
+            shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 64f));
+            shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36f));
+            shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+            TableLayoutPanel overview = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 5,
+                Padding = new Padding(14, 4, 10, 4),
+                Margin = Padding.Empty,
+                BackColor = Theme.Card
+            };
+            overview.RowStyles.Add(new RowStyle(SizeType.Absolute, 27f));
+            overview.RowStyles.Add(new RowStyle(SizeType.Absolute, 44f));
+            overview.RowStyles.Add(new RowStyle(SizeType.Absolute, 46f));
+            overview.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
+            overview.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
             _guardBadge.Text = "●  Lendo o fluxo";
             _guardBadge.AutoSize = false;
-            _guardBadge.Size = new Size(220, 25);
+            _guardBadge.Dock = DockStyle.Fill;
             _guardBadge.BackColor = Color.Transparent;
             _guardBadge.ForeColor = Theme.Blue;
             _guardBadge.TextAlign = ContentAlignment.MiddleLeft;
-            _guardBadge.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
-            _guardBadge.Location = new Point(31, 24);
+            _guardBadge.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Regular);
+            _guardBadge.Margin = Padding.Empty;
             _heroTitle.Text = "Entendendo seu computador";
             _heroTitle.AutoSize = false;
-            _heroTitle.Size = new Size(590, 43);
+            _heroTitle.Dock = DockStyle.Fill;
             _heroTitle.Font = new Font("Segoe UI Variable Display", 23f, FontStyle.Bold);
             _heroTitle.ForeColor = Theme.Text;
-            _heroTitle.Location = new Point(30, 53);
+            _heroTitle.TextAlign = ContentAlignment.MiddleLeft;
+            _heroTitle.Margin = Padding.Empty;
             _guardMessage.Text = "Procurando sinais de sobrecarga...";
             _guardMessage.AutoSize = false;
-            _guardMessage.Size = new Size(590, 43);
+            _guardMessage.Dock = DockStyle.Fill;
             _guardMessage.Font = Theme.Body;
             _guardMessage.ForeColor = Theme.Muted;
-            _guardMessage.Location = new Point(32, 100);
+            _guardMessage.TextAlign = ContentAlignment.TopLeft;
+            _guardMessage.Margin = Padding.Empty;
             _guardProcess.Text = "Maior uso de memória: calculando";
             _guardProcess.AutoSize = false;
-            _guardProcess.Size = new Size(590, 26);
+            _guardProcess.Dock = DockStyle.Fill;
             _guardProcess.Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold);
             _guardProcess.ForeColor = Theme.Text;
-            _guardProcess.Location = new Point(31, 146);
+            _guardProcess.TextAlign = ContentAlignment.MiddleLeft;
+            _guardProcess.Margin = Padding.Empty;
 
-            Panel actionArea = new Panel { Dock = DockStyle.Right, Width = 330, BackColor = Theme.FlowSoft, Padding = new Padding(26, 22, 26, 20) };
-            _actionTitle.Dock = DockStyle.Top;
-            _actionTitle.Height = 48;
+            RoundedPanel actionArea = new RoundedPanel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Theme.FlowSoft,
+                OutlineColor = Theme.FlowSoft,
+                CornerRadius = 20,
+                Padding = new Padding(22, 18, 22, 18),
+                Margin = new Padding(12, 0, 0, 0)
+            };
+            TableLayoutPanel actionLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, BackColor = Theme.FlowSoft };
+            actionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            actionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 55f));
+            actionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52f));
+            actionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            actionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50f));
+            _actionTitle.Dock = DockStyle.Fill;
             _actionTitle.Text = "Analisando o fluxo do computador...";
             _actionTitle.Font = new Font("Segoe UI Variable Display", 13f, FontStyle.Bold);
             _actionTitle.ForeColor = Theme.Text;
             _actionTitle.TextAlign = ContentAlignment.MiddleLeft;
-            _actionHelp.Dock = DockStyle.Top;
-            _actionHelp.Height = 58;
+            _actionTitle.Margin = Padding.Empty;
+            _actionHelp.Dock = DockStyle.Fill;
             _actionHelp.Text = "O Neck indicará a ação mais útil agora.";
             _actionHelp.Font = Theme.Small;
             _actionHelp.ForeColor = Theme.Muted;
             _actionHelp.TextAlign = ContentAlignment.TopLeft;
-            ConfigureButton(_guardButton, "Dar prioridade a um app", Theme.Ink, 244);
-            _guardButton.Dock = DockStyle.Top;
-            _guardButton.Height = 48;
-            _guardButton.Margin = new Padding(8, 0, 8, 0);
+            _actionHelp.Margin = new Padding(0, 4, 0, 4);
+            ConfigureButton(_guardButton, "Dar prioridade a um app", Theme.Lime, 244);
+            _guardButton.Dock = DockStyle.Fill;
+            _guardButton.ForeColor = Theme.Ink;
+            _guardButton.Margin = new Padding(0, 4, 0, 0);
             ConfigureButton(_meetingButton, "Modo reunião", Theme.Blue, 1);
             _meetingButton.Visible = false;
             _meetingButton.Click += delegate { ToggleMeetingMode(); };
@@ -958,45 +1037,40 @@ namespace Neck
                 }
                 else OpenSos();
             };
-            actionArea.Controls.Add(_guardButton);
-            actionArea.Controls.Add(_actionHelp);
-            _flowIndicator.Dock = DockStyle.Top;
-            _flowIndicator.Height = 52;
-            actionArea.Controls.Add(_flowIndicator);
-            actionArea.Controls.Add(_actionTitle);
+            _flowIndicator.Dock = DockStyle.Fill;
+            _flowIndicator.Margin = Padding.Empty;
+            actionLayout.Controls.Add(_actionTitle, 0, 0);
+            actionLayout.Controls.Add(_flowIndicator, 0, 1);
+            actionLayout.Controls.Add(_actionHelp, 0, 2);
+            actionLayout.Controls.Add(_guardButton, 0, 3);
+            actionArea.Controls.Add(actionLayout);
 
             TableLayoutPanel metrics = new TableLayoutPanel
             {
-                Location = new Point(30, 194),
-                Size = new Size(590, 62),
+                Dock = DockStyle.Fill,
                 ColumnCount = 3,
                 RowCount = 1,
                 BackColor = Theme.FlowSoft,
-                Padding = new Padding(4)
+                Padding = new Padding(4),
+                Margin = new Padding(0, 5, 0, 0)
             };
             metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
             metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
             metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.334f));
-            metrics.Controls.Add(BuildInlineMetric("MEMÓRIA EM USO", _memoryValue), 0, 0);
-            metrics.Controls.Add(BuildInlineMetric("ESPAÇO LIVRE", _diskValue), 1, 0);
-            Control flowMetric = BuildInlineMetric("ÍNDICE DE FLUXO  ›", _flowScoreValue);
+            metrics.Controls.Add(BuildInlineMetric("Memória em uso", _memoryValue), 0, 0);
+            metrics.Controls.Add(BuildInlineMetric("Espaço livre", _diskValue), 1, 0);
+            Control flowMetric = BuildInlineMetric("Índice de fluxo  ›", _flowScoreValue);
             MakeFlowMetricInteractive(flowMetric);
             metrics.Controls.Add(flowMetric, 2, 0);
 
-            card.Controls.Add(_guardBadge);
-            card.Controls.Add(_heroTitle);
-            card.Controls.Add(_guardMessage);
-            card.Controls.Add(_guardProcess);
-            card.Controls.Add(metrics);
-            card.Controls.Add(actionArea);
-            card.Resize += delegate
-            {
-                int leftWidth = Math.Max(420, card.ClientSize.Width - actionArea.Width - 52);
-                _heroTitle.Width = leftWidth;
-                _guardMessage.Width = leftWidth;
-                _guardProcess.Width = leftWidth;
-                metrics.Width = leftWidth;
-            };
+            overview.Controls.Add(_guardBadge, 0, 0);
+            overview.Controls.Add(_heroTitle, 0, 1);
+            overview.Controls.Add(_guardMessage, 0, 2);
+            overview.Controls.Add(_guardProcess, 0, 3);
+            overview.Controls.Add(metrics, 0, 4);
+            shell.Controls.Add(overview, 0, 0);
+            shell.Controls.Add(actionArea, 1, 0);
+            card.Controls.Add(shell);
             return card;
         }
 
@@ -1077,7 +1151,8 @@ namespace Neck
             _progress.Height = 5;
             _progress.Visible = false;
             _log.Visible = false;
-            ConfigureButton(_toolsButton, "Ver ferramentas", Theme.Ink, 170);
+            ConfigureButton(_toolsButton, "Ver ferramentas", Theme.FlowSoft, 170);
+            _toolsButton.ForeColor = Theme.Ink;
             _toolsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _toolsButton.Location = new Point(800, 37);
             _toolsButton.Click += async delegate { await ShowToolsHubAsync(); };
@@ -1916,7 +1991,8 @@ namespace Neck
             }
             _guardBadge.Width = 220;
             _guardBadge.BackColor = Color.Transparent;
-            _guardButton.SetPalette(snapshot.Level == HealthLevel.Critical ? Theme.Coral : Theme.Ink);
+            _guardButton.SetPalette(Theme.Lime);
+            _guardButton.ForeColor = Theme.Ink;
             _flowIndicator.SetLevel(snapshot.Level);
             _guardButton.AttentionPulse = snapshot.Level == HealthLevel.Critical && !FocusModeManager.IsActive && Visible && WindowState != FormWindowState.Minimized;
 
@@ -2402,14 +2478,14 @@ namespace Neck
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             for (int row = 0; row < 4; row++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 25f));
-            grid.Controls.Add(CreateTool("Meu plano", "Três prioridades escolhidas para este computador.", ToolHubChoice.Plan), 0, 0);
-            grid.Controls.Add(CreateTool("Cura Bluetooth", "Restaura a conexão sem apagar pareamentos.", ToolHubChoice.Bluetooth), 1, 0);
-            grid.Controls.Add(CreateTool(_meetingActive ? "Encerrar modo reunião" : "Modo reunião", "Evita suspensão durante chamadas e apresentações.", ToolHubChoice.Meeting), 0, 1);
-            grid.Controls.Add(CreateTool("Inicialização", "Veja o que abre junto com o Windows.", ToolHubChoice.Startup), 1, 1);
-            grid.Controls.Add(CreateTool("Diagnóstico", "Detalhes de CPU, memória e armazenamento.", ToolHubChoice.Diagnostic), 0, 2);
-            grid.Controls.Add(CreateTool("Drivers", "Confira atualizações pelas fontes oficiais.", ToolHubChoice.Drivers), 1, 2);
-            grid.Controls.Add(CreateTool("Neck Replay", "Entenda por que o computador acabou de travar.", ToolHubChoice.Replay), 0, 3);
-            grid.Controls.Add(CreateTool("Suporte", "Crie um relatório privado e recupere interrupções.", ToolHubChoice.Support), 1, 3);
+            grid.Controls.Add(CreateTool("✦", "Meu plano", "Três prioridades escolhidas para este computador.", ToolHubChoice.Plan), 0, 0);
+            grid.Controls.Add(CreateTool("⌁", "Cura Bluetooth", "Restaura a conexão sem apagar pareamentos.", ToolHubChoice.Bluetooth), 1, 0);
+            grid.Controls.Add(CreateTool("◷", _meetingActive ? "Encerrar modo reunião" : "Modo reunião", "Evita suspensão durante chamadas e apresentações.", ToolHubChoice.Meeting), 0, 1);
+            grid.Controls.Add(CreateTool("↗", "Inicialização", "Veja o que abre junto com o Windows.", ToolHubChoice.Startup), 1, 1);
+            grid.Controls.Add(CreateTool("▦", "Diagnóstico", "Detalhes de CPU, memória e armazenamento.", ToolHubChoice.Diagnostic), 0, 2);
+            grid.Controls.Add(CreateTool("↓", "Drivers", "Confira atualizações pelas fontes oficiais.", ToolHubChoice.Drivers), 1, 2);
+            grid.Controls.Add(CreateTool("↶", "Neck Replay", "Entenda por que o computador acabou de travar.", ToolHubChoice.Replay), 0, 3);
+            grid.Controls.Add(CreateTool("?", "Suporte", "Crie um relatório privado e recupere interrupções.", ToolHubChoice.Support), 1, 3);
 
             Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 82, BackColor = Theme.Card, Padding = new Padding(28, 12, 28, 12) };
             _continueInTray.Text = "Continuar acompanhando ao fechar";
@@ -2428,12 +2504,14 @@ namespace Neck
             };
             history.Click += delegate { Choose(ToolHubChoice.History); };
             Button preferences = new AnimatedButton();
-            ConfigureToolButton(preferences, "Preferências", Theme.NavySoft, 130);
+            ConfigureToolButton(preferences, "Preferências", Theme.FlowSoft, 130);
+            preferences.ForeColor = Theme.Ink;
             preferences.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             preferences.Location = new Point(footer.Width - 286, 20);
             preferences.Click += delegate { Choose(ToolHubChoice.Preferences); };
             Button close = new AnimatedButton();
-            ConfigureToolButton(close, "Voltar", Theme.Ink, 120);
+            ConfigureToolButton(close, "Voltar", Theme.Lime, 120);
+            close.ForeColor = Theme.Ink;
             close.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             close.Location = new Point(footer.Width - 146, 20);
             close.Click += delegate { Close(); };
@@ -2457,7 +2535,7 @@ namespace Neck
             CancelButton = close;
         }
 
-        private Control CreateTool(string title, string description, ToolHubChoice choice)
+        private Control CreateTool(string glyph, string title, string description, ToolHubChoice choice)
         {
             RoundedPanel card = new RoundedPanel
             {
@@ -2474,7 +2552,7 @@ namespace Neck
                 AutoSize = false,
                 Height = 42,
                 Dock = DockStyle.Top,
-                Padding = new Padding(22, 14, 16, 0),
+                Padding = new Padding(70, 14, 16, 0),
                 Font = new Font("Segoe UI Variable Display", 13f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 Cursor = Cursors.Hand
@@ -2484,9 +2562,21 @@ namespace Neck
                 Text = description,
                 AutoSize = false,
                 Dock = DockStyle.Fill,
-                Padding = new Padding(22, 7, 20, 12),
+                Padding = new Padding(70, 7, 20, 12),
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
+                Cursor = Cursors.Hand
+            };
+            Label icon = new Label
+            {
+                Text = glyph,
+                AutoSize = false,
+                Size = new Size(40, 40),
+                Location = new Point(18, 22),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI Symbol", 15f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
+                BackColor = Theme.FlowSoft,
                 Cursor = Cursors.Hand
             };
             EventHandler select = delegate { Choose(choice); };
@@ -2505,14 +2595,18 @@ namespace Neck
             card.Click += select;
             heading.Click += select;
             detail.Click += select;
+            icon.Click += select;
             card.MouseEnter += enter;
             heading.MouseEnter += enter;
             detail.MouseEnter += enter;
+            icon.MouseEnter += enter;
             card.MouseLeave += leave;
             heading.MouseLeave += leave;
             detail.MouseLeave += leave;
+            icon.MouseLeave += leave;
             card.Controls.Add(detail);
             card.Controls.Add(heading);
+            card.Controls.Add(icon);
             return card;
         }
 
@@ -2973,8 +3067,10 @@ namespace Neck
             };
             Button run = new AnimatedButton { Text = "Revisar e iniciar", DialogResult = DialogResult.OK };
             Button cancel = new AnimatedButton { Text = "Voltar", DialogResult = DialogResult.Cancel };
-            ConfigureDialogButton(run, Theme.Blue, 172);
-            ConfigureDialogButton(cancel, Theme.NavySoft, 110);
+            ConfigureDialogButton(run, Theme.Lime, 172);
+            run.ForeColor = Theme.Ink;
+            ConfigureDialogButton(cancel, Theme.FlowSoft, 110);
+            cancel.ForeColor = Theme.Ink;
             footer.Controls.Add(run);
             footer.Controls.Add(cancel);
             AcceptButton = run;

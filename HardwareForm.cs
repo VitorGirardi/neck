@@ -71,12 +71,14 @@ namespace Neck
             _captured.Font = Theme.Small;
             _captured.ForeColor = Theme.Muted;
             _captured.TextAlign = ContentAlignment.MiddleLeft;
-            ConfigureButton(_refresh, "Atualizar leitura", Theme.NavySoft, 165);
+            ConfigureButton(_refresh, "Atualizar leitura", Theme.FlowSoft, 165);
+            _refresh.ForeColor = Theme.Ink;
             _refresh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _refresh.Location = new Point(560, 17);
             _refresh.Click += async delegate { await RefreshAsync(); };
             Button close = new AnimatedButton();
-            ConfigureButton(close, "Voltar", Theme.Blue, 120);
+            ConfigureButton(close, "Voltar", Theme.Lime, 120);
+            close.ForeColor = Theme.Ink;
             close.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             close.Location = new Point(735, 17);
             close.Click += delegate { Close(); };

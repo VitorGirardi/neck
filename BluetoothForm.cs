@@ -280,10 +280,12 @@ namespace Neck
                 WrapContents = false,
                 Margin = new Padding(0)
             };
-            ConfigureButton(_repairButton, "Tentar corrigir agora", Theme.Blue, 250);
+            ConfigureButton(_repairButton, "Tentar corrigir agora", Theme.Lime, 250);
+            _repairButton.ForeColor = Theme.Ink;
             _repairButton.AttentionPulse = true;
             _repairButton.Click += async delegate { await RepairAsync(); };
-            ConfigureButton(_settingsButton, "Abrir Bluetooth", Theme.NavySoft, 175);
+            ConfigureButton(_settingsButton, "Abrir Bluetooth", Theme.FlowSoft, 175);
+            _settingsButton.ForeColor = Theme.Ink;
             _settingsButton.Click += delegate { OpenBluetoothSettings(); };
             actions.Controls.Add(_repairButton);
             actions.Controls.Add(_settingsButton);

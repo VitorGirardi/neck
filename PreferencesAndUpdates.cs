@@ -166,13 +166,15 @@ namespace Neck
             });
 
             Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 76, BackColor = Color.White, Padding = new Padding(24, 15, 24, 14) };
-            Button save = MakeButton(_firstRun ? "Salvar e começar" : "Salvar alterações", Theme.Blue, 174);
+            Button save = MakeButton(_firstRun ? "Salvar e começar" : "Salvar alterações", Theme.Lime, 174);
+            save.ForeColor = Theme.Ink;
             save.Dock = DockStyle.Right;
             save.Click += delegate { SaveAndClose(); };
             footer.Controls.Add(save);
             if (!_firstRun)
             {
-                Button cancel = MakeButton("Cancelar", Theme.NavySoft, 110);
+                Button cancel = MakeButton("Cancelar", Theme.FlowSoft, 110);
+                cancel.ForeColor = Theme.Ink;
                 cancel.Dock = DockStyle.Right;
                 cancel.Margin = new Padding(0, 0, 10, 0);
                 cancel.DialogResult = DialogResult.Cancel;
@@ -255,10 +257,12 @@ namespace Neck
             _updateStatus.ForeColor = Theme.Muted;
             _updateStatus.Location = new Point(24, 73);
 
-            ConfigureSmallButton(_checkUpdates, "Verificar agora", Theme.Green, 132);
+            ConfigureSmallButton(_checkUpdates, "Verificar agora", Theme.Lime, 132);
+            _checkUpdates.ForeColor = Theme.Ink;
             _checkUpdates.Location = new Point(24, 111);
             _checkUpdates.Click += async delegate { await CheckUpdatesAsync(); };
-            ConfigureSmallButton(_openRelease, "Abrir GitHub", Theme.NavySoft, 112);
+            ConfigureSmallButton(_openRelease, "Abrir GitHub", Theme.FlowSoft, 112);
+            _openRelease.ForeColor = Theme.Ink;
             _openRelease.Location = new Point(166, 111);
             _openRelease.Click += delegate
             {
