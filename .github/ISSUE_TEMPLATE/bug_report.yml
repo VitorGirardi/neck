@@ -1,0 +1,70 @@
+name: Relatar um bug
+description: Informe um comportamento incorreto ou inesperado do Neck.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por ajudar. Não inclua credenciais, nomes de usuário, caminhos pessoais ou relatórios sem revisá-los.
+  - type: input
+    id: neck-version
+    attributes:
+      label: Versão do Neck
+      placeholder: "Ex.: 1.17.2"
+    validations:
+      required: true
+  - type: input
+    id: windows-version
+    attributes:
+      label: Versão do Windows
+      placeholder: "Ex.: Windows 11 24H2"
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Como o Neck foi executado?
+      options:
+        - Instalador
+        - Versão portátil
+        - Compilado do código-fonte
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      description: Explique a sequência mínima que causa o problema.
+      placeholder: |
+        1. Abri...
+        2. Cliquei...
+        3. O Neck...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Resultado observado
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto adicional
+      description: Inclua capturas ou trechos sanitizados somente se forem necessários.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Privacidade e confirmação
+      options:
+        - label: Revisei o conteúdo e removi dados pessoais, credenciais e caminhos privados.
+          required: true
+        - label: Procurei uma issue existente antes de enviar.
+          required: true

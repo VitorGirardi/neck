@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Relatar vulnerabilidade em privado
+    url: https://github.com/VitorGirardi/neck/security/advisories/new
+    about: Não publique detalhes exploráveis ou dados sensíveis em uma issue aberta.
+  - name: Orientações de suporte
+    url: https://github.com/VitorGirardi/neck/blob/main/SUPPORT.md
+    about: Veja quais informações ajudam a diagnosticar um problema.

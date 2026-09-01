@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://github.com/VitorGirardi/neck/actions/workflows/build.yml"><img src="https://github.com/VitorGirardi/neck/actions/workflows/build.yml/badge.svg" alt="Build"></a>
   <a href="https://github.com/VitorGirardi/neck/releases/latest"><img src="https://img.shields.io/github/v/release/VitorGirardi/neck?display_name=tag&sort=semver" alt="Última versão"></a>
+  <img src="https://img.shields.io/badge/status-beta%20p%C3%BAblica-B6EF67" alt="Status: beta pública">
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white" alt="Windows 10 e 11">
   <img src="https://img.shields.io/badge/.NET%20Framework-4.8-512BD4" alt=".NET Framework 4.8">
   <a href="CODE_SIGNING_POLICY.md"><img src="https://img.shields.io/badge/assinatura-em%20prepara%C3%A7%C3%A3o-F0A23B" alt="Assinatura digital em preparação"></a>
@@ -24,10 +25,15 @@
   ·
   <a href="#segurança-por-padrão">Proteções</a>
   ·
+  <a href="TESTING.md">Testes</a>
+  ·
   <a href="PRIVACY.md">Privacidade</a>
   ·
   <a href="CODE_SIGNING_POLICY.md">Assinatura</a>
 </p>
+
+> [!NOTE]
+> O Neck 1.17.2 é uma **beta pública**. A suíte automatizada, o build público, os checksums e a análise do Microsoft Defender foram aprovados, mas os binários ainda não possuem assinatura digital e a matriz em instalações limpas do Windows continua em andamento. Consulte o [estado dos testes](TESTING.md) antes de usar em um computador crítico.
 
 ![Tela principal do Neck](assets/screenshots/neck-dashboard.png)
 
@@ -420,6 +426,8 @@ installer/Neck.iss         Definição do instalador para Windows
 
 Relatos de bugs, ideias e pull requests são bem-vindos.
 
+Leia o [guia de contribuição](CONTRIBUTING.md) para configurar o ambiente, executar a suíte e entender as proteções obrigatórias do projeto.
+
 - Antes de abrir uma issue, verifique se o problema já foi relatado.
 - Explique a versão do Windows, a versão do Neck e como reproduzir o comportamento.
 - Mudanças que apagam dados, encerram processos à força ou enfraquecem as confirmações de segurança não serão aceitas.
@@ -465,6 +473,8 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Neck Autopilot com previsão de curto prazo, consentimento e restauração automática
 - [x] Recuperação após interrupções e relatório de suporte sanitizado
 - [x] Políticas, validação e pipeline de assinatura em duas fases
+- [x] Beta pública com checksums, verificação antimalware e documentação de testes
+- [ ] Concluir matriz de instalação limpa no Windows 10 e 11
 - [ ] Aprovação SignPath e primeira release com Authenticode válido
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade
 - [ ] Internacionalização da interface

@@ -1,0 +1,41 @@
+name: Sugerir uma melhoria
+description: Proponha uma funcionalidade ou aperfeiçoamento para o Neck.
+title: "[Ideia]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        O Neck prioriza ações compreensíveis, locais, seguras e reversíveis.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual problema essa ideia resolve?
+      description: Descreva a situação do usuário antes de propor a interface.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Como você imagina a solução?
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Riscos e reversão
+      description: O que a funcionalidade alteraria e como o estado anterior seria restaurado?
+    validations:
+      required: true
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Quem mais se beneficiaria?
+      options:
+        - Pessoas sem conhecimento técnico
+        - Usuários avançados
+        - Suporte técnico
+        - Desenvolvedores do projeto
+        - Todos os públicos
+    validations:
+      required: true
