@@ -50,7 +50,7 @@ A página inicial foi organizada para qualquer pessoa entender por onde começar
 - **Neck Autopilot** pode antecipar pressão de RAM ou CPU e proteger temporariamente o aplicativo importante.
 - **Limpar arquivos** remove somente temporários conhecidos e mostra antes quanto pode ser liberado.
 - **Revisar o computador** reúne os cuidados mensais do Windows em uma etapa separada.
-- **Mais ferramentas** guarda recursos ocasionais como Neck Replay, Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
+- **Mais ferramentas** guarda recursos ocasionais como Neck Replay, Suporte, Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
 
 Assim, nenhuma ferramenta foi removida: as ações mais importantes aparecem primeiro e os controles ocasionais ficam em uma segunda camada.
 
@@ -75,6 +75,8 @@ A animação ocorre por um intervalo curto após cada diagnóstico e não perman
 | Recurso | O que faz | Proteção principal |
 | --- | --- | --- |
 | **Neck Autopilot** | Projeta a tendência do próximo minuto e alivia concorrentes seguros antes do gargalo. | Desativado por padrão, exige duas previsões e restaura tudo automaticamente. |
+| **Recuperação automática** | Mantém um diário transacional das prioridades temporariamente alteradas e corrige sobras após uma interrupção. | Confere PID, nome técnico e horário de início antes de restaurar; registros somem após a correção. |
+| **Relatório de suporte** | Reúne versão, hardware resumido, métricas agregadas e falhas recentes em um arquivo revisável. | Omite usuário, computador, processos, janelas, caminhos pessoais e nunca envia o arquivo sozinho. |
 | **Neck Baseline** | Aprende as faixas habituais deste computador e transforma desvios no Índice de Fluxo. | Salva somente agregados locais e não aprende leituras de incidente. |
 | **Neck Replay** | Preserva os últimos cinco minutos em memória e explica por que o computador acabou de travar. | Só confirma pressão persistente, não grava conteúdo de janelas e não executa ações sozinho. |
 | **Gargalo Guiado** | Distingue pressão de memória, CPU e armazenamento e recomenda a ação mais útil naquele momento. | Explica o motivo e mantém a confirmação com o usuário. |
@@ -140,6 +142,16 @@ As mudanças são temporárias: o aplicativo volta a responder normalmente ao re
 3. O resultado esperado é **Previsão reconhecida: tendência de memória** e **Proteção simulada para 2 aplicativos**.
 4. Para testar o acompanhamento real, ative o Autopilot e mantenha o Neck aberto ou na bandeja. O Índice de Fluxo personalizado precisa já estar disponível.
 5. Você pode desativá-lo na mesma tela ou em **Preferências**; qualquer proteção real é restaurada imediatamente.
+
+## Suporte e recuperação após interrupções
+
+Antes de aplicar uma prioridade, EcoQoS ou prioridade de memória temporária, o Neck 1.16 registra localmente o estado original. Uma restauração normal remove a entrada imediatamente. Se o processo do Neck cair ou o computador desligar no meio da operação, a próxima abertura confere a identidade e o horário de início de cada processo antes de devolver o estado anterior. Processos já encerrados ou reutilizados por outro aplicativo são descartados sem alteração.
+
+Em **Mais ferramentas → Suporte**, o botão **Criar relatório** gera um arquivo em `Documentos\Neck\Suporte`. Ele contém versão do Neck e do Windows, especificações resumidas, médias de RAM/CPU, contagens de recuperação e eventos técnicos recentes. Nomes de usuário, computador, aplicativos, títulos de janela, caminhos pessoais, documentos, senhas e conteúdo da tela ficam de fora. O arquivo nunca é enviado automaticamente e deve ser revisado antes de ser anexado a uma issue pública.
+
+Falhas inesperadas da interface também passam por uma proteção global: o Neck registra o erro sanitizado, encerra suas intervenções temporárias e informa que a restauração foi executada. Isso não tenta esconder o problema; preserva o computador e deixa evidência local para correção.
+
+![Relatório de suporte local e sistema de recuperação do Neck](assets/screenshots/neck-support.png)
 
 ## Neck Replay: a caixa-preta do gargalo
 
@@ -273,6 +285,8 @@ A implementação utiliza as APIs documentadas [`SetPriorityClass`](https://lear
 - Reinicia somente um adaptador Bluetooth físico validado pelo inventário do Windows.
 - Mantém uma lista fechada de tarefas administrativas permitidas.
 - Salva relatórios de manutenção em `Documentos\Neck\Relatorios`.
+- Registra cada ajuste reversível antes de aplicá-lo e tenta restaurar qualquer pendência na próxima abertura.
+- Cria relatórios de suporte somente quando solicitado e nunca os envia automaticamente.
 
 O Neck normalmente é executado como usuário comum. A janela do UAC aparece somente quando você escolhe uma operação do Windows que realmente exige privilégios elevados, como DISM, SFC, otimização da unidade ou criação de ponto de restauração.
 
@@ -281,11 +295,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.15.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.16.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.15.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.16.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -295,7 +309,7 @@ Get-FileHash .\Neck-Setup-1.15.0.exe -Algorithm SHA256
 Baixe `Neck.exe` na mesma release e execute-o diretamente. Nenhuma instalação é necessária. As preferências e o histórico continuam armazenados no perfil local do Windows.
 
 > [!IMPORTANT]
-> Os binários da versão 1.15.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+> Os binários da versão 1.16.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
 
 ## Assinatura digital
 
@@ -377,6 +391,8 @@ NeckBaseline.cs            Aprendizado estatístico local, contextos e Índice d
 BaselineForm.cs            Faixas habituais e progresso do padrão personalizado
 Autopilot.cs               Previsão de tendência, limites e proteção preventiva reversível
 AutopilotForm.cs           Consentimento, estado e simulação segura do Autopilot
+RecoverySafety.cs          Diário transacional, recuperação de processo e proteção global contra falhas
+SupportReport.cs           Eventos sanitizados, relatório local e interface de suporte
 SosMode.cs                 Alívio seguro de sobrecarga
 EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
 TurboMode.cs               Prioridade de foco temporária e reversível
@@ -447,6 +463,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Neck Replay com caixa-preta local, classificação causal e linha do tempo
 - [x] Neck Baseline com padrão local, Índice de Fluxo e contexto de reunião
 - [x] Neck Autopilot com previsão de curto prazo, consentimento e restauração automática
+- [x] Recuperação após interrupções e relatório de suporte sanitizado
 - [x] Políticas, validação e pipeline de assinatura em duas fases
 - [ ] Aprovação SignPath e primeira release com Authenticode válido
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade

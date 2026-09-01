@@ -285,21 +285,46 @@ namespace Neck
                 saved.MemoryPriorityCaptured = TryGetMemoryPriority(handle, out originalMemory);
                 saved.OriginalMemoryPriority = originalMemory;
 
-                if (priority == NormalPriorityClass || priority == AboveNormalPriorityClass)
+                bool priorityPlanned = priority == NormalPriorityClass || priority == AboveNormalPriorityClass;
+                bool powerPlanned = saved.PowerCaptured;
+                bool memoryPlanned = saved.MemoryPriorityCaptured && saved.OriginalMemoryPriority.MemoryPriority > MemoryPriorityLow;
+                RecoveryRecord recovery = new RecoveryRecord
+                {
+                    Kind = RecoveryChangeKind.Efficiency,
+                    CreatedUtc = DateTime.UtcNow,
+                    ProcessId = saved.ProcessId,
+                    ProcessName = saved.ProcessName,
+                    StartTimeUtcTicks = saved.StartTimeUtcTicks,
+                    OriginalPriority = saved.OriginalPriority,
+                    PriorityChanged = priorityPlanned,
+                    PowerCaptured = saved.PowerCaptured,
+                    PowerChanged = powerPlanned,
+                    OriginalPower = saved.OriginalPower,
+                    MemoryPriorityCaptured = saved.MemoryPriorityCaptured,
+                    MemoryPriorityChanged = memoryPlanned,
+                    OriginalMemoryPriority = saved.OriginalMemoryPriority
+                };
+                bool recoveryReady = (!priorityPlanned && !powerPlanned && !memoryPlanned) || RecoveryJournal.Put(recovery);
+                if (!recoveryReady) result.AccessErrors++;
+
+                if (recoveryReady && priorityPlanned)
                 {
                     saved.PriorityChanged = SetPriorityClass(handle, BelowNormalPriorityClass);
                     if (saved.PriorityChanged) result.PriorityChanges++;
                 }
 
-                ProcessPowerThrottlingState efficient = CreateEfficiencyState(true);
-                saved.PowerChanged = TrySetPowerState(handle, ref efficient);
-                if (saved.PowerChanged) result.EfficiencyChanges++;
+                if (recoveryReady && powerPlanned)
+                {
+                    ProcessPowerThrottlingState efficient = CreateEfficiencyState(true);
+                    saved.PowerChanged = TrySetPowerState(handle, ref efficient);
+                    if (saved.PowerChanged) result.EfficiencyChanges++;
+                }
 
                 if (saved.MemoryPriorityCaptured && saved.OriginalMemoryPriority.MemoryPriority <= MemoryPriorityLow)
                 {
                     result.MemoryPriorityEffective++;
                 }
-                else if (saved.MemoryPriorityCaptured)
+                else if (recoveryReady && memoryPlanned)
                 {
                     MemoryPriorityInformation lowMemory = new MemoryPriorityInformation { MemoryPriority = MemoryPriorityLow };
                     saved.MemoryPriorityChanged = TrySetMemoryPriority(handle, ref lowMemory);
@@ -311,6 +336,12 @@ namespace Neck
                 }
 
                 saved.WorkingSetParked = TryParkWorkingSet(process, result);
+
+                recovery.PriorityChanged = saved.PriorityChanged;
+                recovery.PowerChanged = saved.PowerChanged;
+                recovery.MemoryPriorityChanged = saved.MemoryPriorityChanged;
+                if (saved.PriorityChanged || saved.PowerChanged || saved.MemoryPriorityChanged) RecoveryJournal.Put(recovery);
+                else RecoveryJournal.Remove(RecoveryChangeKind.Efficiency, saved.ProcessId, saved.StartTimeUtcTicks);
 
                 if (saved.PriorityChanged || saved.PowerChanged || saved.MemoryPriorityChanged || saved.WorkingSetParked)
                 {
@@ -346,13 +377,18 @@ namespace Neck
                     process = Process.GetProcessById(saved.ProcessId);
                     if (!string.Equals(process.ProcessName, saved.ProcessName, StringComparison.OrdinalIgnoreCase) || !IsSameProcess(process, saved))
                     {
+                        RecoveryJournal.Remove(RecoveryChangeKind.Efficiency, saved.ProcessId, saved.StartTimeUtcTicks);
                         restored.Add(saved.ProcessId);
                         continue;
                     }
                     result.ProcessesFound++;
                     if (RestoreProcess(process, saved, result)) restored.Add(saved.ProcessId);
                 }
-                catch (ArgumentException) { restored.Add(saved.ProcessId); }
+                catch (ArgumentException)
+                {
+                    RecoveryJournal.Remove(RecoveryChangeKind.Efficiency, saved.ProcessId, saved.StartTimeUtcTicks);
+                    restored.Add(saved.ProcessId);
+                }
                 catch { result.AccessErrors++; }
                 finally { if (process != null) process.Dispose(); }
             }
@@ -407,7 +443,8 @@ namespace Neck
                 }
 
                 if (changed || saved.WorkingSetParked) result.ProcessesChanged++;
-                if (!restored) result.AccessErrors++;
+                if (restored) RecoveryJournal.Remove(RecoveryChangeKind.Efficiency, saved.ProcessId, saved.StartTimeUtcTicks);
+                else result.AccessErrors++;
                 return restored;
             }
             finally
@@ -431,7 +468,12 @@ namespace Neck
                 }
                 catch { exited.Add(processId); }
             }
-            foreach (int processId in exited) session.Processes.Remove(processId);
+            foreach (int processId in exited)
+            {
+                EfficiencyModeProcessState saved = session.Processes[processId];
+                RecoveryJournal.Remove(RecoveryChangeKind.Efficiency, saved.ProcessId, saved.StartTimeUtcTicks);
+                session.Processes.Remove(processId);
+            }
         }
 
         private static bool TryGetPowerState(IntPtr handle, out ProcessPowerThrottlingState state)

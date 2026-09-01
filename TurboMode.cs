@@ -184,12 +184,31 @@ namespace Neck
                     StartTimeUtcTicks = GetStartTimeUtcTicks(process),
                     OriginalPriority = priority
                 };
+                RecoveryRecord recovery = new RecoveryRecord
+                {
+                    Kind = RecoveryChangeKind.Turbo,
+                    CreatedUtc = DateTime.UtcNow,
+                    ProcessId = saved.ProcessId,
+                    ProcessName = saved.ProcessName,
+                    StartTimeUtcTicks = saved.StartTimeUtcTicks,
+                    OriginalPriority = saved.OriginalPriority,
+                    PriorityChanged = true
+                };
+                if (!RecoveryJournal.Put(recovery))
+                {
+                    result.AccessErrors++;
+                    return;
+                }
                 if (SetPriorityClass(handle, AboveNormalPriorityClass))
                 {
                     session.Processes[process.Id] = saved;
                     result.ProcessesChanged++;
                 }
-                else result.AccessErrors++;
+                else
+                {
+                    RecoveryJournal.Remove(RecoveryChangeKind.Turbo, saved.ProcessId, saved.StartTimeUtcTicks);
+                    result.AccessErrors++;
+                }
             }
             catch { result.AccessErrors++; }
             finally { CloseHandle(handle); }
@@ -213,6 +232,7 @@ namespace Neck
                     process = Process.GetProcessById(saved.ProcessId);
                     if (!IsSameProcess(process, saved))
                     {
+                        RecoveryJournal.Remove(RecoveryChangeKind.Turbo, saved.ProcessId, saved.StartTimeUtcTicks);
                         restored.Add(saved.ProcessId);
                         continue;
                     }
@@ -227,6 +247,7 @@ namespace Neck
                     {
                         if (SetPriorityClass(handle, saved.OriginalPriority))
                         {
+                            RecoveryJournal.Remove(RecoveryChangeKind.Turbo, saved.ProcessId, saved.StartTimeUtcTicks);
                             restored.Add(saved.ProcessId);
                             result.ProcessesChanged++;
                         }
@@ -234,7 +255,11 @@ namespace Neck
                     }
                     finally { CloseHandle(handle); }
                 }
-                catch (ArgumentException) { restored.Add(saved.ProcessId); }
+                catch (ArgumentException)
+                {
+                    RecoveryJournal.Remove(RecoveryChangeKind.Turbo, saved.ProcessId, saved.StartTimeUtcTicks);
+                    restored.Add(saved.ProcessId);
+                }
                 catch { result.AccessErrors++; }
                 finally { if (process != null) process.Dispose(); }
             }
@@ -253,7 +278,12 @@ namespace Neck
                 }
                 catch { exited.Add(saved.ProcessId); }
             }
-            foreach (int processId in exited) session.Processes.Remove(processId);
+            foreach (int processId in exited)
+            {
+                TurboProcessState saved = session.Processes[processId];
+                RecoveryJournal.Remove(RecoveryChangeKind.Turbo, saved.ProcessId, saved.StartTimeUtcTicks);
+                session.Processes.Remove(processId);
+            }
         }
 
         private static bool IsSameProcess(Process process, TurboProcessState saved)

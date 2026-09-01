@@ -14,6 +14,10 @@ namespace Neck
                 Thread.Sleep(15000);
                 return 0;
             }
+            string recoveryTestPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "recovery-test.log");
+            try { if (System.IO.File.Exists(recoveryTestPath)) System.IO.File.Delete(recoveryTestPath); }
+            catch { }
+            RecoveryJournal.OverridePathForTesting(recoveryTestPath);
             try
             {
                 ScanResult result = Cleaner.Analyze();
@@ -24,6 +28,8 @@ namespace Neck
                     throw new InvalidOperationException("O inventário de hardware não retornou um resumo válido.");
                 if (hardware.Temperatures.Any(item => item.Celsius < 5d || item.Celsius > 125d))
                     throw new InvalidOperationException("Uma temperatura de hardware fora do intervalo seguro foi aceita.");
+                TestSupportReportPrivacy(hardware);
+                TestRecoveryLedgerRoundTrip();
                 BluetoothSnapshot bluetooth = BluetoothDoctor.Read();
                 if (bluetooth.CapturedUtc == DateTime.MinValue)
                     throw new InvalidOperationException("O diagnóstico Bluetooth não registrou o horário da leitura.");
@@ -93,6 +99,33 @@ namespace Neck
                         Console.WriteLine("ToolsPreview=" + previewPath);
                     }
                     tools.Close();
+                }
+                using (SupportReportForm support = new SupportReportForm(new GuardSettings(),
+                    new[] { new GuardSample { TimestampUtc = DateTime.UtcNow, MemoryPercent = 65, CpuPercent = 24 } },
+                    hardware, new RecoveryStartupResult()))
+                {
+                    support.ShowInTaskbar = false;
+                    support.StartPosition = FormStartPosition.Manual;
+                    support.Location = new System.Drawing.Point(-32000, -32000);
+                    support.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(support.Width, support.Height))
+                    {
+                        support.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, support.Width, support.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Support.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("SupportPreview=" + previewPath);
+                    }
+                    support.Size = support.MinimumSize;
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(support.Width, support.Height))
+                    {
+                        support.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, support.Width, support.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Support.Minimum.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("SupportMinimumPreview=" + previewPath);
+                    }
+                    support.Close();
                 }
                 if (!UpdateChecker.RepositoryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("O verificador de atualizações não aponta para HTTPS.");
@@ -745,6 +778,7 @@ namespace Neck
                     throw new InvalidOperationException("Neck Adaptive vazio permaneceu ativo.");
                 TestProcessFamilyDiscovery();
                 TestEfficiencyModeRoundTrip();
+                TestInterruptedRecovery();
                 TestTurboModeRoundTrip();
                 TestFocusModeRoundTrip();
                 TestFocusShieldRoundTrip();
@@ -815,6 +849,94 @@ namespace Neck
                 Console.Error.WriteLine("SELF_TEST_FAILED");
                 Console.Error.WriteLine(ex);
                 return 1;
+            }
+        }
+
+        private static void TestSupportReportPrivacy(HardwareSnapshot hardware)
+        {
+            string sensitive = @"C:\Users\" + Environment.UserName + @"\Documents\arquivo-pessoal.txt " + Environment.MachineName;
+            string sanitized = SupportDiagnostics.Sanitize(sensitive);
+            if (Environment.UserName.Length >= 3 && sanitized.IndexOf(Environment.UserName, StringComparison.OrdinalIgnoreCase) >= 0)
+                throw new InvalidOperationException("O sanitizador preservou o nome do usuário.");
+            if (Environment.MachineName.Length >= 3 && sanitized.IndexOf(Environment.MachineName, StringComparison.OrdinalIgnoreCase) >= 0)
+                throw new InvalidOperationException("O sanitizador preservou o nome do computador.");
+            GuardSample privateSample = new GuardSample
+            {
+                TimestampUtc = DateTime.UtcNow,
+                MemoryPercent = 72,
+                CpuPercent = 31,
+                DiskFreeBytes = 100L * 1024 * 1024 * 1024,
+                TopProcess = "AplicativoPrivadoDoTeste",
+                TopProcessBytes = 512L * 1024 * 1024
+            };
+            string report = SupportReportBuilder.BuildText(new GuardSettings { AutopilotEnabled = true },
+                new[] { privateSample }, hardware, new RecoveryStartupResult());
+            if (report.IndexOf("AplicativoPrivadoDoTeste", StringComparison.OrdinalIgnoreCase) >= 0)
+                throw new InvalidOperationException("O relatório de suporte expôs o nome de um aplicativo.");
+            if ((Environment.UserName.Length >= 3 && report.IndexOf(Environment.UserName, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                (Environment.MachineName.Length >= 3 && report.IndexOf(Environment.MachineName, StringComparison.OrdinalIgnoreCase) >= 0))
+                throw new InvalidOperationException("O relatório de suporte expôs a identidade local.");
+            if (report.IndexOf("RELATÓRIO DE SUPORTE SANITIZADO", StringComparison.OrdinalIgnoreCase) < 0 ||
+                report.IndexOf("PRIVACIDADE", StringComparison.OrdinalIgnoreCase) < 0 ||
+                report.IndexOf("não inclui nome de usuário", StringComparison.OrdinalIgnoreCase) < 0)
+                throw new InvalidOperationException("O relatório de suporte não explica sua privacidade.");
+            Console.WriteLine("SupportReportPrivacy=OK");
+        }
+
+        private static void TestRecoveryLedgerRoundTrip()
+        {
+            RecoveryRecord record = new RecoveryRecord
+            {
+                Kind = RecoveryChangeKind.Efficiency,
+                CreatedUtc = DateTime.UtcNow,
+                ProcessId = 424242,
+                ProcessName = "NeckRecoveryLedgerProbe",
+                StartTimeUtcTicks = DateTime.UtcNow.Ticks,
+                OriginalPriority = 0x20,
+                PriorityChanged = true
+            };
+            if (!RecoveryJournal.Put(record) || RecoveryJournal.Load().Count != 1)
+                throw new InvalidOperationException("O diário de recuperação não persistiu a alteração.");
+            if (!RecoveryJournal.Remove(record.Kind, record.ProcessId, record.StartTimeUtcTicks) || RecoveryJournal.PendingCount != 0)
+                throw new InvalidOperationException("O diário de recuperação não removeu a alteração restaurada.");
+            Console.WriteLine("RecoveryLedgerRoundTrip=OK");
+        }
+
+        private static void TestInterruptedRecovery()
+        {
+            string probePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NeckRecoveryProbe.exe");
+            System.Diagnostics.Process probe = null;
+            try
+            {
+                System.IO.File.Copy(Application.ExecutablePath, probePath, true);
+                probe = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = probePath,
+                    Arguments = "--efficiency-helper",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                Thread.Sleep(500);
+                EfficiencyModeResult applied = EfficiencyModeManager.Apply("NeckRecoveryProbe");
+                if (!applied.HasChanges || RecoveryJournal.PendingCount == 0)
+                    throw new InvalidOperationException("A alteração reversível não entrou no diário antes de ser aplicada.");
+                RecoveryStartupResult recovered = RecoveryManager.RestoreInterruptedChanges();
+                if (recovered.RestoredEntries < 1 || recovered.FailedEntries != 0 || RecoveryJournal.PendingCount != 0)
+                    throw new InvalidOperationException("A recuperação após interrupção não restaurou o processo de teste.");
+                EfficiencyModeManager.Restore("NeckRecoveryProbe");
+                Console.WriteLine("InterruptedRecovery=OK; Restored=" + recovered.RestoredEntries);
+            }
+            finally
+            {
+                EfficiencyModeManager.Restore("NeckRecoveryProbe");
+                if (probe != null)
+                {
+                    try { if (!probe.HasExited) probe.Kill(); }
+                    catch { }
+                    probe.Dispose();
+                }
+                try { if (System.IO.File.Exists(probePath)) System.IO.File.Delete(probePath); }
+                catch { }
             }
         }
 

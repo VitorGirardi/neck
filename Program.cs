@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.15.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.15.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.16.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.16.0.0")]
 
 namespace Neck
 {
@@ -39,6 +39,7 @@ namespace Neck
                 return;
             }
 
+            ApplicationSafety.Configure();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             bool startHidden = args != null && args.Any(item => string.Equals(item, "--background", StringComparison.OrdinalIgnoreCase));
@@ -55,7 +56,18 @@ namespace Neck
                     }
                     return;
                 }
-                Application.Run(new MainForm(startHidden));
+                RecoveryStartupResult recovery = RecoveryManager.BeginSession();
+                SupportDiagnostics.RecordEvent("Inicialização", "Neck iniciado. " + recovery.Summary);
+                try
+                {
+                    Application.Run(new MainForm(startHidden, false, recovery));
+                }
+                finally
+                {
+                    ApplicationSafety.RestoreActiveChanges("Encerramento seguro do Neck");
+                    RecoveryManager.CompleteSession();
+                    SupportDiagnostics.RecordEvent("Encerramento", "Neck encerrado com restauração segura.");
+                }
                 GC.KeepAlive(singleInstance);
             }
         }
@@ -496,6 +508,7 @@ namespace Neck
         private BaselineEvaluation _baselineEvaluation = new BaselineEvaluation();
         private readonly AutopilotEngine _autopilotEngine = new AutopilotEngine();
         private AutopilotDecision _autopilotDecision = new AutopilotDecision();
+        private readonly RecoveryStartupResult _recoveryStartup;
         private GuardSettings _guardSettings;
         private ToolStripMenuItem _startupMenuItem;
         private ToolStripMenuItem _notificationsMenuItem;
@@ -528,8 +541,9 @@ namespace Neck
         private static readonly string ReportDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Neck", "Relatorios");
 
-        public MainForm(bool startHidden = false, bool suppressOnboarding = false)
+        public MainForm(bool startHidden = false, bool suppressOnboarding = false, RecoveryStartupResult recoveryStartup = null)
         {
+            _recoveryStartup = recoveryStartup ?? RecoveryManager.LastResult;
             Text = "Neck";
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(980, 720);
@@ -1100,6 +1114,7 @@ namespace Neck
                 using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
             });
             menu.Items.Add("Modo Reunião", null, delegate { ShowFromTray(); ToggleMeetingMode(); });
+            menu.Items.Add("Suporte e recuperação", null, delegate { ShowFromTray(); ShowSupport(); });
             bool changingStartup = false;
             _startupMenuItem = new ToolStripMenuItem("Iniciar com o Windows") { CheckOnClick = true, Checked = StartupManager.IsEnabled() };
             _startupMenuItem.CheckedChanged += delegate
@@ -1280,8 +1295,17 @@ namespace Neck
             {
                 using (GuardHistoryForm form = new GuardHistoryForm(_guardSamples.ToList(), ReportDirectory)) form.ShowDialog(this);
             }
+            else if (choice == ToolHubChoice.Support)
+                ShowSupport();
             else if (choice == ToolHubChoice.Preferences)
                 ShowPreferences(false);
+        }
+
+        private void ShowSupport()
+        {
+            if (_closing || IsDisposed) return;
+            using (SupportReportForm form = new SupportReportForm(_guardSettings, _guardSamples.ToList(),
+                _hardwareSnapshot, _recoveryStartup)) form.ShowDialog(this);
         }
 
         private async Task ShowReplayAsync()
@@ -2029,11 +2053,13 @@ namespace Neck
                 AppendLog("Estimativa total: " + FormatBytes(result.TotalBytes));
                 if (result.AccessErrors > 0) AppendLog("Itens protegidos ignorados: " + result.AccessErrors);
                 AppendLog("Análise concluída. Nada foi apagado.");
+                SupportDiagnostics.RecordEvent("Análise", "Análise segura concluída; nada foi apagado. Itens protegidos ignorados: " + result.AccessErrors + ".");
             }
             catch (Exception ex)
             {
                 if (_closing || IsDisposed) return;
                 AppendLog("Falha na análise: " + ex.Message);
+                SupportDiagnostics.RecordException("Análise segura", ex);
             }
             finally
             {
@@ -2067,6 +2093,7 @@ namespace Neck
 
             SetBusy(true, "Executando manutenção...");
             _maintenanceRunning = true;
+            SupportDiagnostics.RecordEvent("Manutenção", "Manutenção iniciada com " + selected.Count + " tarefa(s) confirmada(s).");
             _log.Clear();
             AppendLog("MANUTENÇÃO — " + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
             StringBuilder report = new StringBuilder();
@@ -2142,10 +2169,12 @@ namespace Neck
                     MessageBox.Show(completion, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 else
                     _trayIcon.ShowBalloonTip(6000, "Manutenção concluída", completion, ToolTipIcon.Info);
+                SupportDiagnostics.RecordEvent("Manutenção", "Manutenção concluída. Espaço liberado diretamente: " + FormatBytes(freed) + ".");
             }
             catch (Exception ex)
             {
                 AppendLog("A manutenção foi interrompida: " + ex.Message);
+                SupportDiagnostics.RecordException("Manutenção", ex);
                 try
                 {
                     Directory.CreateDirectory(ReportDirectory);
@@ -2257,6 +2286,7 @@ namespace Neck
         Bluetooth,
         Replay,
         History,
+        Support,
         Preferences
     }
 
@@ -2308,18 +2338,20 @@ namespace Neck
                 Dock = DockStyle.Fill,
                 Padding = new Padding(24, 22, 24, 14),
                 ColumnCount = 2,
-                RowCount = 3,
+                RowCount = 4,
                 BackColor = Theme.Background
             };
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            for (int row = 0; row < 3; row++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
+            for (int row = 0; row < 4; row++) grid.RowStyles.Add(new RowStyle(SizeType.Percent, 25f));
             grid.Controls.Add(CreateTool("Meu plano", "Três prioridades escolhidas para este computador.", ToolHubChoice.Plan), 0, 0);
             grid.Controls.Add(CreateTool("Cura Bluetooth", "Restaura a conexão sem apagar pareamentos.", ToolHubChoice.Bluetooth), 1, 0);
             grid.Controls.Add(CreateTool(_meetingActive ? "Encerrar modo reunião" : "Modo reunião", "Evita suspensão durante chamadas e apresentações.", ToolHubChoice.Meeting), 0, 1);
             grid.Controls.Add(CreateTool("Inicialização", "Veja o que abre junto com o Windows.", ToolHubChoice.Startup), 1, 1);
             grid.Controls.Add(CreateTool("Diagnóstico", "Detalhes de CPU, memória e armazenamento.", ToolHubChoice.Diagnostic), 0, 2);
             grid.Controls.Add(CreateTool("Drivers", "Confira atualizações pelas fontes oficiais.", ToolHubChoice.Drivers), 1, 2);
+            grid.Controls.Add(CreateTool("Neck Replay", "Entenda por que o computador acabou de travar.", ToolHubChoice.Replay), 0, 3);
+            grid.Controls.Add(CreateTool("Suporte", "Crie um relatório privado e recupere interrupções.", ToolHubChoice.Support), 1, 3);
 
             Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 86, BackColor = Color.White, Padding = new Padding(28, 14, 28, 14) };
             _continueInTray.Text = "Continuar protegendo na bandeja ao fechar";
@@ -2337,15 +2369,6 @@ namespace Neck
                 Location = new Point(425, 17)
             };
             history.Click += delegate { Choose(ToolHubChoice.History); };
-            LinkLabel replay = new LinkLabel
-            {
-                Text = "Neck Replay",
-                AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
-                LinkColor = Theme.Cyan,
-                Location = new Point(320, 17)
-            };
-            replay.Click += delegate { Choose(ToolHubChoice.Replay); };
             Button preferences = new AnimatedButton();
             ConfigureToolButton(preferences, "Preferências", Theme.NavySoft, 130);
             preferences.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -2365,7 +2388,6 @@ namespace Neck
             ToolTip tip = new ToolTip();
             tip.SetToolTip(_continueInTray, status);
             footer.Controls.Add(_continueInTray);
-            footer.Controls.Add(replay);
             footer.Controls.Add(history);
             footer.Controls.Add(preferences);
             footer.Controls.Add(close);

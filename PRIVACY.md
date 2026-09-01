@@ -21,9 +21,11 @@ O Neck não baixa nem instala silenciosamente atualizações próprias, aplicati
 - Preferências e histórico recente do Neck Guard: `%LOCALAPPDATA%\Neck`
 - Padrão estatístico agregado do Neck Baseline: `%LOCALAPPDATA%\Neck\baseline-v1.txt`
 - Relatórios de manutenção escolhidos pelo usuário: `Documentos\Neck\Relatorios`
+- Eventos técnicos sanitizados e diário de recuperação: `%LOCALAPPDATA%\Neck`
+- Relatórios de suporte criados pelo usuário: `Documentos\Neck\Suporte`
 - Histórico do Guard: limitado às últimas 24 horas
 
-Esses dados permanecem no computador. Para removê-los, desinstale o Neck e apague as duas pastas acima, caso ainda existam. A versão portátil utiliza os mesmos locais para manter as preferências entre execuções.
+Esses dados permanecem no computador. Para removê-los, desinstale o Neck e apague `%LOCALAPPDATA%\Neck` e `Documentos\Neck`, caso ainda existam. A versão portátil utiliza os mesmos locais para manter as preferências entre execuções.
 
 ## Neck Replay
 
@@ -42,6 +44,18 @@ O arquivo do Baseline não contém nomes de aplicativos ou processos, títulos d
 O Neck Autopilot vem desativado e sua escolha de ativação é guardada junto das preferências locais. Para prever tendências, ele mantém somente na memória uma sequência curta das mesmas métricas locais usadas pelo Replay e pelo Baseline. Essa sequência desaparece ao encerrar o Neck e não cria um novo histórico no disco.
 
 Quando ativado, o Autopilot pode guardar em memória o nome de até dois aplicativos temporariamente protegidos para conseguir restaurá-los. Esses nomes não são enviados nem persistidos. A simulação interna utiliza nomes e leituras artificiais e não examina ou altera aplicativos reais.
+
+## Recuperação automática
+
+Antes de alterar temporariamente prioridade de CPU, EcoQoS ou prioridade de memória, o Neck grava em `%LOCALAPPDATA%\Neck\recovery-state.log` um diário mínimo com o tipo da mudança, PID, nome técnico do processo, horário de início e estado original necessário para desfazê-la. A entrada é removida assim que a restauração termina. Um marcador local permite reconhecer que a execução anterior foi interrompida.
+
+Na próxima abertura, o Neck só restaura uma entrada se PID, nome técnico e horário de início ainda identificarem exatamente o mesmo processo. Entradas de processos encerrados ou reutilizados são descartadas. Esses registros não são enviados e os nomes técnicos não entram no relatório de suporte.
+
+## Falhas e relatório de suporte
+
+Exceções inesperadas são registradas localmente em `%LOCALAPPDATA%\Neck\Diagnostics\events.log`. O Neck remove nomes de usuário e computador, endereços de e-mail e caminhos absolutos conhecidos antes de persistir mensagens e detalhes técnicos. O arquivo é limitado e compactado localmente.
+
+Somente ao clicar em **Criar relatório**, o Neck gera um texto em `Documentos\Neck\Suporte` com versão do aplicativo e do Windows, hardware resumido, preferências não sensíveis, métricas agregadas de RAM/CPU, contagens de recuperação e eventos sanitizados. Ele exclui a lista e os nomes dos processos do histórico. O relatório não é enviado, copiado nem anexado automaticamente; a pessoa deve revisá-lo e decidir onde compartilhá-lo.
 
 ## Operações administrativas
 
