@@ -543,9 +543,6 @@ namespace Neck
         private AutopilotDecision _autopilotDecision = new AutopilotDecision();
         private readonly RecoveryStartupResult _recoveryStartup;
         private GuardSettings _guardSettings;
-        private ToolStripMenuItem _startupMenuItem;
-        private ToolStripMenuItem _notificationsMenuItem;
-        private ToolStripMenuItem _fullscreenMenuItem;
         private List<GuardSample> _guardSamples = new List<GuardSample>();
         private long _analyzedBytes;
         private bool _busy;
@@ -1195,17 +1192,33 @@ namespace Neck
                 _guardSettings.Save();
             };
 
-            ContextMenuStrip menu = new ContextMenuStrip();
+            ContextMenuStrip menu = new ContextMenuStrip
+            {
+                Font = Theme.Body,
+                ShowCheckMargin = false,
+                ShowImageMargin = false
+            };
             ToolStripMenuItem status = new ToolStripMenuItem("Neck Guard iniciando...") { Enabled = false };
             status.Name = "status";
             menu.Items.Add(status);
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
+
+            ToolStripMenuItem openNeck = new ToolStripMenuItem("Abrir Neck")
+            {
+                Font = new Font(Theme.Body, FontStyle.Bold)
+            };
+            openNeck.Click += delegate { ShowFromTray(); };
+            menu.Items.Add(openNeck);
             menu.Items.Add("Acelerar aplicativo", null, delegate { ShowFromTray(); OpenSos(); });
-            menu.Items.Add("Meu padrão Neck", null, delegate { ShowFromTray(); ShowBaseline(); });
-            menu.Items.Add("Neck Autopilot", null, delegate { ShowFromTray(); ShowAutopilot(); });
-            menu.Items.Add("Neck Replay", null, async delegate { ShowFromTray(); await ShowReplayAsync(); });
-            menu.Items.Add("Parar aceleração", null, delegate
+
+            ToolStripMenuItem meeting = new ToolStripMenuItem("Modo reunião");
+            meeting.Click += delegate { ShowFromTray(); ToggleMeetingMode(); };
+            menu.Items.Add(meeting);
+
+            ToolStripMenuItem activeActions = new ToolStripMenuItem("Ações em andamento");
+            activeActions.Visible = false;
+            ToolStripMenuItem stopFocus = new ToolStripMenuItem("Encerrar aceleração");
+            stopFocus.Click += delegate
             {
                 if (!FocusModeManager.IsActive)
                 {
@@ -1216,10 +1229,10 @@ namespace Neck
                 FocusModeManager.Stop();
                 _trayIcon.ShowBalloonTip(3000, "Aceleração encerrada", displayName + " voltou ao funcionamento normal.", ToolTipIcon.Info);
                 UpdateGuardView(_healthSnapshot);
-            });
-            menu.Items.Add("Parar reduções em segundo plano", null, async delegate
+            };
+            ToolStripMenuItem restoreBackground = new ToolStripMenuItem("Restaurar apps em segundo plano");
+            restoreBackground.Click += async delegate
             {
-                if (FocusModeManager.IsActive) FocusModeManager.Stop();
                 if (EfficiencyModeManager.ActiveCount == 0)
                 {
                     _trayIcon.ShowBalloonTip(2500, "Segundo plano", "Nenhum aplicativo está usando menos recursos.", ToolTipIcon.Info);
@@ -1227,49 +1240,50 @@ namespace Neck
                 }
                 EfficiencyModeResult result = await Task.Run(delegate { return EfficiencyModeManager.RestoreAll(); });
                 _trayIcon.ShowBalloonTip(3000, "Segundo plano", "Configurações originais restauradas em " + result.ProcessesChanged + " processo(s).", ToolTipIcon.Info);
-            });
-            menu.Items.Add("Abrir diagnóstico", null, delegate
+            };
+            activeActions.DropDownItems.Add(stopFocus);
+            activeActions.DropDownItems.Add(restoreBackground);
+            menu.Items.Add(activeActions);
+
+            menu.Items.Add(new ToolStripSeparator());
+            ToolStripMenuItem more = new ToolStripMenuItem("Mais opções");
+            more.DropDownItems.Add("Central de ferramentas...", null, async delegate
             {
                 ShowFromTray();
-                HealthSnapshot snapshot = _healthSnapshot;
-                if (snapshot == null || DateTime.UtcNow - _lastReplayCaptureUtc >= TimeSpan.FromSeconds(20))
-                    snapshot = SystemInfo.GetHealthSnapshot();
-                using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
+                await ShowToolsHubAsync();
             });
-            menu.Items.Add("Modo Reunião", null, delegate { ShowFromTray(); ToggleMeetingMode(); });
-            menu.Items.Add("Suporte e recuperação", null, delegate { ShowFromTray(); ShowSupport(); });
-            bool changingStartup = false;
-            _startupMenuItem = new ToolStripMenuItem("Iniciar com o Windows") { CheckOnClick = true, Checked = StartupManager.IsEnabled() };
-            _startupMenuItem.CheckedChanged += delegate
-            {
-                if (changingStartup) return;
-                try
-                {
-                    StartupManager.SetEnabled(_startupMenuItem.Checked);
-                    if (_startupMenuItem.Checked) _backgroundCheck.Checked = true;
-                }
-                catch (Exception ex)
-                {
-                    changingStartup = true;
-                    _startupMenuItem.Checked = !_startupMenuItem.Checked;
-                    changingStartup = false;
-                    MessageBox.Show("Não foi possível alterar a inicialização do Neck.\n\n" + ex.Message, "Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            };
-            menu.Items.Add(_startupMenuItem);
-            _notificationsMenuItem = new ToolStripMenuItem("Exibir notificações") { CheckOnClick = true, Checked = _guardSettings.Notifications };
-            _notificationsMenuItem.CheckedChanged += delegate { _guardSettings.Notifications = _notificationsMenuItem.Checked; _guardSettings.Save(); };
-            menu.Items.Add(_notificationsMenuItem);
-            _fullscreenMenuItem = new ToolStripMenuItem("Silenciar em tela cheia") { CheckOnClick = true, Checked = _guardSettings.SilenceFullscreen };
-            _fullscreenMenuItem.CheckedChanged += delegate { _guardSettings.SilenceFullscreen = _fullscreenMenuItem.Checked; _guardSettings.Save(); };
-            menu.Items.Add(_fullscreenMenuItem);
-            menu.Items.Add("Preferências", null, delegate { ShowFromTray(); ShowPreferences(false); });
-            menu.Items.Add("Silenciar alertas por 2 horas", null, delegate
+            more.DropDownItems.Add(new ToolStripSeparator());
+            more.DropDownItems.Add("Meu padrão Neck", null, delegate { ShowFromTray(); ShowBaseline(); });
+            more.DropDownItems.Add("Neck Autopilot", null, delegate { ShowFromTray(); ShowAutopilot(); });
+            more.DropDownItems.Add(new ToolStripSeparator());
+            ToolStripMenuItem silenceAlerts = new ToolStripMenuItem("Pausar alertas por 2 horas");
+            silenceAlerts.Click += delegate
             {
                 _guardSettings.SilentUntilUtc = DateTime.UtcNow.AddHours(2);
                 _guardSettings.Save();
-                _trayIcon.ShowBalloonTip(2500, "Neck Guard", "Alertas silenciados por duas horas.", ToolTipIcon.Info);
-            });
+                _trayIcon.ShowBalloonTip(2500, "Neck", "Alertas pausados por duas horas.", ToolTipIcon.Info);
+            };
+            more.DropDownItems.Add(silenceAlerts);
+            menu.Items.Add(more);
+            menu.Items.Add("Preferências", null, delegate { ShowFromTray(); ShowPreferences(false); });
+
+            menu.Opening += delegate
+            {
+                bool focusActive = FocusModeManager.IsActive;
+                bool backgroundActive = EfficiencyModeManager.ActiveCount > 0;
+                meeting.Text = _meetingActive ? "Encerrar modo reunião" : "Modo reunião";
+                stopFocus.Visible = focusActive;
+                stopFocus.Text = focusActive && !string.IsNullOrWhiteSpace(FocusModeManager.ActiveDisplayName)
+                    ? "Encerrar aceleração de " + FocusModeManager.ActiveDisplayName
+                    : "Encerrar aceleração";
+                restoreBackground.Visible = backgroundActive;
+                activeActions.Visible = focusActive || backgroundActive;
+                silenceAlerts.Enabled = _guardSettings.SilentUntilUtc <= DateTime.UtcNow;
+                silenceAlerts.Text = silenceAlerts.Enabled
+                    ? "Pausar alertas por 2 horas"
+                    : "Alertas pausados até " + _guardSettings.SilentUntilUtc.ToLocalTime().ToString("HH:mm");
+            };
+
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Sair do Neck", null, delegate
             {
@@ -1298,6 +1312,15 @@ namespace Neck
             UpdateGuardView(_healthSnapshot);
         }
 
+        internal string[] GetVisibleTrayLabelsForTesting()
+        {
+            if (_trayIcon.ContextMenuStrip == null) return new string[0];
+            return _trayIcon.ContextMenuStrip.Items.Cast<ToolStripItem>()
+                .Where(item => item.Available && !(item is ToolStripSeparator))
+                .Select(item => item.Text)
+                .ToArray();
+        }
+
         private void ShowPreferences(bool firstRun)
         {
             if (_closing || IsDisposed) return;
@@ -1307,9 +1330,6 @@ namespace Neck
             }
 
             _backgroundCheck.Checked = _guardSettings.ContinueInTray;
-            if (_startupMenuItem != null) _startupMenuItem.Checked = StartupManager.IsEnabled();
-            if (_notificationsMenuItem != null) _notificationsMenuItem.Checked = _guardSettings.Notifications;
-            if (_fullscreenMenuItem != null) _fullscreenMenuItem.Checked = _guardSettings.SilenceFullscreen;
             VisualEffects.ReduceMotion = _guardSettings.ReduceMotion;
             if (!_guardSettings.AutopilotEnabled)
             {
