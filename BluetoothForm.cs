@@ -438,7 +438,9 @@ namespace Neck
                     " timeout(s) e " + _snapshot.RecentDriverUnloads.ToString(CultureInfo.CurrentCulture) +
                     " queda(s) do driver; última às " + lastFailure + ".";
                 _repairButton.Text = repairBlock.IsBlocked
-                    ? "Pausa de segurança · " + repairBlock.RemainingMinutes(DateTime.UtcNow).ToString(CultureInfo.CurrentCulture) + " min"
+                    ? repairBlock.UntilRestart
+                        ? "Correção bloqueada"
+                        : "Pausa de segurança · " + repairBlock.RemainingMinutes(DateTime.UtcNow).ToString(CultureInfo.CurrentCulture) + " min"
                     : "Tentar correção uma vez";
                 _repairButton.Width = 285;
                 _settingsButton.Text = "Reset elétrico guiado";
@@ -478,9 +480,10 @@ namespace Neck
                 _repairButton.Text = "Tentar corrigir agora";
                 _repairButton.Width = 250;
                 _settingsButton.Visible = true;
-                _settingsButton.Text = "Abrir Bluetooth";
-                _settingsButton.Width = 175;
-                _actionDetail.Text = "A cura redetecta o rádio e restaura os serviços sem apagar dispositivos pareados.";
+                _settingsButton.Text = "Reset elétrico guiado";
+                _settingsButton.Width = 215;
+                _settingsOpenPowerReset = true;
+                _actionDetail.Text = "Tente uma correção; se o rádio continuar ausente, use o reset elétrico guiado sem repetir o ciclo.";
             }
             else
             {

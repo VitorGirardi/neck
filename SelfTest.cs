@@ -920,6 +920,7 @@ namespace Neck
             BluetoothSnapshot unstable = new BluetoothSnapshot
             {
                 CapturedUtc = nowUtc,
+                BootedUtc = nowUtc.AddHours(-1),
                 PowerState = BluetoothPowerState.On,
                 RecentTransportTimeouts = 5,
                 RecentDriverUnloads = 2,
@@ -947,7 +948,7 @@ namespace Neck
                 throw new InvalidOperationException("Uma queda BTHUSB recente foi confundida com Bluetooth estável.");
 
             BluetoothRepairBlock repeated = BluetoothRepairGuard.Evaluate(unstable, nowUtc, null);
-            if (!repeated.IsBlocked || repeated.RemainingMinutes(nowUtc) < 1)
+            if (!repeated.IsBlocked || !repeated.UntilRestart)
                 throw new InvalidOperationException("A proteção anti-loop não bloqueou falhas repetidas do driver.");
 
             unstable.RecentTransportTimeouts = 1;
@@ -959,6 +960,11 @@ namespace Neck
             BluetoothRepairBlock failedAttempt = BluetoothRepairGuard.Evaluate(unstable, nowUtc, nowUtc.AddSeconds(-30));
             if (!failedAttempt.IsBlocked)
                 throw new InvalidOperationException("A queda posterior à correção não ativou o bloqueio temporário.");
+
+            BluetoothSnapshot afterRestart = new BluetoothSnapshot { BootedUtc = nowUtc.AddMinutes(1) };
+            BluetoothRepairBlock clearedByRestart = BluetoothRepairGuard.Evaluate(afterRestart, nowUtc.AddMinutes(2), nowUtc);
+            if (clearedByRestart.IsBlocked)
+                throw new InvalidOperationException("Uma tentativa da inicialização anterior continuou bloqueando o Bluetooth após o reset elétrico.");
         }
 
         private static void TestBluetoothPowerResetPlan()
