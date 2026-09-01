@@ -46,35 +46,46 @@ try {
     $graphics.FillEllipse($accentBrush, -90, 390, 520, 380)
     $accentBrush.Dispose()
 
-    $markX = 72
-    $markY = 62
-    $markScale = 1.15
     $darkBrush = New-Object System.Drawing.SolidBrush($ink)
     $limeBrush = New-Object System.Drawing.SolidBrush($lime)
-    $left = [System.Drawing.PointF[]]@(
-        [System.Drawing.PointF]::new($markX, $markY),
-        [System.Drawing.PointF]::new($markX + 24 * $markScale, $markY),
-        [System.Drawing.PointF]::new($markX + 34 * $markScale, $markY + 32 * $markScale),
-        [System.Drawing.PointF]::new($markX + 24 * $markScale, $markY + 64 * $markScale),
-        [System.Drawing.PointF]::new($markX, $markY + 64 * $markScale),
-        [System.Drawing.PointF]::new($markX + 12 * $markScale, $markY + 32 * $markScale)
-    )
-    $right = [System.Drawing.PointF[]]@(
-        [System.Drawing.PointF]::new($markX + 76 * $markScale, $markY),
-        [System.Drawing.PointF]::new($markX + 52 * $markScale, $markY),
-        [System.Drawing.PointF]::new($markX + 42 * $markScale, $markY + 32 * $markScale),
-        [System.Drawing.PointF]::new($markX + 52 * $markScale, $markY + 64 * $markScale),
-        [System.Drawing.PointF]::new($markX + 76 * $markScale, $markY + 64 * $markScale),
-        [System.Drawing.PointF]::new($markX + 64 * $markScale, $markY + 32 * $markScale)
-    )
-    $graphics.FillPolygon($darkBrush, $left)
-    $graphics.FillPolygon($darkBrush, $right)
+    $leftMark = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $leftMark.StartFigure()
+    $leftMark.AddLine(38, 24, 88, 24)
+    $leftMark.AddBezier(88, 24, 88, 72, 97, 104, 122, 128)
+    $leftMark.AddBezier(122, 128, 97, 152, 88, 184, 88, 232)
+    $leftMark.AddLine(88, 232, 38, 232)
+    $leftMark.AddBezier(38, 232, 38, 180, 51, 148, 76, 128)
+    $leftMark.AddBezier(76, 128, 51, 108, 38, 76, 38, 24)
+    $leftMark.CloseFigure()
+
+    $rightMark = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $rightMark.StartFigure()
+    $rightMark.AddLine(218, 24, 168, 24)
+    $rightMark.AddBezier(168, 24, 168, 72, 159, 104, 134, 128)
+    $rightMark.AddBezier(134, 128, 159, 152, 168, 184, 168, 232)
+    $rightMark.AddLine(168, 232, 218, 232)
+    $rightMark.AddBezier(218, 232, 218, 180, 205, 148, 180, 128)
+    $rightMark.AddBezier(180, 128, 205, 108, 218, 76, 218, 24)
+    $rightMark.CloseFigure()
+
+    $markState = $graphics.Save()
+    $graphics.TranslateTransform(62, 54)
+    $graphics.ScaleTransform(0.42, 0.42)
+    $graphics.FillPath($darkBrush, $leftMark)
+    $graphics.FillPath($darkBrush, $rightMark)
+    $flowPen = New-Object System.Drawing.Pen($lime, 18)
+    $flowPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $flowPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $graphics.DrawLine($flowPen, 58, 128, 182, 128)
     $graphics.FillPolygon($limeBrush, [System.Drawing.PointF[]]@(
-        [System.Drawing.PointF]::new($markX + 23 * $markScale, $markY + 32 * $markScale),
-        [System.Drawing.PointF]::new($markX + 40 * $markScale, $markY + 20 * $markScale),
-        [System.Drawing.PointF]::new($markX + 57 * $markScale, $markY + 32 * $markScale),
-        [System.Drawing.PointF]::new($markX + 40 * $markScale, $markY + 44 * $markScale)
+        [System.Drawing.PointF]::new(176, 105),
+        [System.Drawing.PointF]::new(206, 128),
+        [System.Drawing.PointF]::new(176, 151)
     ))
+    $graphics.Restore($markState)
+    $flowPen.Dispose()
+    $leftMark.Dispose()
+    $rightMark.Dispose()
 
     $brandFont = New-Font 'Segoe UI Variable Display' 58 ([System.Drawing.FontStyle]::Bold)
     $eyebrowFont = New-Font 'Segoe UI Semibold' 19 ([System.Drawing.FontStyle]::Bold)
