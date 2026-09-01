@@ -48,7 +48,7 @@ A página inicial foi organizada para qualquer pessoa entender por onde começar
 - **Acelerar um aplicativo** é a ação principal quando algo importante está travando.
 - **Limpar arquivos** remove somente temporários conhecidos e mostra antes quanto pode ser liberado.
 - **Revisar o computador** reúne os cuidados mensais do Windows em uma etapa separada.
-- **Mais ferramentas** guarda recursos ocasionais como Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
+- **Mais ferramentas** guarda recursos ocasionais como Neck Replay, Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
 
 Assim, nenhuma ferramenta foi removida: as ações mais importantes aparecem primeiro e os controles ocasionais ficam em uma segunda camada.
 
@@ -72,6 +72,7 @@ A animação ocorre por um intervalo curto após cada diagnóstico e não perman
 
 | Recurso | O que faz | Proteção principal |
 | --- | --- | --- |
+| **Neck Replay** | Preserva os últimos cinco minutos em memória e explica por que o computador acabou de travar. | Só confirma pressão persistente, não grava conteúdo de janelas e não executa ações sozinho. |
 | **Gargalo Guiado** | Distingue pressão de memória, CPU e armazenamento e recomenda a ação mais útil naquele momento. | Explica o motivo e mantém a confirmação com o usuário. |
 | **Monitor Inteligente** | Ajusta o intervalo de leitura conforme a pressão, confirma persistência e reconhece a recuperação. | Não limpa, fecha ou altera aplicativos automaticamente. |
 | **Escudo de Foco** | Reduz temporariamente a disputa de até três aplicativos pesados quando o aplicativo escolhido está em uso. | Só age sob pressão, protege comunicação e restaura ao trocar de janela. |
@@ -105,6 +106,24 @@ O cartão principal agora funciona como uma orientação única, não como um pa
 O monitor trabalha de forma adaptativa: verifica a cada 60 segundos quando o computador está fluindo, a cada 30 segundos durante atenção e a cada 15 segundos em situação crítica. Um alerta só é liberado depois de três leituras consecutivas de pressão. Depois, duas leituras estáveis confirmam a recuperação e o intervalo volta ao normal.
 
 Essas leituras e decisões acontecem localmente. O monitor não fecha processos, não executa limpeza e não modifica o Windows por conta própria.
+
+## Neck Replay: a caixa-preta do gargalo
+
+O **Neck Replay** responde à pergunta que o Gerenciador de Tarefas normalmente não consegue responder depois que um pico termina: **“por que o computador travou alguns minutos atrás?”**
+
+A cada dez segundos, uma janela circular mantida somente na memória combina:
+
+- RAM usada, memória realmente disponível, commit e leituras de paginação;
+- uso e fila da CPU, incluindo o aplicativo mais associado ao pico;
+- atividade, fila e latência do armazenamento;
+- resposta da janela em primeiro plano;
+- maior temperatura local confiável já exposta pelo inventário de hardware.
+
+O classificador exige combinação causal e persistência. Por exemplo, 74% de RAM com vários gigabytes disponíveis não vira incidente apenas por parecer um número alto. Pressão de memória só é confirmada quando a perda de folga, o commit ou a paginação sustentam a hipótese. Picos graves precisam de duas leituras; os demais, de três. Duas leituras estáveis encerram o incidente e preservam a explicação até que a janela seja descartada.
+
+Quando o fluxo volta, o cartão principal oferece **Ver o que aconteceu**. A tela apresenta duração, pico, aplicativo associado, evidência técnica e uma única próxima ação segura. O Replay não fecha programas, não limpa arquivos e não altera prioridades automaticamente.
+
+![Neck Replay explicando um gargalo real de memória](assets/screenshots/neck-replay.png)
 
 ## Hardware e temperaturas
 
@@ -228,11 +247,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.12.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.13.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.12.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.13.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -242,7 +261,7 @@ Get-FileHash .\Neck-Setup-1.12.0.exe -Algorithm SHA256
 Baixe `Neck.exe` na mesma release e execute-o diretamente. Nenhuma instalação é necessária. As preferências e o histórico continuam armazenados no perfil local do Windows.
 
 > [!IMPORTANT]
-> Os binários da versão 1.12.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+> Os binários da versão 1.13.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
 
 ## Assinatura digital
 
@@ -317,6 +336,8 @@ Program.cs                 Interface principal e manutenção segura
 SystemMonitoring.cs        Diagnóstico de CPU, memória, disco e reunião
 GuardMonitoring.cs         Monitoramento contínuo, histórico e bandeja
 BottleneckGuidance.cs      Gargalo Guiado, monitor adaptativo e medição de resultado
+NeckReplay.cs              Caixa-preta, PDH, classificação causal e incidentes em memória
+ReplayForm.cs              Explicação visual e linha do tempo dos últimos cinco minutos
 SosMode.cs                 Alívio seguro de sobrecarga
 EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
 TurboMode.cs               Prioridade de foco temporária e reversível
@@ -357,6 +378,8 @@ Contribuições também devem respeitar a [política de segurança](SECURITY.md)
 
 O Neck ajuda a diagnosticar e reduzir sobrecarga, mas não substitui backup, antivírus, suporte técnico ou uma atualização de hardware. Ele não consegue transformar falta física de RAM em memória adicional e não promete acelerar todos os computadores.
 
+As causas mostradas pelo Replay são inferências locais baseadas na coincidência e persistência de sinais do Windows. Elas explicam a evidência observada, mas não substituem uma análise especializada de hardware quando a falha é intermitente ou física.
+
 Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware. Leia cada recomendação e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Roadmap
@@ -378,6 +401,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Escudo de Foco sensível a RAM e CPU, com restauração imediata
 - [x] Inventário de hardware e temperaturas locais com fontes explícitas
 - [x] Cura Bluetooth com diagnóstico, reinício seletivo e nova detecção
+- [x] Neck Replay com caixa-preta local, classificação causal e linha do tempo
 - [x] Políticas, validação e pipeline de assinatura em duas fases
 - [ ] Aprovação SignPath e primeira release com Authenticode válido
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade

@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.12.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.12.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.13.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.13.0.0")]
 
 namespace Neck
 {
@@ -483,11 +483,14 @@ namespace Neck
         private readonly Timer _guardMonitorTimer = new Timer();
         private readonly Timer _adaptiveTimer = new Timer();
         private readonly Timer _hardwareTimer = new Timer();
+        private readonly Timer _replayTimer = new Timer();
         private readonly NotifyIcon _trayIcon = new NotifyIcon();
         private Icon _trayStableIcon;
         private readonly GuardHistoryStore _guardHistory = new GuardHistoryStore();
         private readonly GuardPressureDetector _guardDetector = new GuardPressureDetector();
         private readonly SmartGuardMonitor _smartMonitor = new SmartGuardMonitor();
+        private readonly ReplayEngine _replayEngine = new ReplayEngine();
+        private readonly ReplayProbe _replayProbe = new ReplayProbe();
         private GuardSettings _guardSettings;
         private ToolStripMenuItem _startupMenuItem;
         private ToolStripMenuItem _notificationsMenuItem;
@@ -509,6 +512,9 @@ namespace Neck
         private DateTime _lastOutcomeShownUtc = DateTime.MinValue;
         private HardwareSnapshot _hardwareSnapshot;
         private bool _hardwareRefreshing;
+        private bool _replayCapturing;
+        private bool _showReplayAsPrimary;
+        private DateTime _lastReplayCaptureUtc = DateTime.MinValue;
 
         private static readonly string DataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neck");
@@ -572,6 +578,9 @@ namespace Neck
                 if (Visible && !_closing) await RefreshHardwareAsync(false);
             };
             _hardwareTimer.Start();
+            _replayTimer.Interval = 10000;
+            _replayTimer.Tick += async delegate { await CaptureReplayAsync(); };
+            _replayTimer.Start();
 
             if (!startHidden)
             {
@@ -582,6 +591,7 @@ namespace Neck
                 };
             }
             Shown += delegate { CaptureGuardSample(); };
+            Shown += async delegate { await CaptureReplayAsync(); };
             Shown += async delegate { await RefreshHardwareAsync(true); };
             Shown += delegate { if (!startHidden) VisualEffects.FadeIn(this); };
             if (startHidden)
@@ -602,6 +612,8 @@ namespace Neck
                 _guardMonitorTimer.Stop();
                 _adaptiveTimer.Stop();
                 _hardwareTimer.Stop();
+                _replayTimer.Stop();
+                _replayProbe.Dispose();
                 FocusModeManager.Stop();
                 EfficiencyModeManager.RestoreAll();
                 _trayIcon.Visible = false;
@@ -863,6 +875,11 @@ namespace Neck
             _meetingButton.Click += delegate { ToggleMeetingMode(); };
             _guardButton.Click += async delegate
             {
+                if (_showReplayAsPrimary)
+                {
+                    await ShowReplayAsync();
+                    return;
+                }
                 if (_currentAdvice != null && _currentAdvice.Kind == BottleneckKind.Disk)
                 {
                     _tempCheck.Checked = true;
@@ -1021,6 +1038,7 @@ namespace Neck
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
             menu.Items.Add("Acelerar aplicativo", null, delegate { ShowFromTray(); OpenSos(); });
+            menu.Items.Add("Neck Replay", null, async delegate { ShowFromTray(); await ShowReplayAsync(); });
             menu.Items.Add("Parar aceleração", null, delegate
             {
                 if (!FocusModeManager.IsActive)
@@ -1047,7 +1065,9 @@ namespace Neck
             menu.Items.Add("Abrir diagnóstico", null, delegate
             {
                 ShowFromTray();
-                HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
+                HealthSnapshot snapshot = _healthSnapshot;
+                if (snapshot == null || DateTime.UtcNow - _lastReplayCaptureUtc >= TimeSpan.FromSeconds(20))
+                    snapshot = SystemInfo.GetHealthSnapshot();
                 using (DiagnosticForm form = new DiagnosticForm(snapshot)) form.ShowDialog(this);
             });
             menu.Items.Add("Modo Reunião", null, delegate { ShowFromTray(); ToggleMeetingMode(); });
@@ -1217,12 +1237,50 @@ namespace Neck
             {
                 using (BluetoothDoctorForm form = new BluetoothDoctorForm()) form.ShowDialog(this);
             }
+            else if (choice == ToolHubChoice.Replay)
+            {
+                await ShowReplayAsync();
+            }
             else if (choice == ToolHubChoice.History)
             {
                 using (GuardHistoryForm form = new GuardHistoryForm(_guardSamples.ToList(), ReportDirectory)) form.ShowDialog(this);
             }
             else if (choice == ToolHubChoice.Preferences)
                 ShowPreferences(false);
+        }
+
+        private async Task ShowReplayAsync()
+        {
+            if (_closing || IsDisposed) return;
+            ReplayActionKind action;
+            string processName;
+            bool historyRequested;
+            using (ReplayForm form = new ReplayForm(_replayEngine.GetLatestIncident(), _replayEngine.GetSamples()))
+            {
+                form.ShowDialog(this);
+                action = form.SelectedAction;
+                processName = form.IncidentProcessName;
+                historyRequested = form.HistoryRequested;
+            }
+            if (historyRequested)
+            {
+                using (GuardHistoryForm history = new GuardHistoryForm(_guardSamples.ToList(), ReportDirectory)) history.ShowDialog(this);
+                return;
+            }
+            if (action == ReplayActionKind.Accelerate)
+            {
+                using (SosForm form = new SosForm(string.IsNullOrWhiteSpace(processName) ? null : processName)) form.ShowDialog(this);
+                UpdateSystemStatus();
+                UpdateGuardView(_healthSnapshot);
+            }
+            else if (action == ReplayActionKind.Diagnostic)
+            {
+                using (DiagnosticForm form = new DiagnosticForm(_healthSnapshot ?? SystemInfo.GetHealthSnapshot())) form.ShowDialog(this);
+            }
+            else if (action == ReplayActionKind.Hardware)
+            {
+                await ShowHardwareDetailsAsync();
+            }
         }
 
         private async Task RefreshHardwareAsync(bool fullInventory)
@@ -1341,6 +1399,7 @@ namespace Neck
             _statusTimer.Stop();
             _guardMonitorTimer.Stop();
             _adaptiveTimer.Stop();
+            _replayTimer.Stop();
         }
 
         private void HideToTray(string message)
@@ -1365,7 +1424,9 @@ namespace Neck
             if (_closing || IsDisposed || _busy) return;
             try
             {
-                HealthSnapshot snapshot = SystemInfo.GetHealthSnapshot();
+                HealthSnapshot snapshot = _healthSnapshot;
+                if (snapshot == null || DateTime.UtcNow - _lastReplayCaptureUtc >= TimeSpan.FromSeconds(20))
+                    snapshot = SystemInfo.GetHealthSnapshot();
                 _healthSnapshot = snapshot;
                 UpdateGuardView(snapshot);
                 GuardSample sample = GuardSample.FromSnapshot(snapshot);
@@ -1386,6 +1447,38 @@ namespace Neck
                 if (monitoring.RecoveryConfirmed) ShowRecoveryNotification();
             }
             catch { }
+        }
+
+        private async Task CaptureReplayAsync()
+        {
+            if (_closing || IsDisposed || _busy || _replayCapturing) return;
+            _replayCapturing = true;
+            try
+            {
+                double temperature = 0;
+                if (_hardwareSnapshot != null && _hardwareSnapshot.Temperatures != null && _hardwareSnapshot.Temperatures.Count > 0)
+                    temperature = _hardwareSnapshot.Temperatures.Max(item => item.Celsius);
+                ReplayCapture capture = await Task.Run(delegate { return _replayProbe.Capture(temperature); });
+                if (_closing || IsDisposed || capture == null || capture.Sample == null) return;
+                _healthSnapshot = capture.Health;
+                _lastReplayCaptureUtc = capture.Sample.TimestampUtc;
+                ReplayDecision decision = _replayEngine.Record(capture.Sample);
+                UpdateGuardView(capture.Health);
+                UpdateTrayState(capture.Health);
+                if (decision.IncidentConfirmed && decision.Incident != null)
+                {
+                    _activityStatus.Text = "Neck Replay registrou um gargalo: " + decision.Incident.Title + ".";
+                    if (_guardSettings.Notifications && !_meetingActive && _guardSettings.SilentUntilUtc <= DateTime.UtcNow &&
+                        !(_guardSettings.SilenceFullscreen && SystemInfo.IsForegroundWindowFullScreen()))
+                        _trayIcon.ShowBalloonTip(5000, "Neck Replay registrou o contexto", decision.Incident.Title + ". Abra o Neck Replay para entender o que aconteceu.", ToolTipIcon.Warning);
+                }
+                else if (decision.RecoveryConfirmed && decision.Incident != null)
+                {
+                    _activityStatus.Text = "O fluxo voltou. O Replay preservou a causa provável para você revisar.";
+                }
+            }
+            catch { }
+            finally { _replayCapturing = false; }
         }
 
         private void UpdateTrayState(HealthSnapshot snapshot)
@@ -1610,7 +1703,8 @@ namespace Neck
             }
             catch { _diskValue.Text = "—"; }
 
-            if ((DateTime.Now - _lastHealthScan).TotalSeconds >= 10)
+            if ((_healthSnapshot == null || (!_replayCapturing && DateTime.UtcNow - _lastReplayCaptureUtc >= TimeSpan.FromSeconds(30))) &&
+                (DateTime.Now - _lastHealthScan).TotalSeconds >= 10)
             {
                 _lastHealthScan = DateTime.Now;
                 _healthSnapshot = SystemInfo.GetHealthSnapshot();
@@ -1668,9 +1762,21 @@ namespace Neck
                 : "Maior uso: " + top.DisplayName + "  •  " + FormatBytes(top.MemoryBytes)) + adaptive;
 
             _currentAdvice = BottleneckAdvisor.Analyze(snapshot);
-            _actionTitle.Text = _currentAdvice.Title;
-            _actionHelp.Text = _currentAdvice.Explanation;
-            _guardButton.Text = _currentAdvice.ActionText;
+            ReplayIncident replay = _replayEngine.GetLatestIncident();
+            _showReplayAsPrimary = replay != null && !replay.Ongoing && replay.EndedUtc != DateTime.MinValue &&
+                DateTime.UtcNow - replay.EndedUtc <= TimeSpan.FromMinutes(30) && snapshot.Level == HealthLevel.Stable;
+            if (_showReplayAsPrimary)
+            {
+                _actionTitle.Text = "O fluxo voltou ao normal";
+                _actionHelp.Text = "O Replay registrou a causa provável às " + replay.PeakUtc.ToLocalTime().ToString("HH:mm") + ".";
+                _guardButton.Text = "Ver o que aconteceu";
+            }
+            else
+            {
+                _actionTitle.Text = _currentAdvice.Title;
+                _actionHelp.Text = _currentAdvice.Explanation;
+                _guardButton.Text = _currentAdvice.ActionText;
+            }
         }
 
         private void ToggleMeetingMode()
@@ -2015,6 +2121,7 @@ namespace Neck
         Diagnostic,
         Drivers,
         Bluetooth,
+        Replay,
         History,
         Preferences
     }
@@ -2093,9 +2200,18 @@ namespace Neck
                 AutoSize = true,
                 Font = Theme.Small,
                 LinkColor = Theme.Blue,
-                Location = new Point(325, 17)
+                Location = new Point(425, 17)
             };
             history.Click += delegate { Choose(ToolHubChoice.History); };
+            LinkLabel replay = new LinkLabel
+            {
+                Text = "Neck Replay",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold),
+                LinkColor = Theme.Cyan,
+                Location = new Point(320, 17)
+            };
+            replay.Click += delegate { Choose(ToolHubChoice.Replay); };
             Button preferences = new AnimatedButton();
             ConfigureToolButton(preferences, "Preferências", Theme.NavySoft, 130);
             preferences.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -2115,6 +2231,7 @@ namespace Neck
             ToolTip tip = new ToolTip();
             tip.SetToolTip(_continueInTray, status);
             footer.Controls.Add(_continueInTray);
+            footer.Controls.Add(replay);
             footer.Controls.Add(history);
             footer.Controls.Add(preferences);
             footer.Controls.Add(close);

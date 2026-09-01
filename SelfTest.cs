@@ -413,6 +413,131 @@ namespace Neck
                 };
                 if (!syntheticOutcome.Summary.StartsWith("Resultado observado:", StringComparison.Ordinal))
                     throw new InvalidOperationException("A medição de resultado não produziu um resumo verificável.");
+                ReplaySample healthyMemory = new ReplaySample
+                {
+                    TimestampUtc = DateTime.UtcNow,
+                    MemoryPercent = 74,
+                    AvailableBytes = 4L * 1024 * 1024 * 1024,
+                    CommitPercent = 78,
+                    PageReadsPerSecond = 220,
+                    CpuPercent = 35,
+                    ForegroundResponsive = true
+                };
+                if (ReplayClassifier.Analyze(healthyMemory).Cause != ReplayCause.None)
+                    throw new InvalidOperationException("O Replay tratou RAM alta com folga como gargalo real.");
+                using (ReplayPerformanceSampler performanceSampler = new ReplayPerformanceSampler())
+                {
+                    System.Threading.Thread.Sleep(250);
+                    ReplayPerformanceValues performanceValues = performanceSampler.Capture();
+                    if (performanceValues.CommitPercent <= 0 || performanceValues.CommitPercent > 100)
+                        throw new InvalidOperationException("Os contadores PDH independentes do idioma não retornaram a pressão de commit.");
+                    Console.WriteLine("ReplayCounters=Commit " + performanceValues.CommitPercent.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "%/Disk " + performanceValues.DiskLatencyMilliseconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "ms");
+                }
+                using (ReplayProbe replayProbe = new ReplayProbe())
+                {
+                    System.Threading.Thread.Sleep(250);
+                    System.Diagnostics.Stopwatch replayTimer = System.Diagnostics.Stopwatch.StartNew();
+                    ReplayCapture liveReplay = replayProbe.Capture(0);
+                    replayTimer.Stop();
+                    if (liveReplay == null || liveReplay.Sample == null || liveReplay.Health == null)
+                        throw new InvalidOperationException("A captura real do Replay não retornou contexto.");
+                    if (replayTimer.ElapsedMilliseconds > 2000)
+                        throw new InvalidOperationException("A captura do Replay excedeu o limite conservador de 2 segundos.");
+                    Console.WriteLine("ReplayCaptureMilliseconds=" + replayTimer.ElapsedMilliseconds);
+                }
+                ReplaySample diskStall = new ReplaySample
+                {
+                    TimestampUtc = DateTime.UtcNow,
+                    MemoryPercent = 55,
+                    AvailableBytes = 6L * 1024 * 1024 * 1024,
+                    CpuPercent = 35,
+                    DiskActivePercent = 96,
+                    DiskLatencyMilliseconds = 85,
+                    DiskQueueLength = 3,
+                    ForegroundResponsive = true
+                };
+                if (ReplayClassifier.Analyze(diskStall).Cause != ReplayCause.DiskStall)
+                    throw new InvalidOperationException("O Replay não reconheceu espera real do armazenamento.");
+                ReplaySample cpuContention = new ReplaySample
+                {
+                    TimestampUtc = DateTime.UtcNow,
+                    MemoryPercent = 52,
+                    AvailableBytes = 7L * 1024 * 1024 * 1024,
+                    CpuPercent = 96,
+                    ProcessorQueueLength = Math.Max(4, Environment.ProcessorCount),
+                    TopCpuProcess = "NeckReplayCpuApp",
+                    ForegroundResponsive = true
+                };
+                if (ReplayClassifier.Analyze(cpuContention).Cause != ReplayCause.CpuContention)
+                    throw new InvalidOperationException("O Replay não reconheceu disputa real de CPU.");
+                ReplayEngine replayEngine = new ReplayEngine();
+                DateTime replayStart = DateTime.UtcNow.AddSeconds(-50);
+                ReplayDecision replayDecision = null;
+                bool replayConfirmed = false;
+                for (int i = 0; i < 3; i++)
+                {
+                    replayDecision = replayEngine.Record(new ReplaySample
+                    {
+                        TimestampUtc = replayStart.AddSeconds(i * 10),
+                        MemoryPercent = 93,
+                        AvailableBytes = 620L * 1024 * 1024,
+                        CommitPercent = 96,
+                        PageReadsPerSecond = 140,
+                        CpuPercent = 48,
+                        TopMemoryProcess = "Claude",
+                        TopMemoryBytes = 3L * 1024 * 1024 * 1024,
+                        ForegroundResponsive = true
+                    });
+                    replayConfirmed = replayConfirmed || replayDecision.IncidentConfirmed;
+                }
+                if (replayDecision == null || !replayConfirmed || replayDecision.Incident == null ||
+                    replayDecision.Incident.Cause != ReplayCause.MemoryPressure)
+                    throw new InvalidOperationException("O Replay não congelou o contexto após pressão persistente.");
+                replayEngine.Record(new ReplaySample
+                {
+                    TimestampUtc = replayStart.AddSeconds(30),
+                    MemoryPercent = 58,
+                    AvailableBytes = 6L * 1024 * 1024 * 1024,
+                    CommitPercent = 65,
+                    CpuPercent = 30,
+                    ForegroundResponsive = true
+                });
+                ReplayDecision replayRecovered = replayEngine.Record(new ReplaySample
+                {
+                    TimestampUtc = replayStart.AddSeconds(40),
+                    MemoryPercent = 55,
+                    AvailableBytes = 7L * 1024 * 1024 * 1024,
+                    CommitPercent = 62,
+                    CpuPercent = 24,
+                    ForegroundResponsive = true
+                });
+                if (!replayRecovered.RecoveryConfirmed || replayRecovered.Incident == null || replayRecovered.Incident.Ongoing)
+                    throw new InvalidOperationException("O Replay não confirmou a recuperação com duas leituras estáveis.");
+                using (ReplayForm replay = new ReplayForm(replayEngine.GetLatestIncident(), replayEngine.GetSamples()))
+                {
+                    replay.ShowInTaskbar = false;
+                    replay.StartPosition = FormStartPosition.Manual;
+                    replay.Location = new System.Drawing.Point(-32000, -32000);
+                    replay.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(replay.Width, replay.Height))
+                    {
+                        replay.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, replay.Width, replay.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Replay.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("ReplayPreview=" + previewPath);
+                    }
+                    replay.Size = replay.MinimumSize;
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(replay.Width, replay.Height))
+                    {
+                        replay.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, replay.Width, replay.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Replay.Minimum.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("ReplayMinimumPreview=" + previewPath);
+                    }
+                    replay.Close();
+                }
                 using (GuardHistoryForm history = new GuardHistoryForm(synthetic, System.IO.Path.GetTempPath()))
                 {
                     history.ShowInTaskbar = false;

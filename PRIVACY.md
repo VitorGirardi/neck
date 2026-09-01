@@ -1,6 +1,6 @@
 # Política de privacidade do Neck
 
-Vigente a partir de 28 de agosto de 2026.
+Vigente a partir de 1 de setembro de 2026.
 
 O Neck não possui telemetria, publicidade, contas de usuário ou coleta de inventário remoto. Diagnósticos de CPU, memória, armazenamento, hardware, temperatura, processos e Bluetooth são executados localmente.
 
@@ -23,6 +23,12 @@ O Neck não baixa nem instala silenciosamente atualizações próprias, aplicati
 - Histórico do Guard: limitado às últimas 24 horas
 
 Esses dados permanecem no computador. Para removê-los, desinstale o Neck e apague as duas pastas acima, caso ainda existam. A versão portátil utiliza os mesmos locais para manter as preferências entre execuções.
+
+## Neck Replay
+
+O Neck Replay mantém em memória uma janela circular de até cinco minutos. Ela contém métricas de recursos, o nome do processo mais associado ao pico, o nome do processo em primeiro plano e apenas seu estado de resposta. O Replay não captura título ou conteúdo da janela, texto digitado, tela, áudio, arquivos abertos ou tráfego de rede.
+
+As amostras detalhadas do Replay não são gravadas no disco e desaparecem quando o Neck é encerrado. O histórico de 24 horas do Guard continua sendo um registro separado e mais simples, conforme os locais descritos acima.
 
 ## Operações administrativas
 
