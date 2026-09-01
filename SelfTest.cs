@@ -918,12 +918,35 @@ namespace Neck
                 });
                 Thread.Sleep(500);
                 EfficiencyModeResult applied = EfficiencyModeManager.Apply("NeckRecoveryProbe");
-                if (!applied.HasChanges || RecoveryJournal.PendingCount == 0)
+                if (!applied.HasChanges)
+                    throw new InvalidOperationException("A preparação do processo de recuperação não aplicou nenhuma ação de teste.");
+                if (RecoveryJournal.PendingCount > 0) RecoveryManager.RestoreInterruptedChanges();
+                EfficiencyModeManager.Restore("NeckRecoveryProbe");
+
+                probe.Refresh();
+                System.Diagnostics.ProcessPriorityClass originalPriority = probe.PriorityClass;
+                System.Diagnostics.ProcessPriorityClass temporaryPriority = originalPriority == System.Diagnostics.ProcessPriorityClass.BelowNormal
+                    ? System.Diagnostics.ProcessPriorityClass.Normal
+                    : System.Diagnostics.ProcessPriorityClass.BelowNormal;
+                RecoveryRecord interrupted = new RecoveryRecord
+                {
+                    Kind = RecoveryChangeKind.Turbo,
+                    CreatedUtc = DateTime.UtcNow,
+                    ProcessId = probe.Id,
+                    ProcessName = probe.ProcessName,
+                    StartTimeUtcTicks = probe.StartTime.ToUniversalTime().Ticks,
+                    OriginalPriority = (uint)(int)originalPriority,
+                    PriorityChanged = true
+                };
+                if (!RecoveryJournal.Put(interrupted))
                     throw new InvalidOperationException("A alteração reversível não entrou no diário antes de ser aplicada.");
+                probe.PriorityClass = temporaryPriority;
                 RecoveryStartupResult recovered = RecoveryManager.RestoreInterruptedChanges();
                 if (recovered.RestoredEntries < 1 || recovered.FailedEntries != 0 || RecoveryJournal.PendingCount != 0)
                     throw new InvalidOperationException("A recuperação após interrupção não restaurou o processo de teste.");
-                EfficiencyModeManager.Restore("NeckRecoveryProbe");
+                probe.Refresh();
+                if (probe.PriorityClass != originalPriority)
+                    throw new InvalidOperationException("A prioridade original não voltou após a recuperação simulada.");
                 Console.WriteLine("InterruptedRecovery=OK; Restored=" + recovered.RestoredEntries);
             }
             finally
