@@ -491,7 +491,8 @@ namespace Neck
                     DiskFreeBytes = 1024L * 1024 * 1024,
                     DiskTotalBytes = 256L * 1024 * 1024 * 1024
                 };
-                if (BottleneckAdvisor.Analyze(guidedDisk).Kind != BottleneckKind.Disk)
+                BottleneckAdvice guidedDiskAdvice = BottleneckAdvisor.Analyze(guidedDisk);
+                if (guidedDiskAdvice.Kind != BottleneckKind.Disk || guidedDiskAdvice.ActionKind != BottleneckActionKind.Cleanup)
                     throw new InvalidOperationException("O Gargalo Guiado não priorizou armazenamento crítico.");
                 HealthSnapshot guidedCpu = new HealthSnapshot
                 {
@@ -534,6 +535,48 @@ namespace Neck
                 };
                 if (ReplayClassifier.Analyze(healthyMemory).Cause != ReplayCause.None)
                     throw new InvalidOperationException("O Replay tratou RAM alta com folga como gargalo real.");
+                HealthSnapshot healthyHighRam = new HealthSnapshot
+                {
+                    Score = 68,
+                    Level = HealthLevel.Warning,
+                    CpuPercent = 35,
+                    Memory = new MemoryStatus { PercentUsed = 78, AvailableBytes = 4UL * 1024 * 1024 * 1024 },
+                    DiskFreeBytes = 100L * 1024 * 1024 * 1024,
+                    DiskTotalBytes = 256L * 1024 * 1024 * 1024
+                };
+                healthyMemory.MemoryPercent = 78;
+                FlowHealthRefiner.Apply(healthyHighRam, healthyMemory);
+                BottleneckAdvice healthyHighRamAdvice = BottleneckAdvisor.Analyze(healthyHighRam, healthyMemory);
+                if (healthyHighRam.Level != HealthLevel.Stable || healthyHighRamAdvice.Kind != BottleneckKind.None ||
+                    healthyHighRamAdvice.Confidence < 80)
+                    throw new InvalidOperationException("O Flow Engine confundiu RAM ocupada com pressão real.");
+                ReplaySample measuredDiskStall = new ReplaySample
+                {
+                    TimestampUtc = DateTime.UtcNow,
+                    MemoryPercent = 55,
+                    AvailableBytes = 6L * 1024 * 1024 * 1024,
+                    CommitPercent = 65,
+                    CpuPercent = 35,
+                    DiskActivePercent = 96,
+                    DiskLatencyMilliseconds = 85,
+                    DiskQueueLength = 3,
+                    ForegroundResponsive = true
+                };
+                HealthSnapshot diskStallHealth = new HealthSnapshot
+                {
+                    Score = 90,
+                    Level = HealthLevel.Stable,
+                    CpuPercent = 35,
+                    Memory = new MemoryStatus { PercentUsed = 55, AvailableBytes = 6UL * 1024 * 1024 * 1024 },
+                    DiskFreeBytes = 100L * 1024 * 1024 * 1024,
+                    DiskTotalBytes = 256L * 1024 * 1024 * 1024
+                };
+                FlowHealthRefiner.Apply(diskStallHealth, measuredDiskStall);
+                BottleneckAdvice diskStallAdvice = BottleneckAdvisor.Analyze(diskStallHealth, measuredDiskStall);
+                if (diskStallHealth.Level == HealthLevel.Stable || diskStallAdvice.Kind != BottleneckKind.Disk ||
+                    diskStallAdvice.ActionKind != BottleneckActionKind.Diagnostic)
+                    throw new InvalidOperationException("O Flow Engine tentou limpar arquivos diante de latência real do disco.");
+                Console.WriteLine("FlowEngine=HighRamStable/DiskLatencyDiagnostic");
                 using (ReplayPerformanceSampler performanceSampler = new ReplayPerformanceSampler())
                 {
                     System.Threading.Thread.Sleep(250);
