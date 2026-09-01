@@ -318,7 +318,7 @@ namespace Neck
             {
                 Text = "Suporte e recuperação",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 23f, FontStyle.Bold),
+                Font = new Font("Segoe UI Variable Display", 23f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 Location = new Point(32, 20)
             });

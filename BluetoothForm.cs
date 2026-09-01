@@ -165,7 +165,7 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 118, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = Theme.Card };
             BluetoothGlyph glyph = new BluetoothGlyph { Location = new Point(28, 27) };
             header.Controls.Add(glyph);
             header.Controls.Add(new Label
@@ -173,7 +173,7 @@ namespace Neck
                 Text = "Cura Bluetooth",
                 AutoSize = true,
                 Font = Theme.Title,
-                ForeColor = Color.White,
+                ForeColor = Theme.Ink,
                 Location = new Point(104, 22)
             });
             header.Controls.Add(new Label
@@ -181,7 +181,7 @@ namespace Neck
                 Text = "Diagnostica e restaura a conexão sem apagar seus dispositivos.",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(194, 207, 225),
+                ForeColor = Theme.Muted,
                 Location = new Point(108, 70)
             });
 

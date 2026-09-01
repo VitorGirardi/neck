@@ -146,13 +146,13 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 116, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 108, BackColor = Theme.Card };
             header.Controls.Add(new Label
             {
                 Text = _firstRun ? "Bem-vindo ao Neck" : "Preferências",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 23f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 23f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(30, 20)
             });
             header.Controls.Add(new Label
@@ -161,7 +161,7 @@ namespace Neck
                 AutoSize = false,
                 Size = new Size(640, 35),
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(190, 203, 222),
+                ForeColor = Theme.Muted,
                 Location = new Point(33, 67)
             });
 

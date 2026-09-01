@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <rect x="12" y="12" width="232" height="232" rx="40" fill="#0b1324"/>
-  <path d="M45 66 C91 66 87 108 128 108 C169 108 165 66 211 66" fill="none" stroke="#0ea5a8" stroke-width="18" stroke-linecap="round"/>
-  <path d="M45 190 C91 190 87 148 128 148 C169 148 165 190 211 190" fill="none" stroke="#0ea5a8" stroke-width="18" stroke-linecap="round"/>
-  <circle cx="128" cy="128" r="13" fill="#ffffff"/>
+  <title>Neck — o fluxo atravessando o gargalo</title>
+  <path d="M38 24h50c0 48 9 80 34 104-25 24-34 56-34 104H38c0-52 13-84 38-104-25-20-38-52-38-104Z" fill="#1f2925"/>
+  <path d="M218 24h-50c0 48-9 80-34 104 25 24 34 56 34 104h50c0-52-13-84-38-104 25-20 38-52 38-104Z" fill="#1f2925"/>
+  <path d="M58 128h124" fill="none" stroke="#b6ef67" stroke-width="18" stroke-linecap="round"/>
+  <path d="m176 105 30 23-30 23Z" fill="#b6ef67"/>
 </svg>

@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.16.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.16.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.17.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.17.0.0")]
 
 namespace Neck
 {
@@ -75,23 +75,27 @@ namespace Neck
 
     internal static class Theme
     {
-        public static readonly Color Background = Color.FromArgb(246, 248, 252);
-        public static readonly Color Card = Color.White;
-        public static readonly Color Navy = Color.FromArgb(11, 19, 36);
-        public static readonly Color NavySoft = Color.FromArgb(51, 65, 85);
-        public static readonly Color Blue = Color.FromArgb(37, 99, 235);
-        public static readonly Color BlueSoft = Color.FromArgb(239, 246, 255);
-        public static readonly Color Cyan = Color.FromArgb(14, 165, 168);
-        public static readonly Color FlowSoft = Color.FromArgb(240, 253, 250);
-        public static readonly Color Green = Color.FromArgb(5, 150, 105);
-        public static readonly Color GreenSoft = Color.FromArgb(236, 253, 245);
-        public static readonly Color Amber = Color.FromArgb(217, 119, 6);
-        public static readonly Color Text = Color.FromArgb(30, 41, 59);
-        public static readonly Color Muted = Color.FromArgb(100, 116, 139);
-        public static readonly Color Border = Color.FromArgb(226, 232, 240);
-        public static readonly Font Title = new Font("Bahnschrift", 25f, FontStyle.Bold);
-        public static readonly Font Heading = new Font("Bahnschrift", 15f, FontStyle.Bold);
-        public static readonly Font Brand = new Font("Bahnschrift", 23f, FontStyle.Bold);
+        public static readonly Color Background = Color.FromArgb(244, 243, 237);
+        public static readonly Color Card = Color.FromArgb(255, 255, 252);
+        public static readonly Color Ink = Color.FromArgb(31, 41, 37);
+        public static readonly Color Navy = Ink;
+        public static readonly Color NavySoft = Color.FromArgb(70, 86, 78);
+        public static readonly Color Blue = Color.FromArgb(47, 107, 87);
+        public static readonly Color BlueSoft = Color.FromArgb(232, 241, 236);
+        public static readonly Color Lime = Color.FromArgb(182, 239, 103);
+        public static readonly Color Cyan = Color.FromArgb(89, 132, 57);
+        public static readonly Color FlowSoft = Color.FromArgb(242, 248, 232);
+        public static readonly Color Green = Color.FromArgb(47, 125, 89);
+        public static readonly Color GreenSoft = Color.FromArgb(235, 245, 237);
+        public static readonly Color Amber = Color.FromArgb(211, 103, 55);
+        public static readonly Color Coral = Color.FromArgb(238, 113, 77);
+        public static readonly Color Text = Ink;
+        public static readonly Color Muted = Color.FromArgb(102, 116, 108);
+        public static readonly Color Border = Color.FromArgb(220, 224, 216);
+        public static readonly Color Hairline = Color.FromArgb(230, 232, 226);
+        public static readonly Font Title = new Font("Segoe UI Variable Display", 25f, FontStyle.Bold);
+        public static readonly Font Heading = new Font("Segoe UI Semibold", 15f, FontStyle.Bold);
+        public static readonly Font Brand = new Font("Segoe UI Variable Display", 24f, FontStyle.Bold);
         public static readonly Font Body = new Font("Segoe UI", 10f, FontStyle.Regular);
         public static readonly Font Small = new Font("Segoe UI", 9f, FontStyle.Regular);
     }
@@ -110,24 +114,37 @@ namespace Neck
         {
             base.OnPaint(e);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            Rectangle bounds = new Rectangle(0, 0, Width - 1, Height - 1);
-            using (GraphicsPath background = RoundedRect(bounds, 14))
-            using (SolidBrush brush = new SolidBrush(Theme.Cyan))
-                e.Graphics.FillPath(brush, background);
-            using (Pen flow = new Pen(Color.White, 3.6f))
+            float scaleX = Width / 256f;
+            float scaleY = Height / 256f;
+            e.Graphics.ScaleTransform(scaleX, scaleY);
+            using (GraphicsPath left = new GraphicsPath())
+            using (GraphicsPath right = new GraphicsPath())
+            using (SolidBrush ink = new SolidBrush(Theme.Ink))
+            using (SolidBrush lime = new SolidBrush(Theme.Lime))
+            using (Pen flow = new Pen(Theme.Lime, 18f))
             {
+                left.StartFigure();
+                left.AddLine(38, 24, 88, 24);
+                left.AddBezier(88, 24, 88, 72, 97, 104, 122, 128);
+                left.AddBezier(122, 128, 97, 152, 88, 184, 88, 232);
+                left.AddLine(88, 232, 38, 232);
+                left.AddBezier(38, 232, 38, 180, 51, 148, 76, 128);
+                left.AddBezier(76, 128, 51, 108, 38, 76, 38, 24);
+                left.CloseFigure();
+                right.StartFigure();
+                right.AddLine(218, 24, 168, 24);
+                right.AddBezier(168, 24, 168, 72, 159, 104, 134, 128);
+                right.AddBezier(134, 128, 159, 152, 168, 184, 168, 232);
+                right.AddLine(168, 232, 218, 232);
+                right.AddBezier(218, 232, 218, 180, 205, 148, 180, 128);
+                right.AddBezier(180, 128, 205, 108, 218, 76, 218, 24);
+                right.CloseFigure();
+                e.Graphics.FillPath(ink, left);
+                e.Graphics.FillPath(ink, right);
                 flow.StartCap = LineCap.Round;
                 flow.EndCap = LineCap.Round;
-                using (GraphicsPath top = new GraphicsPath())
-                using (GraphicsPath bottom = new GraphicsPath())
-                {
-                    top.AddBezier(9, 14, 18, 14, 18, 22, 25, 22);
-                    top.AddBezier(25, 22, 32, 22, 32, 14, 41, 14);
-                    bottom.AddBezier(9, 36, 18, 36, 18, 28, 25, 28);
-                    bottom.AddBezier(25, 28, 32, 28, 32, 36, 41, 36);
-                    e.Graphics.DrawPath(flow, top);
-                    e.Graphics.DrawPath(flow, bottom);
-                }
+                e.Graphics.DrawLine(flow, 58, 128, 184, 128);
+                e.Graphics.FillPolygon(lime, new[] { new PointF(176, 105), new PointF(206, 128), new PointF(176, 151) });
             }
         }
 
@@ -476,6 +493,7 @@ namespace Neck
         private readonly Button _settingsButton = new Button();
         private readonly Button _planButton = new Button();
         private readonly Button _toolsButton = new AnimatedButton();
+        private readonly Label _heroTitle = new Label();
         private readonly Label _guardBadge = new Label();
         private readonly Label _guardMessage = new Label();
         private readonly Label _guardProcess = new Label();
@@ -656,14 +674,15 @@ namespace Neck
             Panel header = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 96,
-                BackColor = Theme.Navy,
-                Padding = new Padding(30, 16, 30, 14)
+                Height = 86,
+                BackColor = Theme.Card,
+                Padding = new Padding(30, 12, 30, 10)
             };
 
             FlowMark mark = new FlowMark
             {
-                Location = new Point(31, 22)
+                Size = new Size(48, 48),
+                Location = new Point(30, 19)
             };
 
             Label title = new Label
@@ -671,31 +690,36 @@ namespace Neck
                 AutoSize = true,
                 Text = "Neck",
                 Font = Theme.Brand,
-                ForeColor = Color.White,
-                Location = new Point(99, 15)
+                ForeColor = Theme.Ink,
+                Location = new Point(93, 11)
             };
             Label subtitle = new Label
             {
                 AutoSize = true,
-                Text = "Deixe seu computador mais leve, sem complicação",
+                Text = "Destrave o fluxo do seu computador",
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(186, 199, 218),
-                Location = new Point(102, 57)
+                ForeColor = Theme.Muted,
+                Location = new Point(96, 51)
             };
 
             Label promise = new Label
             {
                 AutoSize = false,
-                Size = new Size(245, 40),
-                Text = "SEGURO  •  REVERSÍVEL  •  LOCAL",
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(191, 219, 254),
-                BackColor = Color.FromArgb(30, 41, 59),
+                Size = new Size(205, 36),
+                Text = "●  Acompanhamento local",
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Segoe UI Semibold", 9f, FontStyle.Regular),
+                ForeColor = Theme.Green,
+                BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Location = new Point(ClientSize.Width - 278, 27)
+                Location = new Point(ClientSize.Width - 235, 25)
             };
             header.Resize += delegate { promise.Left = header.ClientSize.Width - promise.Width - 30; };
+            header.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                using (Pen line = new Pen(Theme.Hairline))
+                    e.Graphics.DrawLine(line, 0, header.ClientSize.Height - 1, header.ClientSize.Width, header.ClientSize.Height - 1);
+            };
 
             header.Controls.Add(mark);
             header.Controls.Add(title);
@@ -710,14 +734,14 @@ namespace Neck
             {
                 Dock = DockStyle.Fill,
                 BackColor = Theme.Background,
-                Padding = new Padding(24, 18, 24, 22),
+                Padding = new Padding(24, 20, 24, 18),
                 ColumnCount = 2,
                 RowCount = 3
             };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 250f));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 220f));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 288f));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 178f));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
             Control guard = BuildGuardCard();
@@ -734,45 +758,52 @@ namespace Neck
         private Control BuildQuickCard()
         {
             Panel card = MakeCard(new Padding(24));
-            card.Margin = new Padding(0, 12, 9, 12);
+            card.Margin = new Padding(0, 10, 9, 10);
 
-            Label badge = CreateBadge("SEGURO", Theme.BlueSoft, Theme.Blue);
-            badge.Location = new Point(24, 20);
+            Label eyebrow = new Label
+            {
+                Text = "CUIDADO RÁPIDO",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
+                ForeColor = Theme.Blue,
+                Location = new Point(24, 18)
+            };
             Label title = new Label
             {
-                Text = "Limpar arquivos",
+                Text = "Liberar espaço",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 17f, FontStyle.Bold),
+                Font = new Font("Segoe UI Variable Display", 16f, FontStyle.Bold),
                 ForeColor = Theme.Text,
-                Location = new Point(23, 54)
+                Location = new Point(23, 39)
             };
             Label description = new Label
             {
-                Text = "Remove temporários antigos. Documentos, senhas e downloads ficam intactos.",
+                Text = "Remove apenas arquivos temporários antigos.",
                 AutoSize = false,
-                Size = new Size(440, 40),
+                Size = new Size(420, 30),
                 Font = Theme.Body,
                 ForeColor = Theme.Muted,
-                Location = new Point(25, 91)
+                Location = new Point(25, 72)
             };
             Label available = new Label
             {
-                Text = "Disponível para limpar:",
+                Text = "Para limpar:",
                 AutoSize = true,
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
-                Location = new Point(25, 128)
+                Location = new Point(25, 112)
             };
             _analysisValue.Text = "Analisando…";
             _analysisValue.AutoSize = true;
             _analysisValue.Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
             _analysisValue.ForeColor = Theme.Text;
-            _analysisValue.Location = new Point(159, 126);
+            _analysisValue.Location = new Point(99, 110);
 
             ConfigureButton(_analyzeButton, "Analisar novamente", Theme.NavySoft, 1);
             _analyzeButton.Visible = false;
-            ConfigureButton(_runButton, "Fazer limpeza segura", Theme.Blue, 214);
-            _runButton.Location = new Point(24, 150);
+            ConfigureButton(_runButton, "Limpar com segurança", Theme.Blue, 194);
+            _runButton.Location = new Point(290, 96);
+            _runButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _analyzeButton.Click += async delegate { await AnalyzeAsync(true); };
             _runButton.Click += async delegate
             {
@@ -785,7 +816,8 @@ namespace Neck
                 await RunMaintenanceAsync();
             };
 
-            card.Controls.Add(badge);
+            card.Resize += delegate { _runButton.Left = card.ClientSize.Width - _runButton.Width - 24; };
+            card.Controls.Add(eyebrow);
             card.Controls.Add(title);
             card.Controls.Add(description);
             card.Controls.Add(available);
@@ -797,44 +829,52 @@ namespace Neck
         private Control BuildDeepCard()
         {
             Panel card = MakeCard(new Padding(24));
-            card.Margin = new Padding(9, 12, 0, 12);
+            card.Margin = new Padding(9, 10, 0, 10);
 
-            Label badge = CreateBadge("MENSAL", Theme.GreenSoft, Theme.Green);
-            badge.Location = new Point(24, 20);
+            Label eyebrow = new Label
+            {
+                Text = "UMA VEZ POR MÊS",
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
+                ForeColor = Theme.Green,
+                Location = new Point(24, 18)
+            };
             Label title = new Label
             {
-                Text = "Revisar o computador",
+                Text = "Cuidado completo",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 17f, FontStyle.Bold),
+                Font = new Font("Segoe UI Variable Display", 16f, FontStyle.Bold),
                 ForeColor = Theme.Text,
-                Location = new Point(23, 54)
+                Location = new Point(23, 39)
             };
             Label description = new Label
             {
-                Text = "Verifica o Windows e recomenda os cuidados mais importantes.",
+                Text = "Confere o Windows e sugere apenas o que faz sentido.",
                 AutoSize = false,
-                Size = new Size(440, 40),
+                Size = new Size(420, 30),
                 Font = Theme.Body,
                 ForeColor = Theme.Muted,
-                Location = new Point(25, 91)
+                Location = new Point(25, 72)
             };
             _recommendation.AutoSize = false;
-            _recommendation.Size = new Size(310, 25);
+            _recommendation.Size = new Size(260, 25);
             _recommendation.TextAlign = ContentAlignment.MiddleLeft;
             _recommendation.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
             _recommendation.ForeColor = Theme.Green;
-            _recommendation.BackColor = Color.White;
-            _recommendation.Location = new Point(25, 126);
+            _recommendation.BackColor = Color.Transparent;
+            _recommendation.Location = new Point(25, 108);
             _lastRunValue.Visible = false;
-            ConfigureButton(_advancedButton, "Começar revisão", Theme.Green, 190);
-            _advancedButton.Location = new Point(24, 150);
+            ConfigureButton(_advancedButton, "Revisar agora", Theme.Green, 164);
+            _advancedButton.Location = new Point(305, 96);
+            _advancedButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _advancedButton.Click += async delegate { await ShowAdvancedAndRunAsync(); };
             _bootButton.Click += delegate
             {
                 using (StartupAppsForm form = new StartupAppsForm()) form.ShowDialog(this);
             };
 
-            card.Controls.Add(badge);
+            card.Resize += delegate { _advancedButton.Left = card.ClientSize.Width - _advancedButton.Width - 24; };
+            card.Controls.Add(eyebrow);
             card.Controls.Add(title);
             card.Controls.Add(description);
             card.Controls.Add(_recommendation);
@@ -844,51 +884,50 @@ namespace Neck
 
         private Control BuildGuardCard()
         {
-            RoundedPanel card = MakeCard(new Padding(28));
+            RoundedPanel card = MakeCard(new Padding(30));
             card.Margin = new Padding(0, 0, 0, 0);
-            _guardBadge.Text = "ANALISANDO";
+            card.CornerRadius = 24;
+            _guardBadge.Text = "●  Lendo o fluxo";
             _guardBadge.AutoSize = false;
-            _guardBadge.Size = new Size(108, 25);
-            _guardBadge.BackColor = Theme.BlueSoft;
+            _guardBadge.Size = new Size(220, 25);
+            _guardBadge.BackColor = Color.Transparent;
             _guardBadge.ForeColor = Theme.Blue;
-            _guardBadge.TextAlign = ContentAlignment.MiddleCenter;
-            _guardBadge.Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold);
-            _guardBadge.Location = new Point(28, 24);
-            Label title = new Label
-            {
-                Text = "Seu computador agora",
-                AutoSize = true,
-                Font = new Font("Bahnschrift", 21f, FontStyle.Bold),
-                ForeColor = Theme.Text,
-                Location = new Point(27, 58)
-            };
+            _guardBadge.TextAlign = ContentAlignment.MiddleLeft;
+            _guardBadge.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
+            _guardBadge.Location = new Point(31, 24);
+            _heroTitle.Text = "Entendendo seu computador";
+            _heroTitle.AutoSize = false;
+            _heroTitle.Size = new Size(590, 43);
+            _heroTitle.Font = new Font("Segoe UI Variable Display", 23f, FontStyle.Bold);
+            _heroTitle.ForeColor = Theme.Text;
+            _heroTitle.Location = new Point(30, 53);
             _guardMessage.Text = "Procurando sinais de sobrecarga...";
             _guardMessage.AutoSize = false;
-            _guardMessage.Size = new Size(570, 43);
+            _guardMessage.Size = new Size(590, 43);
             _guardMessage.Font = Theme.Body;
             _guardMessage.ForeColor = Theme.Muted;
-            _guardMessage.Location = new Point(30, 103);
+            _guardMessage.Location = new Point(32, 100);
             _guardProcess.Text = "Maior uso de memória: calculando";
             _guardProcess.AutoSize = false;
-            _guardProcess.Size = new Size(600, 26);
+            _guardProcess.Size = new Size(590, 26);
             _guardProcess.Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold);
             _guardProcess.ForeColor = Theme.Text;
-            _guardProcess.Location = new Point(29, 148);
+            _guardProcess.Location = new Point(31, 146);
 
-            Panel actionArea = new Panel { Dock = DockStyle.Right, Width = 310, BackColor = Color.White, Padding = new Padding(24, 20, 24, 16) };
+            Panel actionArea = new Panel { Dock = DockStyle.Right, Width = 330, BackColor = Theme.FlowSoft, Padding = new Padding(26, 22, 26, 20) };
             _actionTitle.Dock = DockStyle.Top;
-            _actionTitle.Height = 40;
+            _actionTitle.Height = 48;
             _actionTitle.Text = "Analisando o fluxo do computador...";
-            _actionTitle.Font = new Font("Bahnschrift", 12f, FontStyle.Bold);
+            _actionTitle.Font = new Font("Segoe UI Variable Display", 13f, FontStyle.Bold);
             _actionTitle.ForeColor = Theme.Text;
-            _actionTitle.TextAlign = ContentAlignment.MiddleCenter;
+            _actionTitle.TextAlign = ContentAlignment.MiddleLeft;
             _actionHelp.Dock = DockStyle.Top;
-            _actionHelp.Height = 52;
+            _actionHelp.Height = 58;
             _actionHelp.Text = "O Neck indicará a ação mais útil agora.";
             _actionHelp.Font = Theme.Small;
             _actionHelp.ForeColor = Theme.Muted;
-            _actionHelp.TextAlign = ContentAlignment.TopCenter;
-            ConfigureButton(_guardButton, "Acelerar um aplicativo", Theme.Blue, 244);
+            _actionHelp.TextAlign = ContentAlignment.TopLeft;
+            ConfigureButton(_guardButton, "Dar prioridade a um app", Theme.Ink, 244);
             _guardButton.Dock = DockStyle.Top;
             _guardButton.Height = 48;
             _guardButton.Margin = new Padding(8, 0, 8, 0);
@@ -922,16 +961,17 @@ namespace Neck
             actionArea.Controls.Add(_guardButton);
             actionArea.Controls.Add(_actionHelp);
             _flowIndicator.Dock = DockStyle.Top;
+            _flowIndicator.Height = 52;
             actionArea.Controls.Add(_flowIndicator);
             actionArea.Controls.Add(_actionTitle);
 
             TableLayoutPanel metrics = new TableLayoutPanel
             {
-                Location = new Point(28, 177),
-                Size = new Size(570, 55),
+                Location = new Point(30, 194),
+                Size = new Size(590, 62),
                 ColumnCount = 3,
                 RowCount = 1,
-                BackColor = Theme.Background,
+                BackColor = Theme.FlowSoft,
                 Padding = new Padding(4)
             };
             metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
@@ -944,17 +984,25 @@ namespace Neck
             metrics.Controls.Add(flowMetric, 2, 0);
 
             card.Controls.Add(_guardBadge);
-            card.Controls.Add(title);
+            card.Controls.Add(_heroTitle);
             card.Controls.Add(_guardMessage);
             card.Controls.Add(_guardProcess);
             card.Controls.Add(metrics);
             card.Controls.Add(actionArea);
+            card.Resize += delegate
+            {
+                int leftWidth = Math.Max(420, card.ClientSize.Width - actionArea.Width - 52);
+                _heroTitle.Width = leftWidth;
+                _guardMessage.Width = leftWidth;
+                _guardProcess.Width = leftWidth;
+                metrics.Width = leftWidth;
+            };
             return card;
         }
 
         private static Control BuildInlineMetric(string caption, Label value)
         {
-            Panel panel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background, Margin = Padding.Empty };
+            Panel panel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.FlowSoft, Margin = Padding.Empty };
             Label name = new Label
             {
                 Text = caption,
@@ -996,7 +1044,7 @@ namespace Neck
             card.Margin = new Padding(0, 0, 0, 0);
             Label title = new Label
             {
-                Text = "Hardware deste computador",
+                Text = "Seu computador por dentro",
                 AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 12.5f, FontStyle.Bold),
                 ForeColor = Theme.Text,
@@ -1029,7 +1077,7 @@ namespace Neck
             _progress.Height = 5;
             _progress.Visible = false;
             _log.Visible = false;
-            ConfigureButton(_toolsButton, "Mais ferramentas", Theme.NavySoft, 190);
+            ConfigureButton(_toolsButton, "Ver ferramentas", Theme.Ink, 170);
             _toolsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _toolsButton.Location = new Point(800, 37);
             _toolsButton.Click += async delegate { await ShowToolsHubAsync(); };
@@ -1847,28 +1895,28 @@ namespace Neck
             }
             if (snapshot.Level == HealthLevel.Critical)
             {
-                _guardBadge.Text = "GARGALO DETECTADO";
-                _guardBadge.Width = 142;
-                _guardBadge.BackColor = Color.FromArgb(254, 226, 226);
-                _guardBadge.ForeColor = Color.Firebrick;
-                _guardButton.Text = "Resolver gargalo";
+                _guardBadge.Text = "●  Gargalo agora";
+                _guardBadge.ForeColor = Theme.Coral;
+                _heroTitle.Text = "Tem um gargalo pedindo espaço";
+                _guardButton.Text = "Destravar agora";
             }
             else if (snapshot.Level == HealthLevel.Warning)
             {
-                _guardBadge.Text = "ATENÇÃO";
-                _guardBadge.Width = 108;
-                _guardBadge.BackColor = Color.FromArgb(255, 247, 237);
+                _guardBadge.Text = "●  Fluxo sob pressão";
                 _guardBadge.ForeColor = Theme.Amber;
-                _guardButton.Text = "Acelerar um aplicativo";
+                _heroTitle.Text = "O fluxo está mais apertado";
+                _guardButton.Text = "Dar prioridade a um app";
             }
             else
             {
-                _guardBadge.Text = "FLUINDO BEM";
-                _guardBadge.Width = 118;
-                _guardBadge.BackColor = Theme.FlowSoft;
-                _guardBadge.ForeColor = Theme.Cyan;
-                _guardButton.Text = "Acelerar um aplicativo";
+                _guardBadge.Text = "●  Fluxo livre";
+                _guardBadge.ForeColor = Theme.Green;
+                _heroTitle.Text = "Tudo está passando bem";
+                _guardButton.Text = "Dar prioridade a um app";
             }
+            _guardBadge.Width = 220;
+            _guardBadge.BackColor = Color.Transparent;
+            _guardButton.SetPalette(snapshot.Level == HealthLevel.Critical ? Theme.Coral : Theme.Ink);
             _flowIndicator.SetLevel(snapshot.Level);
             _guardButton.AttentionPulse = snapshot.Level == HealthLevel.Critical && !FocusModeManager.IsActive && Visible && WindowState != FormWindowState.Minimized;
 
@@ -1906,10 +1954,11 @@ namespace Neck
                 _guardButton.Text = _autopilotDecision.State == AutopilotState.Protecting ? "Ver proteção" : "Ver previsão";
                 if (_autopilotDecision.State == AutopilotState.Protecting && snapshot.Level != HealthLevel.Critical)
                 {
-                    _guardBadge.Text = "AUTOPILOT ATIVO";
-                    _guardBadge.Width = 132;
-                    _guardBadge.BackColor = Theme.FlowSoft;
+                    _guardBadge.Text = "●  Autopilot cuidando";
+                    _guardBadge.Width = 220;
+                    _guardBadge.BackColor = Color.Transparent;
                     _guardBadge.ForeColor = Theme.Green;
+                    _heroTitle.Text = "O Neck abriu espaço sozinho";
                 }
             }
             else
@@ -1978,9 +2027,11 @@ namespace Neck
         {
             TimeSpan remaining = _meetingEndsAt - DateTime.Now;
             int minutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
-            _guardBadge.Text = "PROTEGIDO";
-            _guardBadge.BackColor = Color.FromArgb(236, 254, 255);
-            _guardBadge.ForeColor = Theme.Cyan;
+            _guardBadge.Text = "●  Reunião em fluxo";
+            _guardBadge.Width = 220;
+            _guardBadge.BackColor = Color.Transparent;
+            _guardBadge.ForeColor = Theme.Green;
+            _heroTitle.Text = "Sua apresentação está protegida";
             _guardMessage.Text = "Reunião protegida por mais " + minutes + " min. Manutenções estão pausadas.";
             _guardProcess.Text = "A tela e o computador não entrarão em suspensão.";
             _flowIndicator.SetLevel(HealthLevel.Stable);
@@ -2315,28 +2366,35 @@ namespace Neck
 
         private void BuildInterface(bool continueInTray, string activity)
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Navy, Padding = new Padding(30, 20, 30, 16) };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Card, Padding = new Padding(30, 16, 30, 12) };
+            FlowMark mark = new FlowMark { Size = new Size(42, 42), Location = new Point(28, 26) };
             header.Controls.Add(new Label
             {
-                Text = "Mais ferramentas",
+                Text = "Ferramentas",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 23f, FontStyle.Bold),
-                ForeColor = Color.White,
-                Location = new Point(30, 20)
+                Font = new Font("Segoe UI Variable Display", 21f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
+                Location = new Point(88, 15)
             });
             header.Controls.Add(new Label
             {
-                Text = "Recursos extras ficam aqui para não atrapalhar o que importa na tela inicial.",
+                Text = "O que você usa menos fica aqui, sem poluir a tela inicial.",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(191, 203, 220),
-                Location = new Point(33, 69)
+                ForeColor = Theme.Muted,
+                Location = new Point(91, 58)
             });
+            header.Controls.Add(mark);
+            header.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                using (Pen line = new Pen(Theme.Hairline))
+                    e.Graphics.DrawLine(line, 0, header.ClientSize.Height - 1, header.ClientSize.Width, header.ClientSize.Height - 1);
+            };
 
             TableLayoutPanel grid = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(24, 22, 24, 14),
+                Padding = new Padding(24, 18, 24, 12),
                 ColumnCount = 2,
                 RowCount = 4,
                 BackColor = Theme.Background
@@ -2353,8 +2411,8 @@ namespace Neck
             grid.Controls.Add(CreateTool("Neck Replay", "Entenda por que o computador acabou de travar.", ToolHubChoice.Replay), 0, 3);
             grid.Controls.Add(CreateTool("Suporte", "Crie um relatório privado e recupere interrupções.", ToolHubChoice.Support), 1, 3);
 
-            Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 86, BackColor = Color.White, Padding = new Padding(28, 14, 28, 14) };
-            _continueInTray.Text = "Continuar protegendo na bandeja ao fechar";
+            Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 82, BackColor = Theme.Card, Padding = new Padding(28, 12, 28, 12) };
+            _continueInTray.Text = "Continuar acompanhando ao fechar";
             _continueInTray.Checked = continueInTray;
             _continueInTray.AutoSize = true;
             _continueInTray.Font = Theme.Small;
@@ -2375,7 +2433,7 @@ namespace Neck
             preferences.Location = new Point(footer.Width - 286, 20);
             preferences.Click += delegate { Choose(ToolHubChoice.Preferences); };
             Button close = new AnimatedButton();
-            ConfigureToolButton(close, "Voltar", Theme.Blue, 120);
+            ConfigureToolButton(close, "Voltar", Theme.Ink, 120);
             close.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             close.Location = new Point(footer.Width - 146, 20);
             close.Click += delegate { Close(); };
@@ -2404,10 +2462,10 @@ namespace Neck
             RoundedPanel card = new RoundedPanel
             {
                 Dock = DockStyle.Fill,
-                Margin = new Padding(8),
-                BackColor = Color.White,
-                OutlineColor = Theme.Border,
-                CornerRadius = 16,
+                Margin = new Padding(7),
+                BackColor = Theme.Card,
+                OutlineColor = Theme.Hairline,
+                CornerRadius = 18,
                 Cursor = Cursors.Hand
             };
             Label heading = new Label
@@ -2416,8 +2474,8 @@ namespace Neck
                 AutoSize = false,
                 Height = 42,
                 Dock = DockStyle.Top,
-                Padding = new Padding(24, 15, 16, 0),
-                Font = new Font("Segoe UI Semibold", 13f, FontStyle.Bold),
+                Padding = new Padding(22, 14, 16, 0),
+                Font = new Font("Segoe UI Variable Display", 13f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 Cursor = Cursors.Hand
             };
@@ -2426,7 +2484,7 @@ namespace Neck
                 Text = description,
                 AutoSize = false,
                 Dock = DockStyle.Fill,
-                Padding = new Padding(24, 8, 20, 12),
+                Padding = new Padding(22, 7, 20, 12),
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
                 Cursor = Cursors.Hand
@@ -2434,14 +2492,14 @@ namespace Neck
             EventHandler select = delegate { Choose(choice); };
             EventHandler enter = delegate
             {
-                card.BackColor = Color.FromArgb(248, 250, 252);
+                card.BackColor = Theme.FlowSoft;
                 card.Invalidate();
             };
             EventHandler leave = delegate
             {
                 Point pointer = card.PointToClient(Cursor.Position);
                 if (card.ClientRectangle.Contains(pointer)) return;
-                card.BackColor = Color.White;
+                card.BackColor = Theme.Card;
                 card.Invalidate();
             };
             card.Click += select;
@@ -2511,13 +2569,13 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 116, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 108, BackColor = Theme.Card };
             header.Controls.Add(new Label
             {
                 Text = "Modo Reunião",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 22f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 21f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(28, 18)
             });
             header.Controls.Add(new Label
@@ -2525,7 +2583,7 @@ namespace Neck
                 Text = "Prepare o computador antes de compartilhar sua tela",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(186, 199, 218),
+                ForeColor = Theme.Muted,
                 Location = new Point(31, 67)
             });
 
@@ -2679,13 +2737,13 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Card };
             header.Controls.Add(new Label
             {
                 Text = "Neck Guard",
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 22f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 21f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(28, 18)
             });
             header.Controls.Add(new Label
@@ -2693,7 +2751,7 @@ namespace Neck
                 Text = "O que está pressionando seu computador agora",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(186, 199, 218),
+                ForeColor = Theme.Muted,
                 Location = new Point(31, 65)
             });
 
@@ -2859,13 +2917,13 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Card };
             header.Controls.Add(new Label
             {
                 Text = "O que você quer melhorar?",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 21f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 21f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(28, 20)
             });
             header.Controls.Add(new Label
@@ -2873,7 +2931,7 @@ namespace Neck
                 Text = "As opções mais seguras já estão marcadas. Você revisará tudo antes de iniciar.",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(186, 199, 218),
+                ForeColor = Theme.Muted,
                 Location = new Point(31, 62)
             });
 
@@ -3064,9 +3122,9 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 106, BackColor = Theme.Navy, Padding = new Padding(28, 20, 28, 16) };
-            header.Controls.Add(new Label { Text = "Drivers e atualizações", AutoSize = true, Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold), ForeColor = Color.White, Location = new Point(27, 18) });
-            header.Controls.Add(new Label { Text = "Somente fontes oficiais. Revise as atualizações antes de instalar.", AutoSize = true, Font = Theme.Body, ForeColor = Color.FromArgb(194, 207, 225), Location = new Point(30, 61) });
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 102, BackColor = Theme.Card, Padding = new Padding(28, 20, 28, 16) };
+            header.Controls.Add(new Label { Text = "Drivers e atualizações", AutoSize = true, Font = new Font("Segoe UI Variable Display", 21f, FontStyle.Bold), ForeColor = Theme.Ink, Location = new Point(27, 18) });
+            header.Controls.Add(new Label { Text = "Somente fontes oficiais. Revise as atualizações antes de instalar.", AutoSize = true, Font = Theme.Body, ForeColor = Theme.Muted, Location = new Point(30, 61) });
 
             TableLayoutPanel body = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 2, RowCount = 2 };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 53));

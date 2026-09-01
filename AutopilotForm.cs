@@ -46,15 +46,15 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 120, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Card };
             FlowMark mark = new FlowMark { Location = new Point(28, 31), Size = new Size(54, 54) };
             header.Controls.Add(mark);
             header.Controls.Add(new Label
             {
                 Text = "Neck Autopilot",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 24f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 24f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(104, 24)
             });
             header.Controls.Add(new Label
@@ -62,18 +62,18 @@ namespace Neck
                 Text = "Prevê gargalos e protege o que importa antes do travamento.",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(191, 203, 220),
+                ForeColor = Theme.Muted,
                 Location = new Point(107, 70)
             });
             Label promise = new Label
             {
-                Text = "TEMPORÁRIO  •  REVERSÍVEL",
+                Text = "●  Temporário e reversível",
                 AutoSize = false,
                 Size = new Size(230, 38),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(191, 219, 254),
-                BackColor = Color.FromArgb(30, 41, 59),
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Segoe UI Semibold", 9f, FontStyle.Regular),
+                ForeColor = Theme.Green,
+                BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(ClientSize.Width - 260, 41)
             };
@@ -131,7 +131,7 @@ namespace Neck
             _title.AutoSize = false;
             _title.Location = new Point(24, 58);
             _title.Size = new Size(745, 34);
-            _title.Font = new Font("Bahnschrift", 18f, FontStyle.Bold);
+            _title.Font = new Font("Segoe UI Variable Display", 18f, FontStyle.Bold);
             _title.ForeColor = Theme.Text;
             _explanation.AutoSize = false;
             _explanation.Location = new Point(26, 96);
@@ -157,7 +157,7 @@ namespace Neck
             {
                 Text = "Proteção com limites claros",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 16f, FontStyle.Bold),
+                Font = new Font("Segoe UI Variable Display", 16f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 Location = new Point(24, 14)
             };
@@ -199,7 +199,7 @@ namespace Neck
             {
                 Text = "Teste sem sobrecarregar o computador",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 15f, FontStyle.Bold),
+                Font = new Font("Segoe UI Variable Display", 15f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 Location = new Point(24, 20)
             };

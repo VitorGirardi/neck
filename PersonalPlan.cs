@@ -211,15 +211,15 @@ namespace Neck
 
         private void BuildInterface(PersonalPlan plan)
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 124, BackColor = Theme.Navy };
-            header.Controls.Add(new Label { Text = "Meu Plano Neck", AutoSize = true, Font = new Font("Segoe UI Semibold", 24f, FontStyle.Bold), ForeColor = Color.White, Location = new Point(30, 18) });
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 116, BackColor = Theme.Card };
+            header.Controls.Add(new Label { Text = "Meu Plano Neck", AutoSize = true, Font = new Font("Segoe UI Variable Display", 24f, FontStyle.Bold), ForeColor = Theme.Ink, Location = new Point(30, 18) });
             header.Controls.Add(new Label
             {
                 Text = plan.Title + " — " + plan.Summary,
                 AutoSize = false,
                 Size = new Size(700, 46),
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(190, 203, 222),
+                ForeColor = Theme.Muted,
                 Location = new Point(33, 66)
             });
             RoundedPanel score = new RoundedPanel { Size = new Size(92, 72), BackColor = Theme.NavySoft, OutlineColor = Theme.NavySoft, CornerRadius = 14, Location = new Point(790, 25), Anchor = AnchorStyles.Top | AnchorStyles.Right };

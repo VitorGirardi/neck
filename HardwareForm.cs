@@ -33,13 +33,13 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Card };
             header.Controls.Add(new Label
             {
                 Text = "Hardware deste computador",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 23f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 23f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(30, 19)
             });
             header.Controls.Add(new Label
@@ -47,7 +47,7 @@ namespace Neck
                 Text = "Especificações lidas localmente. Nenhuma informação é enviada pela internet.",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(191, 203, 220),
+                ForeColor = Theme.Muted,
                 Location = new Point(33, 68)
             });
 

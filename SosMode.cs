@@ -170,7 +170,7 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 120, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Card };
             header.Controls.Add(new Label
             {
                 Text = "ACELERAR",
@@ -186,8 +186,8 @@ namespace Neck
             {
                 Text = "Qual aplicativo precisa ficar mais rápido?",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 20f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 20f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(138, 20)
             });
             header.Controls.Add(new Label
@@ -195,7 +195,7 @@ namespace Neck
                 Text = "Escolha um aplicativo. O Neck cuida do resto automaticamente.",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(186, 199, 218),
+                ForeColor = Theme.Muted,
                 Location = new Point(32, 74)
             });
 
@@ -510,9 +510,9 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Navy };
-            header.Controls.Add(new Label { Text = "Controles avançados", AutoSize = true, Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold), ForeColor = Color.White, Location = new Point(28, 18) });
-            header.Controls.Add(new Label { Text = _candidate.DisplayName + " • opções para usuários experientes", AutoSize = true, Font = Theme.Body, ForeColor = Color.FromArgb(186, 199, 218), Location = new Point(30, 61) });
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 100, BackColor = Theme.Card };
+            header.Controls.Add(new Label { Text = "Controles avançados", AutoSize = true, Font = new Font("Segoe UI Variable Display", 21f, FontStyle.Bold), ForeColor = Theme.Ink, Location = new Point(28, 18) });
+            header.Controls.Add(new Label { Text = _candidate.DisplayName + " • opções para usuários experientes", AutoSize = true, Font = Theme.Body, ForeColor = Theme.Muted, Location = new Point(30, 61) });
 
             Panel body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(28), BackColor = Theme.Background };
             Label explanation = new Label

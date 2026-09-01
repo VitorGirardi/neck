@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$OutputPath
+    [string]$OutputPath,
+    [string]$PreviewPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,29 +27,47 @@ $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
 $graphics.Clear([System.Drawing.Color]::Transparent)
 
-$path = [System.Drawing.Drawing2D.GraphicsPath]::new()
-$path.AddArc(12, 12, 72, 72, 180, 90)
-$path.AddArc(172, 12, 72, 72, 270, 90)
-$path.AddArc(172, 172, 72, 72, 0, 90)
-$path.AddArc(12, 172, 72, 72, 90, 90)
-$path.CloseFigure()
+$left = [System.Drawing.Drawing2D.GraphicsPath]::new()
+$left.StartFigure()
+$left.AddLine(38, 24, 88, 24)
+$left.AddBezier(88, 24, 88, 72, 97, 104, 122, 128)
+$left.AddBezier(122, 128, 97, 152, 88, 184, 88, 232)
+$left.AddLine(88, 232, 38, 232)
+$left.AddBezier(38, 232, 38, 180, 51, 148, 76, 128)
+$left.AddBezier(76, 128, 51, 108, 38, 76, 38, 24)
+$left.CloseFigure()
 
-$navy = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 11, 19, 36))
-$cyan = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 14, 165, 168), 18)
-$white = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::White)
+$right = [System.Drawing.Drawing2D.GraphicsPath]::new()
+$right.StartFigure()
+$right.AddLine(218, 24, 168, 24)
+$right.AddBezier(168, 24, 168, 72, 159, 104, 134, 128)
+$right.AddBezier(134, 128, 159, 152, 168, 184, 168, 232)
+$right.AddLine(168, 232, 218, 232)
+$right.AddBezier(218, 232, 218, 180, 205, 148, 180, 128)
+$right.AddBezier(180, 128, 205, 108, 218, 76, 218, 24)
+$right.CloseFigure()
 
-$graphics.FillPath($navy, $path)
-$cyan.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-$cyan.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-$top = [System.Drawing.Drawing2D.GraphicsPath]::new()
-$bottom = [System.Drawing.Drawing2D.GraphicsPath]::new()
-$top.AddBezier(45, 66, 91, 66, 87, 108, 128, 108)
-$top.AddBezier(128, 108, 169, 108, 165, 66, 211, 66)
-$bottom.AddBezier(45, 190, 91, 190, 87, 148, 128, 148)
-$bottom.AddBezier(128, 148, 169, 148, 165, 190, 211, 190)
-$graphics.DrawPath($cyan, $top)
-$graphics.DrawPath($cyan, $bottom)
-$graphics.FillEllipse($white, 115, 115, 26, 26)
+$ink = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 31, 41, 37))
+$lime = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 182, 239, 103))
+$flow = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 182, 239, 103), 18)
+$flow.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+$flow.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+
+$graphics.FillPath($ink, $left)
+$graphics.FillPath($ink, $right)
+$graphics.DrawLine($flow, 58, 128, 184, 128)
+$arrow = [System.Drawing.PointF[]]@(
+    [System.Drawing.PointF]::new(176, 105),
+    [System.Drawing.PointF]::new(206, 128),
+    [System.Drawing.PointF]::new(176, 151)
+)
+$graphics.FillPolygon($lime, $arrow)
+
+if (-not [string]::IsNullOrWhiteSpace($PreviewPath)) {
+    $previewDirectory = Split-Path -Parent $PreviewPath
+    if ($previewDirectory) { New-Item -ItemType Directory -Path $previewDirectory -Force | Out-Null }
+    $bitmap.Save($PreviewPath, [System.Drawing.Imaging.ImageFormat]::Png)
+}
 
 $handle = $bitmap.GetHicon()
 try {
@@ -57,12 +76,11 @@ try {
     try { $icon.Save($stream) } finally { $stream.Dispose() }
 } finally {
     [NeckIconNative]::DestroyIcon($handle) | Out-Null
-    $top.Dispose()
-    $bottom.Dispose()
-    $white.Dispose()
-    $cyan.Dispose()
-    $navy.Dispose()
-    $path.Dispose()
+    $flow.Dispose()
+    $lime.Dispose()
+    $ink.Dispose()
+    $left.Dispose()
+    $right.Dispose()
     $graphics.Dispose()
     $bitmap.Dispose()
 }

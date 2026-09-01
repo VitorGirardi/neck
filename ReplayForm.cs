@@ -34,14 +34,14 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 118, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = Theme.Card };
             FlowMark mark = new FlowMark { Location = new Point(28, 30), Size = new Size(54, 54) };
             Label title = new Label
             {
                 Text = "Neck Replay",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 24f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 24f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(103, 25)
             };
             Label subtitle = new Label
@@ -49,18 +49,18 @@ namespace Neck
                 Text = "A caixa-preta local que explica onde o fluxo foi estrangulado.",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(191, 203, 220),
+                ForeColor = Theme.Muted,
                 Location = new Point(106, 70)
             };
             Label privacy = new Label
             {
-                Text = "ÚLTIMOS 5 MIN  •  SOMENTE NESTE PC",
+                Text = "●  Últimos 5 min neste PC",
                 AutoSize = false,
                 Size = new Size(260, 38),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(191, 219, 254),
-                BackColor = Color.FromArgb(30, 41, 59),
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Segoe UI Semibold", 9f, FontStyle.Regular),
+                ForeColor = Theme.Green,
+                BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(ClientSize.Width - 292, 40)
             };
@@ -112,7 +112,7 @@ namespace Neck
                 AutoSize = false,
                 Location = new Point(23, 51),
                 Size = new Size(820, 34),
-                Font = new Font("Bahnschrift", 18f, FontStyle.Bold),
+                Font = new Font("Segoe UI Variable Display", 18f, FontStyle.Bold),
                 ForeColor = Theme.Text,
                 Text = hasIncident ? _incident.Title : "Nenhum gargalo foi confirmado nesta janela"
             };
@@ -175,7 +175,7 @@ namespace Neck
             RoundedPanel card = NewCard(new Padding(18));
             card.Margin = new Padding(0, 0, 10, 10);
             Label captionLabel = new Label { Text = caption, Dock = DockStyle.Top, Height = 20, Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold), ForeColor = Theme.Muted };
-            Label valueLabel = new Label { Text = value, Dock = DockStyle.Top, Height = 31, Font = new Font("Bahnschrift", 16f, FontStyle.Bold), ForeColor = Theme.Text, AutoEllipsis = true };
+            Label valueLabel = new Label { Text = value, Dock = DockStyle.Top, Height = 31, Font = new Font("Segoe UI Variable Display", 16f, FontStyle.Bold), ForeColor = Theme.Text, AutoEllipsis = true };
             Label detailLabel = new Label { Text = detail, Dock = DockStyle.Fill, Font = Theme.Small, ForeColor = Theme.Muted, AutoEllipsis = true };
             card.Controls.Add(detailLabel);
             card.Controls.Add(valueLabel);

@@ -5,7 +5,7 @@
 <h1 align="center">Neck</h1>
 
 <p align="center">
-  <strong>Cuide do Windows sem complicação.</strong><br>
+  <strong>Destrave o fluxo do seu computador.</strong><br>
   Detecta o gargalo, recomenda uma única ação e acompanha o resultado sem colocar seus arquivos em risco.
 </p>
 
@@ -45,12 +45,12 @@ Ele foi criado para quem quer responder três perguntas simples:
 
 A página inicial foi organizada para qualquer pessoa entender por onde começar, mesmo sem conhecer termos técnicos:
 
-- **Acelerar um aplicativo** é a ação principal quando algo importante está travando.
+- **Destravar agora** aponta a ação principal quando o Neck encontra um gargalo.
 - **Índice de Fluxo** aprende o padrão saudável deste computador e mostra quando ele está diferente do próprio normal.
 - **Neck Autopilot** pode antecipar pressão de RAM ou CPU e proteger temporariamente o aplicativo importante.
-- **Limpar arquivos** remove somente temporários conhecidos e mostra antes quanto pode ser liberado.
-- **Revisar o computador** reúne os cuidados mensais do Windows em uma etapa separada.
-- **Mais ferramentas** guarda recursos ocasionais como Neck Replay, Suporte, Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
+- **Liberar espaço** remove somente temporários conhecidos e mostra antes quanto pode ser liberado.
+- **Cuidado completo** reúne os cuidados mensais do Windows em uma etapa separada.
+- **Ferramentas** guarda recursos ocasionais como Neck Replay, Suporte, Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
 
 Assim, nenhuma ferramenta foi removida: as ações mais importantes aparecem primeiro e os controles ocasionais ficam em uma segunda camada.
 
@@ -60,11 +60,11 @@ As interações usam movimentos curtos e leves: janelas aparecem suavemente, bot
 
 O nome Neck vem de **bottleneck**: um gargalo que limita o fluxo do computador. A identidade visual transforma essa ideia em uma linguagem funcional:
 
-- o símbolo mostra um canal que estreita e volta a abrir;
-- os estados usam **Fluindo bem**, **Atenção** e **Gargalo detectado**;
+- o símbolo mostra duas paredes formando um gargalo e uma seta atravessando a restrição;
+- os estados usam **Fluxo livre**, **Fluxo sob pressão** e **Gargalo agora**;
 - a animação da tela principal representa o fluxo passando pelo ponto de restrição;
-- [Bahnschrift](https://learn.microsoft.com/typography/font-list/bahnschrift), fonte técnica incluída no Windows 10 e 11, identifica títulos e métricas; Segoe UI preserva a leitura dos textos;
-- ciano representa o fluxo do Neck, âmbar indica restrição e verde confirma ações concluídas.
+- **Segoe UI Variable Display** dá personalidade aos títulos sem perder a familiaridade do Windows; Segoe UI preserva a leitura dos textos;
+- grafite representa estrutura, verde-lima mostra o fluxo, âmbar indica restrição e o fundo quente evita a aparência clínica de antivírus.
 
 A animação ocorre por um intervalo curto após cada diagnóstico e não permanece consumindo recursos na bandeja.
 
@@ -145,7 +145,7 @@ As mudanças são temporárias: o aplicativo volta a responder normalmente ao re
 
 ## Suporte e recuperação após interrupções
 
-Antes de aplicar uma prioridade, EcoQoS ou prioridade de memória temporária, o Neck 1.16 registra localmente o estado original. Uma restauração normal remove a entrada imediatamente. Se o processo do Neck cair ou o computador desligar no meio da operação, a próxima abertura confere a identidade e o horário de início de cada processo antes de devolver o estado anterior. Processos já encerrados ou reutilizados por outro aplicativo são descartados sem alteração.
+Antes de aplicar uma prioridade, EcoQoS ou prioridade de memória temporária, o Neck 1.17 registra localmente o estado original. Uma restauração normal remove a entrada imediatamente. Se o processo do Neck cair ou o computador desligar no meio da operação, a próxima abertura confere a identidade e o horário de início de cada processo antes de devolver o estado anterior. Processos já encerrados ou reutilizados por outro aplicativo são descartados sem alteração.
 
 Em **Mais ferramentas → Suporte**, o botão **Criar relatório** gera um arquivo em `Documentos\Neck\Suporte`. Ele contém versão do Neck e do Windows, especificações resumidas, médias de RAM/CPU, contagens de recuperação e eventos técnicos recentes. Nomes de usuário, computador, aplicativos, títulos de janela, caminhos pessoais, documentos, senhas e conteúdo da tela ficam de fora. O arquivo nunca é enviado automaticamente e deve ser revisado antes de ser anexado a uma issue pública.
 
@@ -295,11 +295,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.16.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.17.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.16.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.17.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -309,7 +309,7 @@ Get-FileHash .\Neck-Setup-1.16.0.exe -Algorithm SHA256
 Baixe `Neck.exe` na mesma release e execute-o diretamente. Nenhuma instalação é necessária. As preferências e o histórico continuam armazenados no perfil local do Windows.
 
 > [!IMPORTANT]
-> Os binários da versão 1.16.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+> Os binários da versão 1.17.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
 
 ## Assinatura digital
 

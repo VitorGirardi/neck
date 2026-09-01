@@ -277,15 +277,15 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Theme.Navy };
-            header.Controls.Add(new Label { Text = "Neck Boot", AutoSize = true, Font = new Font("Segoe UI Semibold", 23f, FontStyle.Bold), ForeColor = Color.White, Location = new Point(28, 17) });
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 104, BackColor = Theme.Card };
+            header.Controls.Add(new Label { Text = "Neck Boot", AutoSize = true, Font = new Font("Segoe UI Variable Display", 23f, FontStyle.Bold), ForeColor = Theme.Ink, Location = new Point(28, 17) });
             header.Controls.Add(new Label
             {
                 Text = "Descubra o que acompanha o Windows e decida com segurança o que realmente precisa iniciar junto.",
                 AutoSize = false,
                 Size = new Size(850, 34),
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(190, 203, 222),
+                ForeColor = Theme.Muted,
                 Location = new Point(31, 64)
             });
 

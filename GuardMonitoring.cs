@@ -309,9 +309,9 @@ namespace Neck
 
         private void BuildInterface(IList<GuardSample> samples, string reportDirectory)
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 108, BackColor = Theme.Navy };
-            header.Controls.Add(new Label { Text = "Últimas 24 horas", AutoSize = true, Font = new Font("Segoe UI Semibold", 22f, FontStyle.Bold), ForeColor = Color.White, Location = new Point(28, 18) });
-            header.Controls.Add(new Label { Text = "Apenas métricas locais; nenhum dado é enviado.", AutoSize = true, Font = Theme.Body, ForeColor = Color.FromArgb(186, 199, 218), Location = new Point(31, 64) });
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 102, BackColor = Theme.Card };
+            header.Controls.Add(new Label { Text = "Últimas 24 horas", AutoSize = true, Font = new Font("Segoe UI Variable Display", 22f, FontStyle.Bold), ForeColor = Theme.Ink, Location = new Point(28, 18) });
+            header.Controls.Add(new Label { Text = "Apenas métricas locais; nenhum dado é enviado.", AutoSize = true, Font = Theme.Body, ForeColor = Theme.Muted, Location = new Point(31, 64) });
 
             TableLayoutPanel body = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24, 20, 24, 20), ColumnCount = 1, RowCount = 3, BackColor = Theme.Background };
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 82));

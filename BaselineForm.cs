@@ -28,14 +28,14 @@ namespace Neck
 
         private void BuildInterface()
         {
-            Panel header = new Panel { Dock = DockStyle.Top, Height = 118, BackColor = Theme.Navy };
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = Theme.Card };
             FlowMark mark = new FlowMark { Location = new Point(28, 30), Size = new Size(54, 54) };
             Label title = new Label
             {
                 Text = "Meu padrão Neck",
                 AutoSize = true,
-                Font = new Font("Bahnschrift", 24f, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font = new Font("Segoe UI Variable Display", 24f, FontStyle.Bold),
+                ForeColor = Theme.Ink,
                 Location = new Point(103, 25)
             };
             Label subtitle = new Label
@@ -43,18 +43,18 @@ namespace Neck
                 Text = "O padrão normal deste PC, aprendido apenas no dispositivo.",
                 AutoSize = true,
                 Font = Theme.Body,
-                ForeColor = Color.FromArgb(191, 203, 220),
+                ForeColor = Theme.Muted,
                 Location = new Point(106, 70)
             };
             Label privacy = new Label
             {
-                Text = "LOCAL  •  ADAPTATIVO  •  PRIVADO",
+                Text = "●  Local e privado",
                 AutoSize = false,
                 Size = new Size(248, 38),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(191, 219, 254),
-                BackColor = Color.FromArgb(30, 41, 59),
+                TextAlign = ContentAlignment.MiddleRight,
+                Font = new Font("Segoe UI Semibold", 9f, FontStyle.Regular),
+                ForeColor = Theme.Green,
+                BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(ClientSize.Width - 280, 40)
             };
@@ -97,7 +97,7 @@ namespace Neck
                 AutoSize = false,
                 Size = new Size(150, 72),
                 Location = new Point(24, 29),
-                Font = new Font("Bahnschrift", 35f, FontStyle.Bold),
+                Font = new Font("Segoe UI Variable Display", 35f, FontStyle.Bold),
                 ForeColor = personalized ? ScoreColor(evaluation.Score) : Theme.Blue,
                 TextAlign = ContentAlignment.MiddleCenter
             };
@@ -117,7 +117,7 @@ namespace Neck
                 AutoSize = false,
                 Location = new Point(198, 27),
                 Size = new Size(610, 38),
-                Font = new Font("Bahnschrift", 18f, FontStyle.Bold),
+                Font = new Font("Segoe UI Variable Display", 18f, FontStyle.Bold),
                 ForeColor = Theme.Text
             };
             Label explanation = new Label
@@ -200,7 +200,7 @@ namespace Neck
             RoundedPanel card = NewCard(Padding.Empty);
             card.Margin = new Padding(0, 0, 10, 10);
             Label caption = new Label { Text = title, Location = new Point(20, 13), Size = new Size(330, 18), Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold), ForeColor = Theme.Muted };
-            Label range = new Label { Text = value, Location = new Point(20, 35), Size = new Size(330, 31), Font = new Font("Bahnschrift", 16f, FontStyle.Bold), ForeColor = Theme.Text, AutoEllipsis = true };
+            Label range = new Label { Text = value, Location = new Point(20, 35), Size = new Size(330, 31), Font = new Font("Segoe UI Variable Display", 16f, FontStyle.Bold), ForeColor = Theme.Text, AutoEllipsis = true };
             ToolTip tip = new ToolTip();
             tip.SetToolTip(card, detail);
             tip.SetToolTip(caption, detail);
