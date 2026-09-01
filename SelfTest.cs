@@ -64,6 +64,20 @@ namespace Neck
                         Thread.Sleep(50);
                     }
                     Console.WriteLine("MainFormShown=" + form.Visible);
+                    string[] trayLabels = form.GetVisibleTrayLabelsForTesting();
+                    string[] expectedTrayLabels =
+                    {
+                        trayLabels.FirstOrDefault() ?? "",
+                        "Abrir Neck",
+                        "Acelerar aplicativo",
+                        "Modo reunião",
+                        "Mais opções",
+                        "Preferências",
+                        "Sair do Neck"
+                    };
+                    if (!trayLabels.SequenceEqual(expectedTrayLabels))
+                        throw new InvalidOperationException("O menu da bandeja voltou a expor opções demais: " + string.Join(" | ", trayLabels));
+                    Console.WriteLine("TrayMenu=" + string.Join(" | ", trayLabels));
                     using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(form.Width, form.Height))
                     {
                         form.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, form.Width, form.Height));
