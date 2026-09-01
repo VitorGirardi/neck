@@ -563,6 +563,7 @@ namespace Neck
         private bool _replayCapturing;
         private bool _showReplayAsPrimary;
         private bool _showAutopilotAsPrimary;
+        private ReplaySample _latestReplaySample;
         private DateTime _lastReplayCaptureUtc = DateTime.MinValue;
 
         private static readonly string DataDirectory = Path.Combine(
@@ -1022,7 +1023,7 @@ namespace Neck
                     ShowAutopilot();
                     return;
                 }
-                if (_currentAdvice != null && _currentAdvice.Kind == BottleneckKind.Disk)
+                if (_currentAdvice != null && _currentAdvice.ActionKind == BottleneckActionKind.Cleanup)
                 {
                     _tempCheck.Checked = true;
                     _reportsCheck.Checked = true;
@@ -1031,6 +1032,14 @@ namespace Neck
                     _healthCheck.Checked = false;
                     _drivesCheck.Checked = false;
                     await RunMaintenanceAsync();
+                }
+                else if (_currentAdvice != null && _currentAdvice.ActionKind == BottleneckActionKind.Diagnostic)
+                {
+                    using (DiagnosticForm form = new DiagnosticForm(_healthSnapshot ?? SystemInfo.GetHealthSnapshot())) form.ShowDialog(this);
+                }
+                else if (_currentAdvice != null && _currentAdvice.ActionKind == BottleneckActionKind.Hardware)
+                {
+                    await ShowHardwareDetailsAsync();
                 }
                 else OpenSos();
             };
@@ -1688,6 +1697,7 @@ namespace Neck
                 ReplayCapture capture = await Task.Run(delegate { return _replayProbe.Capture(temperature); });
                 if (_closing || IsDisposed || capture == null || capture.Sample == null) return;
                 _healthSnapshot = capture.Health;
+                _latestReplaySample = capture.Sample;
                 _lastReplayCaptureUtc = capture.Sample.TimestampUtc;
                 ReplayDecision decision = _replayEngine.Record(capture.Sample);
                 _baselineEvaluation = _baselineEngine.Observe(capture.Sample, _meetingActive);
@@ -2030,7 +2040,7 @@ namespace Neck
                 ? "Nenhum processo pôde ser analisado."
                 : "Maior uso: " + top.DisplayName + "  •  " + FormatBytes(top.MemoryBytes)) + adaptive;
 
-            _currentAdvice = BottleneckAdvisor.Analyze(snapshot);
+            _currentAdvice = BottleneckAdvisor.Analyze(snapshot, _latestReplaySample);
             ReplayIncident replay = _replayEngine.GetLatestIncident();
             _showReplayAsPrimary = replay != null && !replay.Ongoing && replay.EndedUtc != DateTime.MinValue &&
                 DateTime.UtcNow - replay.EndedUtc <= TimeSpan.FromMinutes(30) && snapshot.Level == HealthLevel.Stable;

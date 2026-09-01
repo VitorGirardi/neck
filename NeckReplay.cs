@@ -381,6 +381,7 @@ namespace Neck
                 ForegroundProcess = foreground,
                 ForegroundResponsive = responsive
             };
+            FlowHealthRefiner.Apply(health, sample);
             return new ReplayCapture { Health = health, Sample = sample };
         }
 
