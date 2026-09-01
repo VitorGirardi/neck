@@ -46,6 +46,7 @@ Ele foi criado para quem quer responder três perguntas simples:
 A página inicial foi organizada para qualquer pessoa entender por onde começar, mesmo sem conhecer termos técnicos:
 
 - **Acelerar um aplicativo** é a ação principal quando algo importante está travando.
+- **Índice de Fluxo** aprende o padrão saudável deste computador e mostra quando ele está diferente do próprio normal.
 - **Limpar arquivos** remove somente temporários conhecidos e mostra antes quanto pode ser liberado.
 - **Revisar o computador** reúne os cuidados mensais do Windows em uma etapa separada.
 - **Mais ferramentas** guarda recursos ocasionais como Neck Replay, Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
@@ -72,6 +73,7 @@ A animação ocorre por um intervalo curto após cada diagnóstico e não perman
 
 | Recurso | O que faz | Proteção principal |
 | --- | --- | --- |
+| **Neck Baseline** | Aprende as faixas habituais deste computador e transforma desvios no Índice de Fluxo. | Salva somente agregados locais e não aprende leituras de incidente. |
 | **Neck Replay** | Preserva os últimos cinco minutos em memória e explica por que o computador acabou de travar. | Só confirma pressão persistente, não grava conteúdo de janelas e não executa ações sozinho. |
 | **Gargalo Guiado** | Distingue pressão de memória, CPU e armazenamento e recomenda a ação mais útil naquele momento. | Explica o motivo e mantém a confirmação com o usuário. |
 | **Monitor Inteligente** | Ajusta o intervalo de leitura conforme a pressão, confirma persistência e reconhece a recuperação. | Não limpa, fecha ou altera aplicativos automaticamente. |
@@ -106,6 +108,18 @@ O cartão principal agora funciona como uma orientação única, não como um pa
 O monitor trabalha de forma adaptativa: verifica a cada 60 segundos quando o computador está fluindo, a cada 30 segundos durante atenção e a cada 15 segundos em situação crítica. Um alerta só é liberado depois de três leituras consecutivas de pressão. Depois, duas leituras estáveis confirmam a recuperação e o intervalo volta ao normal.
 
 Essas leituras e decisões acontecem localmente. O monitor não fecha processos, não executa limpeza e não modifica o Windows por conta própria.
+
+## Neck Baseline: o padrão do seu computador
+
+O **Neck Baseline** deixa de comparar todo computador com um número genérico. Ele aprende como RAM, CPU, paginação, fila e latência do armazenamento e temperaturas costumam se comportar **nesta máquina**. Depois transforma a comparação em um **Índice de Fluxo de 0 a 100**, visível e clicável no cartão principal.
+
+O primeiro índice personalizado aparece após 30 leituras válidas — aproximadamente cinco minutos com o Neck aberto ou na bandeja — e continua se refinando com o uso. O aprendizado mantém dois contextos separados: uso normal e Modo Reunião. Assim, uma chamada naturalmente mais pesada não redefine o restante do dia.
+
+Antes de atualizar o padrão, o Neck verifica a leitura. Travamentos, pressão absoluta de RAM, disputa de CPU, espera de disco, temperatura crítica, janela sem resposta e desvios já identificados ficam fora das médias. Isso impede que um problema recorrente seja gradualmente tratado como “normal”.
+
+No disco são salvos apenas contagem, média, variação e faixas numéricas em `%LOCALAPPDATA%\Neck\baseline-v1.txt`. Nomes de aplicativos, amostras individuais, títulos de janelas e uma linha do tempo de uso não fazem parte desse arquivo.
+
+![Neck Baseline com Índice de Fluxo e faixas locais](assets/screenshots/neck-baseline.png)
 
 ## Neck Replay: a caixa-preta do gargalo
 
@@ -247,11 +261,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.13.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.14.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.13.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.14.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -261,7 +275,7 @@ Get-FileHash .\Neck-Setup-1.13.0.exe -Algorithm SHA256
 Baixe `Neck.exe` na mesma release e execute-o diretamente. Nenhuma instalação é necessária. As preferências e o histórico continuam armazenados no perfil local do Windows.
 
 > [!IMPORTANT]
-> Os binários da versão 1.13.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+> Os binários da versão 1.14.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
 
 ## Assinatura digital
 
@@ -294,6 +308,7 @@ A descrição completa do tráfego iniciado pelo usuário, dos dados locais e da
 Dados mantidos localmente:
 
 - Preferências e histórico do Guard: `%LOCALAPPDATA%\Neck`
+- Padrão estatístico agregado: `%LOCALAPPDATA%\Neck\baseline-v1.txt`
 - Relatórios de manutenção: `Documentos\Neck\Relatorios`
 - Histórico do Guard: somente as últimas 24 horas
 
@@ -338,6 +353,8 @@ GuardMonitoring.cs         Monitoramento contínuo, histórico e bandeja
 BottleneckGuidance.cs      Gargalo Guiado, monitor adaptativo e medição de resultado
 NeckReplay.cs              Caixa-preta, PDH, classificação causal e incidentes em memória
 ReplayForm.cs              Explicação visual e linha do tempo dos últimos cinco minutos
+NeckBaseline.cs            Aprendizado estatístico local, contextos e Índice de Fluxo
+BaselineForm.cs            Faixas habituais e progresso do padrão personalizado
 SosMode.cs                 Alívio seguro de sobrecarga
 EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
 TurboMode.cs               Prioridade de foco temporária e reversível
@@ -380,6 +397,8 @@ O Neck ajuda a diagnosticar e reduzir sobrecarga, mas não substitui backup, ant
 
 As causas mostradas pelo Replay são inferências locais baseadas na coincidência e persistência de sinais do Windows. Elas explicam a evidência observada, mas não substituem uma análise especializada de hardware quando a falha é intermitente ou física.
 
+O Índice de Fluxo é uma comparação estatística, não um benchmark universal. Nos primeiros minutos ele ainda está aprendendo; mudanças grandes de hardware ou de rotina levam algum tempo para se refletir nas faixas.
+
 Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware. Leia cada recomendação e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Roadmap
@@ -402,6 +421,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Inventário de hardware e temperaturas locais com fontes explícitas
 - [x] Cura Bluetooth com diagnóstico, reinício seletivo e nova detecção
 - [x] Neck Replay com caixa-preta local, classificação causal e linha do tempo
+- [x] Neck Baseline com padrão local, Índice de Fluxo e contexto de reunião
 - [x] Políticas, validação e pipeline de assinatura em duas fases
 - [ ] Aprovação SignPath e primeira release com Authenticode válido
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade

@@ -19,6 +19,7 @@ O Neck não baixa nem instala silenciosamente atualizações próprias, aplicati
 ## Dados armazenados localmente
 
 - Preferências e histórico recente do Neck Guard: `%LOCALAPPDATA%\Neck`
+- Padrão estatístico agregado do Neck Baseline: `%LOCALAPPDATA%\Neck\baseline-v1.txt`
 - Relatórios de manutenção escolhidos pelo usuário: `Documentos\Neck\Relatorios`
 - Histórico do Guard: limitado às últimas 24 horas
 
@@ -29,6 +30,12 @@ Esses dados permanecem no computador. Para removê-los, desinstale o Neck e apag
 O Neck Replay mantém em memória uma janela circular de até cinco minutos. Ela contém métricas de recursos, o nome do processo mais associado ao pico, o nome do processo em primeiro plano e apenas seu estado de resposta. O Replay não captura título ou conteúdo da janela, texto digitado, tela, áudio, arquivos abertos ou tráfego de rede.
 
 As amostras detalhadas do Replay não são gravadas no disco e desaparecem quando o Neck é encerrado. O histórico de 24 horas do Guard continua sendo um registro separado e mais simples, conforme os locais descritos acima.
+
+## Neck Baseline
+
+O Neck Baseline grava somente agregados numéricos locais: quantidade de leituras, média, variação, mínimo e máximo das métricas de RAM, paginação, CPU, armazenamento e temperatura. Uso normal e Modo Reunião possuem agregados separados.
+
+O arquivo do Baseline não contém nomes de aplicativos ou processos, títulos de janelas, horários de amostras individuais nem uma linha do tempo detalhada. Leituras reconhecidas como incidente ou desvio do padrão não são incorporadas às médias. Para apagar o aprendizado, encerre o Neck e remova `%LOCALAPPDATA%\Neck\baseline-v1.txt`.
 
 ## Operações administrativas
 

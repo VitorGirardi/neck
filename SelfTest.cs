@@ -513,6 +513,126 @@ namespace Neck
                 });
                 if (!replayRecovered.RecoveryConfirmed || replayRecovered.Incident == null || replayRecovered.Incident.Ongoing)
                     throw new InvalidOperationException("O Replay não confirmou a recuperação com duas leituras estáveis.");
+                string baselinePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "neck-baseline-" + Guid.NewGuid().ToString("N") + ".txt");
+                BaselineView baselineView;
+                try
+                {
+                    using (BaselineEngine baseline = new BaselineEngine(baselinePath))
+                    {
+                        BaselineEvaluation learned = null;
+                        for (int i = 0; i < BaselineEngine.RequiredSamples; i++)
+                        {
+                            learned = baseline.Observe(new ReplaySample
+                            {
+                                TimestampUtc = DateTime.UtcNow.AddSeconds(i * 10),
+                                MemoryPercent = 70 + (i % 3 - 1),
+                                AvailableBytes = (4L * 1024 * 1024 * 1024) + (i % 3 - 1) * 32L * 1024 * 1024,
+                                CommitPercent = 72 + (i % 3 - 1),
+                                PageReadsPerSecond = 2 + i % 2,
+                                CpuPercent = 20 + (i % 5 - 2),
+                                ProcessorQueueLength = 0.2d,
+                                DiskActivePercent = 5 + i % 3,
+                                DiskLatencyMilliseconds = 2 + i % 2,
+                                DiskQueueLength = 0.1d,
+                                TemperatureCelsius = 65 + i % 2,
+                                TopMemoryProcess = "SensitiveAppMustNotPersist",
+                                TopCpuProcess = "SensitiveAppMustNotPersist",
+                                ForegroundProcess = "SensitiveAppMustNotPersist",
+                                ForegroundResponsive = true
+                            }, false);
+                        }
+                        if (learned == null || learned.State != BaselineState.Personalized || learned.Score < 85)
+                            throw new InvalidOperationException("O Baseline não formou um padrão local saudável.");
+
+                        ReplaySample personalizedIncident = new ReplaySample
+                        {
+                            TimestampUtc = DateTime.UtcNow.AddMinutes(6),
+                            MemoryPercent = 84,
+                            AvailableBytes = 2L * 1024 * 1024 * 1024,
+                            CommitPercent = 89,
+                            PageReadsPerSecond = 10,
+                            CpuPercent = 23,
+                            ProcessorQueueLength = 0.2d,
+                            DiskActivePercent = 6,
+                            DiskLatencyMilliseconds = 3,
+                            DiskQueueLength = 0.1d,
+                            TemperatureCelsius = 66,
+                            TopMemoryProcess = "SensitiveIncidentMustNotPersist",
+                            ForegroundResponsive = true
+                        };
+                        if (ReplayClassifier.Analyze(personalizedIncident).Cause != ReplayCause.None)
+                            throw new InvalidOperationException("A amostra personalizada de teste acionou um limite absoluto.");
+                        BaselineEvaluation incidentEvaluation = baseline.Observe(personalizedIncident, false);
+                        if (incidentEvaluation.SampleAccepted || incidentEvaluation.Score >= 85 ||
+                            baseline.GetView().Profile.Normal.SampleCount != BaselineEngine.RequiredSamples)
+                            throw new InvalidOperationException("O Baseline contaminou o padrão ao aprender um desvio local.");
+
+                        for (int i = 0; i < 6; i++)
+                        {
+                            baseline.Observe(new ReplaySample
+                            {
+                                TimestampUtc = DateTime.UtcNow.AddMinutes(7).AddSeconds(i * 10),
+                                MemoryPercent = 72,
+                                AvailableBytes = 4L * 1024 * 1024 * 1024,
+                                CommitPercent = 74,
+                                PageReadsPerSecond = 3,
+                                CpuPercent = 30,
+                                ProcessorQueueLength = 0.4d,
+                                DiskActivePercent = 7,
+                                DiskLatencyMilliseconds = 3,
+                                DiskQueueLength = 0.2d,
+                                TemperatureCelsius = 67,
+                                ForegroundResponsive = true
+                            }, true);
+                        }
+                        baselineView = baseline.GetView();
+                        if (baselineView.Profile.Normal.SampleCount != BaselineEngine.RequiredSamples ||
+                            baselineView.Profile.Meeting.SampleCount != 6)
+                            throw new InvalidOperationException("O Baseline misturou os contextos normal e reunião.");
+                    }
+                    string persistedBaseline = System.IO.File.ReadAllText(baselinePath);
+                    if (persistedBaseline.IndexOf("SensitiveAppMustNotPersist", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        persistedBaseline.IndexOf("SensitiveIncidentMustNotPersist", StringComparison.OrdinalIgnoreCase) >= 0)
+                        throw new InvalidOperationException("O Baseline persistiu identidade de aplicativo ou processo.");
+                    using (BaselineEngine reloadedBaseline = new BaselineEngine(baselinePath))
+                    {
+                        BaselineView reloaded = reloadedBaseline.GetView();
+                        if (reloaded.Profile.Normal.SampleCount != BaselineEngine.RequiredSamples || reloaded.Profile.Meeting.SampleCount != 6)
+                            throw new InvalidOperationException("O Baseline não restaurou os agregados locais.");
+                    }
+                }
+                finally
+                {
+                    try { if (System.IO.File.Exists(baselinePath)) System.IO.File.Delete(baselinePath); }
+                    catch { }
+                    try { if (System.IO.File.Exists(baselinePath + ".tmp")) System.IO.File.Delete(baselinePath + ".tmp"); }
+                    catch { }
+                }
+                using (BaselineForm baseline = new BaselineForm(baselineView))
+                {
+                    baseline.ShowInTaskbar = false;
+                    baseline.StartPosition = FormStartPosition.Manual;
+                    baseline.Location = new System.Drawing.Point(-32000, -32000);
+                    baseline.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(baseline.Width, baseline.Height))
+                    {
+                        baseline.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, baseline.Width, baseline.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Baseline.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BaselinePreview=" + previewPath);
+                    }
+                    baseline.Size = baseline.MinimumSize;
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(baseline.Width, baseline.Height))
+                    {
+                        baseline.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, baseline.Width, baseline.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Baseline.Minimum.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BaselineMinimumPreview=" + previewPath);
+                    }
+                    baseline.Close();
+                }
                 using (ReplayForm replay = new ReplayForm(replayEngine.GetLatestIncident(), replayEngine.GetSamples()))
                 {
                     replay.ShowInTaskbar = false;

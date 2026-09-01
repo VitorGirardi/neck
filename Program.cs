@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.13.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.13.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.14.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.14.0.0")]
 
 namespace Neck
 {
@@ -447,6 +447,7 @@ namespace Neck
     {
         private readonly Label _memoryValue = new Label();
         private readonly Label _diskValue = new Label();
+        private readonly Label _flowScoreValue = new Label();
         private readonly Label _lastRunValue = new Label();
         private readonly Label _recommendation = new Label();
         private readonly Label _analysisValue = new Label();
@@ -491,6 +492,8 @@ namespace Neck
         private readonly SmartGuardMonitor _smartMonitor = new SmartGuardMonitor();
         private readonly ReplayEngine _replayEngine = new ReplayEngine();
         private readonly ReplayProbe _replayProbe = new ReplayProbe();
+        private readonly BaselineEngine _baselineEngine = new BaselineEngine();
+        private BaselineEvaluation _baselineEvaluation = new BaselineEvaluation();
         private GuardSettings _guardSettings;
         private ToolStripMenuItem _startupMenuItem;
         private ToolStripMenuItem _notificationsMenuItem;
@@ -614,6 +617,7 @@ namespace Neck
                 _hardwareTimer.Stop();
                 _replayTimer.Stop();
                 _replayProbe.Dispose();
+                _baselineEngine.Dispose();
                 FocusModeManager.Stop();
                 EfficiencyModeManager.RestoreAll();
                 _trayIcon.Visible = false;
@@ -902,15 +906,19 @@ namespace Neck
             {
                 Location = new Point(28, 177),
                 Size = new Size(570, 55),
-                ColumnCount = 2,
+                ColumnCount = 3,
                 RowCount = 1,
                 BackColor = Theme.Background,
                 Padding = new Padding(4)
             };
-            metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+            metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+            metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.334f));
             metrics.Controls.Add(BuildInlineMetric("MEMÓRIA EM USO", _memoryValue), 0, 0);
             metrics.Controls.Add(BuildInlineMetric("ESPAÇO LIVRE", _diskValue), 1, 0);
+            Control flowMetric = BuildInlineMetric("ÍNDICE DE FLUXO  ›", _flowScoreValue);
+            MakeFlowMetricInteractive(flowMetric);
+            metrics.Controls.Add(flowMetric, 2, 0);
 
             card.Controls.Add(_guardBadge);
             card.Controls.Add(title);
@@ -928,25 +936,35 @@ namespace Neck
             {
                 Text = caption,
                 AutoSize = false,
-                Size = new Size(270, 19),
-                Location = new Point(0, 3),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Location = new Point(0, 2),
+                Size = new Size(100, 19),
                 Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold),
                 ForeColor = Theme.Muted,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Margin = Padding.Empty
             };
             value.AutoSize = false;
-            value.Size = new Size(270, 25);
-            value.Location = new Point(0, 23);
-            value.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            value.Location = new Point(0, 22);
+            value.Size = new Size(100, 27);
             value.TextAlign = ContentAlignment.MiddleCenter;
             value.Font = new Font("Segoe UI Semibold", 13f, FontStyle.Bold);
             value.ForeColor = Theme.Text;
             value.Margin = Padding.Empty;
             panel.Controls.Add(name);
             panel.Controls.Add(value);
+            panel.Resize += delegate
+            {
+                name.Width = panel.ClientSize.Width;
+                value.Width = panel.ClientSize.Width;
+            };
             return panel;
+        }
+
+        private void MakeFlowMetricInteractive(Control control)
+        {
+            control.Cursor = Cursors.Hand;
+            control.Click += delegate { ShowBaseline(); };
+            foreach (Control child in control.Controls) MakeFlowMetricInteractive(child);
         }
 
         private Control BuildToolsStrip()
@@ -1038,6 +1056,7 @@ namespace Neck
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
             menu.Items.Add("Acelerar aplicativo", null, delegate { ShowFromTray(); OpenSos(); });
+            menu.Items.Add("Meu padrão Neck", null, delegate { ShowFromTray(); ShowBaseline(); });
             menu.Items.Add("Neck Replay", null, async delegate { ShowFromTray(); await ShowReplayAsync(); });
             menu.Items.Add("Parar aceleração", null, delegate
             {
@@ -1283,6 +1302,12 @@ namespace Neck
             }
         }
 
+        private void ShowBaseline()
+        {
+            if (_closing || IsDisposed) return;
+            using (BaselineForm form = new BaselineForm(_baselineEngine.GetView())) form.ShowDialog(this);
+        }
+
         private async Task RefreshHardwareAsync(bool fullInventory)
         {
             if (_hardwareRefreshing || _closing || IsDisposed) return;
@@ -1463,6 +1488,7 @@ namespace Neck
                 _healthSnapshot = capture.Health;
                 _lastReplayCaptureUtc = capture.Sample.TimestampUtc;
                 ReplayDecision decision = _replayEngine.Record(capture.Sample);
+                _baselineEvaluation = _baselineEngine.Observe(capture.Sample, _meetingActive);
                 UpdateGuardView(capture.Health);
                 UpdateTrayState(capture.Health);
                 if (decision.IncidentConfirmed && decision.Incident != null)
@@ -1715,6 +1741,7 @@ namespace Neck
         private void UpdateGuardView(HealthSnapshot snapshot)
         {
             if (snapshot == null) return;
+            UpdateFlowScore();
             if (_meetingActive)
             {
                 UpdateMeetingDisplay();
@@ -1773,9 +1800,26 @@ namespace Neck
             }
             else
             {
-                _actionTitle.Text = _currentAdvice.Title;
-                _actionHelp.Text = _currentAdvice.Explanation;
+                bool showPersonalizedInsight = _currentAdvice.Kind == BottleneckKind.None &&
+                    _baselineEvaluation != null && _baselineEvaluation.State == BaselineState.Personalized;
+                _actionTitle.Text = showPersonalizedInsight ? _baselineEvaluation.Title : _currentAdvice.Title;
+                _actionHelp.Text = showPersonalizedInsight ? _baselineEvaluation.Explanation : _currentAdvice.Explanation;
                 _guardButton.Text = _currentAdvice.ActionText;
+            }
+        }
+
+        private void UpdateFlowScore()
+        {
+            BaselineEvaluation evaluation = _baselineEvaluation ?? new BaselineEvaluation();
+            if (evaluation.State == BaselineState.Learning)
+            {
+                _flowScoreValue.Text = evaluation.LearningPercent + "% aprendido";
+                _flowScoreValue.ForeColor = Theme.Blue;
+            }
+            else
+            {
+                _flowScoreValue.Text = evaluation.Score + " / 100";
+                _flowScoreValue.ForeColor = evaluation.Score >= 85 ? Theme.Green : evaluation.Score >= 60 ? Theme.Amber : Color.Firebrick;
             }
         }
 
