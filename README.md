@@ -213,6 +213,10 @@ Somente quando existe falha real no adaptador ou nos serviços, **Tentar corrigi
 
 O Neck também consulta os eventos `BTHUSB` do Windows. Se o rádio reaparecer e o driver voltar a cair ao ser ligado, a interface não declara um falso sucesso: mostra a falha, interrompe novas reinicializações por alguns minutos e encaminha para os drivers oficiais. Essa proteção anti-loop evita repetir indefinidamente o ciclo “aparece, tenta ligar, desaparece”.
 
+Quando o histórico confirma esse ciclo, a central oferece um **Reset elétrico guiado**. O Neck restaura primeiro qualquer otimização temporária e solicita ao Windows um desligamento completo, sem `/hybrid` e sem `/f`. Depois que luzes e ventoinhas apagarem, a própria tela orienta a etapa que software não consegue executar: retirar o carregador, manter o botão de ligar pressionado por 20 segundos, reconectar e ligar o computador. O procedimento segue o [desligamento documentado pela Microsoft](https://learn.microsoft.com/windows-server/administration/windows-commands/shutdown) e a [orientação de power reset da HP](https://support.hp.com/us-en/document/ish_3974055-3873564-16).
+
+O reset elétrico não é restauração de fábrica, não reinstala o Windows e não apaga arquivos. Ele só começa depois que a pessoa marca que salvou o trabalho e confirma novamente o desligamento. O Neck não afirma conseguir descarregar capacitores por software: essa parte permanece física e explícita.
+
 O reparo usa o [`PnPUtil`](https://learn.microsoft.com/windows-hardware/drivers/devtest/pnputil-command-syntax), ferramenta nativa recomendada pela Microsoft para reiniciar dispositivos e examinar alterações de hardware. O Neck não remove acessórios pareados, não apaga entradas do Registro, não desinstala drivers e não reinicia o computador. Fones, mouse ou teclado Bluetooth podem se desconectar por alguns segundos durante a cura.
 
 Se o rádio continuar indisponível, a central apresenta o ponto em que o reparo parou e oferece acesso às atualizações opcionais de driver do Windows.
@@ -287,7 +291,7 @@ A implementação utiliza as APIs documentadas [`SetPriorityClass`](https://lear
 - Não esvazia a Lixeira sem uma seleção explícita.
 - Não baixa nem executa atualizações do Neck silenciosamente.
 - Não armazena tokens ou credenciais do GitHub.
-- Não reinicia o computador automaticamente.
+- Não reinicia nem desliga o computador automaticamente; o Reset elétrico guiado exige duas confirmações explícitas.
 - Não instala drivers automaticamente; utiliza Windows Update e páginas oficiais.
 - Não remove pareamentos nem desinstala drivers durante a Cura Bluetooth.
 - Reinicia somente um adaptador Bluetooth físico validado pelo inventário do Windows.
@@ -412,6 +416,8 @@ HardwareForm.cs            Especificações e sensores em interface dedicada
 BluetoothDoctor.cs         Diagnóstico e motor de reparo seguro do Bluetooth
 BluetoothForm.cs           Central visual da Cura Bluetooth
 BluetoothRadio.cs          Leitura local do estado ligado/desligado do rádio
+BluetoothPowerReset.cs     Plano validado de desligamento completo
+BluetoothPowerResetForm.cs Assistente visual para a etapa física do power reset
 StartupAnalysis.cs         Análise somente leitura da inicialização
 PersonalPlan.cs            Motor e interface das três prioridades
 ElevatedOperations.cs      Executor administrativo com lista fechada
@@ -470,6 +476,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Escudo de Foco sensível a RAM e CPU, com restauração imediata
 - [x] Inventário de hardware e temperaturas locais com fontes explícitas
 - [x] Cura Bluetooth com diagnóstico, reinício seletivo e nova detecção
+- [x] Proteção anti-loop e Reset elétrico guiado com desligamento não forçado
 - [x] Neck Replay com caixa-preta local, classificação causal e linha do tempo
 - [x] Neck Baseline com padrão local, Índice de Fluxo e contexto de reunião
 - [x] Neck Autopilot com previsão de curto prazo, consentimento e restauração automática

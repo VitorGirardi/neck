@@ -19,6 +19,7 @@ Este documento separa o que foi comprovado automaticamente do que ainda exige va
 | Instalação limpa no Windows 11 | Pendente | Exige VM ou segundo computador |
 | Cura Bluetooth em múltiplos adaptadores | Pendente | Exige hardware real de fabricantes diferentes |
 | Proteção anti-loop do Bluetooth | Automatizado | Simula timeout, descarga do BTHUSB, repetição e cooldown |
+| Reset elétrico guiado | Automatizado e visual | Recusa `/f`, `/hybrid` e reinicialização; confere layout normal e mínimo sem executar desligamento |
 
 Enquanto qualquer linha crítica estiver pendente, o Neck deve ser apresentado como **beta pública**, não como software certificado ou garantia universal de desempenho.
 
