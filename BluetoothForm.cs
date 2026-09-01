@@ -135,6 +135,8 @@ namespace Neck
         private bool _busy;
         private bool _closing;
         private bool _initialized;
+        private bool _repairBlocked;
+        private bool _settingsOpenDriverUpdates;
 
         public BluetoothDoctorForm() : this(null) { }
 
@@ -286,7 +288,7 @@ namespace Neck
             _repairButton.Click += async delegate { await RepairAsync(); };
             ConfigureButton(_settingsButton, "Abrir Bluetooth", Theme.FlowSoft, 175);
             _settingsButton.ForeColor = Theme.Ink;
-            _settingsButton.Click += delegate { OpenBluetoothSettings(); };
+            _settingsButton.Click += delegate { OpenSecondaryAction(); };
             actions.Controls.Add(_repairButton);
             actions.Controls.Add(_settingsButton);
 
@@ -363,6 +365,12 @@ namespace Neck
         private async Task RepairAsync()
         {
             if (_busy || _closing || IsDisposed) return;
+            BluetoothRepairBlock currentBlock = BluetoothRepairGuard.Current(_snapshot);
+            if (currentBlock.IsBlocked)
+            {
+                ApplySnapshot(_snapshot, "Proteção anti-loop ativa. Aguarde antes de executar uma nova correção.");
+                return;
+            }
             if (IsOnlyTurnedOff(_snapshot))
             {
                 OpenBluetoothSettings();
@@ -392,7 +400,9 @@ namespace Neck
                 await Task.Delay(900);
                 BluetoothSnapshot refreshed = await Task.Run(delegate { return BluetoothDoctor.Read(); });
                 if (_closing || IsDisposed) return;
-                string message = refreshed.IsHealthy
+                string message = refreshed.HasRecentDriverFailure
+                    ? "O driver caiu ao ligar o Bluetooth. A proteção anti-loop interrompeu novas tentativas automáticas."
+                    : refreshed.IsHealthy
                     ? "Cura concluída. O Bluetooth está respondendo e seus pareamentos foram preservados."
                     : refreshed.PowerState == BluetoothPowerState.Off
                         ? "O adaptador voltou. Agora use Abrir e ligar no Windows; o Neck não força essa chave."
@@ -414,8 +424,32 @@ namespace Neck
             _snapshot = snapshot ?? new BluetoothSnapshot();
             BluetoothAdapterInfo adapter = _snapshot.PrimaryAdapter;
             BluetoothServiceInfo support = _snapshot.SupportService;
+            BluetoothRepairBlock repairBlock = BluetoothRepairGuard.Current(_snapshot);
+            _repairBlocked = repairBlock.IsBlocked;
+            _settingsOpenDriverUpdates = false;
 
-            if (_snapshot.IsHealthy)
+            if (_snapshot.HasRecentDriverFailure)
+            {
+                SetOverall("CICLO INTERROMPIDO", "O driver caiu ao ligar o Bluetooth", Color.FromArgb(190, 55, 55));
+                string lastFailure = _snapshot.LastTransportFailureUtc.HasValue
+                    ? _snapshot.LastTransportFailureUtc.Value.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture)
+                    : "agora há pouco";
+                _summary.Text = "O Windows registrou " + _snapshot.RecentTransportTimeouts.ToString(CultureInfo.CurrentCulture) +
+                    " timeout(s) e " + _snapshot.RecentDriverUnloads.ToString(CultureInfo.CurrentCulture) +
+                    " queda(s) do driver; última às " + lastFailure + ".";
+                _repairButton.Text = repairBlock.IsBlocked
+                    ? "Pausa de segurança · " + repairBlock.RemainingMinutes(DateTime.UtcNow).ToString(CultureInfo.CurrentCulture) + " min"
+                    : "Tentar correção uma vez";
+                _repairButton.Width = 285;
+                _settingsButton.Text = "Ver drivers oficiais";
+                _settingsButton.Width = 205;
+                _settingsButton.Visible = true;
+                _settingsOpenDriverUpdates = true;
+                _actionDetail.Text = repairBlock.IsBlocked
+                    ? "Repetir agora recriaria o ciclo. O Neck pausou a correção; faça um desligamento completo antes de tentar novamente."
+                    : "O driver falhou recentemente. O Neck permitirá somente uma tentativa e bloqueará repetições se ele cair outra vez.";
+            }
+            else if (_snapshot.IsHealthy)
             {
                 SetOverall("PRONTO AGORA", "Bluetooth está respondendo", Theme.Green);
                 _summary.Text = adapter.Name + "  •  driver " + adapter.DriverVersion +
@@ -423,6 +457,8 @@ namespace Neck
                 _repairButton.Text = "Reiniciar com segurança";
                 _repairButton.Width = 250;
                 _settingsButton.Visible = true;
+                _settingsButton.Text = "Abrir Bluetooth";
+                _settingsButton.Width = 175;
                 _actionDetail.Text = "Se a conexão falhar, a cura reinicia somente o adaptador e os serviços Bluetooth. Seus pareamentos são preservados.";
             }
             else if (adapter != null && adapter.IsReady &&
@@ -442,6 +478,8 @@ namespace Neck
                 _repairButton.Text = "Tentar corrigir agora";
                 _repairButton.Width = 250;
                 _settingsButton.Visible = true;
+                _settingsButton.Text = "Abrir Bluetooth";
+                _settingsButton.Width = 175;
                 _actionDetail.Text = "A cura redetecta o rádio e restaura os serviços sem apagar dispositivos pareados.";
             }
             else
@@ -451,21 +489,27 @@ namespace Neck
                 _repairButton.Text = "Tentar corrigir agora";
                 _repairButton.Width = 250;
                 _settingsButton.Visible = true;
+                _settingsButton.Text = "Abrir Bluetooth";
+                _settingsButton.Width = 175;
                 _actionDetail.Text = "A cura reinicia somente o adaptador com falha e os serviços Bluetooth. Seus pareamentos são preservados.";
             }
 
             if (adapter == null)
                 _adapterRow.SetState(BluetoothRowState.Missing, "Nenhum rádio físico foi encontrado pelo Windows.");
             else
-                _adapterRow.SetState(adapter.IsReady && _snapshot.PowerState == BluetoothPowerState.On ? BluetoothRowState.Good : BluetoothRowState.Attention,
-                    adapter.IsReady && _snapshot.PowerState == BluetoothPowerState.Off
+                _adapterRow.SetState(adapter.IsReady && _snapshot.PowerState == BluetoothPowerState.On && !_snapshot.HasRecentDriverFailure ? BluetoothRowState.Good : BluetoothRowState.Attention,
+                    _snapshot.HasRecentDriverFailure
+                        ? adapter.Name + " — o driver deixou de responder ao ser ligado"
+                        : adapter.IsReady && _snapshot.PowerState == BluetoothPowerState.Off
                         ? adapter.Name + " — hardware pronto; chave Bluetooth desligada"
                         : adapter.Name + " — " + BluetoothDoctor.ExplainErrorCode(adapter.ErrorCode));
 
             if (adapter != null && adapter.DriverBacked && !string.IsNullOrWhiteSpace(adapter.DriverVersion))
             {
                 string date = adapter.DriverDate.HasValue ? " • " + adapter.DriverDate.Value.ToString("dd/MM/yyyy", CultureInfo.CurrentCulture) : "";
-                _driverRow.SetState(BluetoothRowState.Good, adapter.Manufacturer + " • versão " + adapter.DriverVersion + date);
+                _driverRow.SetState(_snapshot.HasRecentDriverFailure ? BluetoothRowState.Attention : BluetoothRowState.Good,
+                    adapter.Manufacturer + " • versão " + adapter.DriverVersion + date +
+                    (_snapshot.HasRecentDriverFailure ? " • falhou recentemente" : ""));
             }
             else
                 _driverRow.SetState(BluetoothRowState.Attention, "O Windows não informou um driver Bluetooth válido.");
@@ -474,8 +518,12 @@ namespace Neck
                 support == null ? "Serviço de suporte não encontrado." :
                 support.IsRunning ? "Suporte a Bluetooth ativo e pronto para conexões." : "Suporte a Bluetooth está parado.");
 
-            _activity.Text = activity;
-            _updatesLink.Visible = adapter == null || !adapter.IsReady || !_snapshot.HasDriver;
+            _activity.Text = _snapshot.HasRecentDriverFailure && repairBlock.IsBlocked
+                ? "Proteção anti-loop ativa. Nenhum novo reinício do adaptador será executado agora."
+                : activity;
+            _updatesLink.Visible = _snapshot.HasRecentDriverFailure || adapter == null || !adapter.IsReady || !_snapshot.HasDriver;
+            _repairButton.Enabled = !_busy && !_repairBlocked;
+            _repairButton.AttentionPulse = !_busy && !_repairBlocked;
         }
 
         private static bool IsOnlyTurnedOff(BluetoothSnapshot snapshot)
@@ -493,6 +541,17 @@ namespace Neck
             _activity.Text = "Ligue a chave na tela oficial do Windows e volte ao Neck; o diagnóstico será atualizado automaticamente.";
         }
 
+        private void OpenSecondaryAction()
+        {
+            if (_settingsOpenDriverUpdates)
+            {
+                MainForm.OpenTarget("ms-settings:windowsupdate-optionalupdates");
+                _activity.Text = "Procure apenas atualizações oficiais de Bluetooth ou MediaTek oferecidas pelo Windows.";
+                return;
+            }
+            OpenBluetoothSettings();
+        }
+
         private void SetOverall(string badge, string headline, Color color)
         {
             _badge.Text = badge;
@@ -504,8 +563,8 @@ namespace Neck
         private void SetBusy(bool busy, string activity)
         {
             _busy = busy;
-            _repairButton.Enabled = !busy;
-            _repairButton.AttentionPulse = !busy;
+            _repairButton.Enabled = !busy && !_repairBlocked;
+            _repairButton.AttentionPulse = !busy && !_repairBlocked;
             _progress.Running = busy;
             if (!string.IsNullOrWhiteSpace(activity)) _activity.Text = activity;
         }

@@ -37,6 +37,7 @@ namespace Neck
                     throw new InvalidOperationException("Um adaptador Bluetooth físico válido foi recusado.");
                 if (BluetoothRepairEngine.IsSafeAdapterId(@"BTHENUM\DEV_TESTE") || BluetoothRepairEngine.IsSafeAdapterId("USB\\TESTE\" MALICIOSO"))
                     throw new InvalidOperationException("Um identificador Bluetooth não confiável foi aceito para reparo.");
+                TestBluetoothLoopProtection();
                 System.Diagnostics.Stopwatch healthTimer = System.Diagnostics.Stopwatch.StartNew();
                 HealthSnapshot health = SystemInfo.GetHealthSnapshot();
                 healthTimer.Stop();
@@ -262,6 +263,28 @@ namespace Neck
                         Console.WriteLine("BluetoothAttentionPreview=" + previewPath);
                     }
                     attentionForm.Close();
+                }
+                bluetoothPreview.Adapters[0].ErrorCode = 0;
+                bluetoothPreview.Services[0].State = "Running";
+                bluetoothPreview.RecentTransportTimeouts = 5;
+                bluetoothPreview.RecentDriverUnloads = 2;
+                bluetoothPreview.LastTransportFailureUtc = DateTime.UtcNow.AddSeconds(-20);
+                bluetoothPreview.EventHistoryAvailable = true;
+                using (BluetoothDoctorForm loopGuardForm = new BluetoothDoctorForm(bluetoothPreview))
+                {
+                    loopGuardForm.ShowInTaskbar = false;
+                    loopGuardForm.StartPosition = FormStartPosition.Manual;
+                    loopGuardForm.Location = new System.Drawing.Point(-32000, -32000);
+                    loopGuardForm.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(loopGuardForm.Width, loopGuardForm.Height))
+                    {
+                        loopGuardForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, loopGuardForm.Width, loopGuardForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Bluetooth.LoopGuard.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BluetoothLoopGuardPreview=" + previewPath);
+                    }
+                    loopGuardForm.Close();
                 }
                 System.Collections.Generic.List<StartupEntry> startupEntries = StartupAnalyzer.Analyze();
                 using (StartupAppsForm startup = new StartupAppsForm(startupEntries))
@@ -863,6 +886,53 @@ namespace Neck
                 Console.Error.WriteLine(ex);
                 return 1;
             }
+        }
+
+        private static void TestBluetoothLoopProtection()
+        {
+            DateTime nowUtc = DateTime.UtcNow;
+            BluetoothSnapshot unstable = new BluetoothSnapshot
+            {
+                CapturedUtc = nowUtc,
+                PowerState = BluetoothPowerState.On,
+                RecentTransportTimeouts = 5,
+                RecentDriverUnloads = 2,
+                LastTransportFailureUtc = nowUtc.AddSeconds(-20),
+                EventHistoryAvailable = true,
+                Adapters = new System.Collections.Generic.List<BluetoothAdapterInfo>
+                {
+                    new BluetoothAdapterInfo
+                    {
+                        Name = "Adaptador Bluetooth de teste",
+                        DeviceId = @"USB\VID_0000&PID_0000\TESTE",
+                        DriverVersion = "1.0.0.0",
+                        DriverBacked = true,
+                        SeenByWindows = true,
+                        ErrorCode = 0
+                    }
+                },
+                Services = new System.Collections.Generic.List<BluetoothServiceInfo>
+                {
+                    new BluetoothServiceInfo { Name = "bthserv", State = "Running" }
+                }
+            };
+
+            if (!unstable.IsCoreHealthy || unstable.IsHealthy)
+                throw new InvalidOperationException("Uma queda BTHUSB recente foi confundida com Bluetooth estável.");
+
+            BluetoothRepairBlock repeated = BluetoothRepairGuard.Evaluate(unstable, nowUtc, null);
+            if (!repeated.IsBlocked || repeated.RemainingMinutes(nowUtc) < 1)
+                throw new InvalidOperationException("A proteção anti-loop não bloqueou falhas repetidas do driver.");
+
+            unstable.RecentTransportTimeouts = 1;
+            unstable.RecentDriverUnloads = 1;
+            BluetoothRepairBlock firstAttempt = BluetoothRepairGuard.Evaluate(unstable, nowUtc, null);
+            if (firstAttempt.IsBlocked)
+                throw new InvalidOperationException("Uma falha isolada bloqueou indevidamente a primeira correção segura.");
+
+            BluetoothRepairBlock failedAttempt = BluetoothRepairGuard.Evaluate(unstable, nowUtc, nowUtc.AddSeconds(-30));
+            if (!failedAttempt.IsBlocked)
+                throw new InvalidOperationException("A queda posterior à correção não ativou o bloqueio temporário.");
         }
 
         private static void TestSupportReportPrivacy(HardwareSnapshot hardware)

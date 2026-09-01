@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -43,6 +44,10 @@ namespace Neck
         public int StaleDeviceEntries;
         public string ReadError = "";
         public BluetoothPowerState PowerState = BluetoothPowerState.Unknown;
+        public int RecentTransportTimeouts;
+        public int RecentDriverUnloads;
+        public DateTime? LastTransportFailureUtc;
+        public bool EventHistoryAvailable;
 
         public BluetoothAdapterInfo PrimaryAdapter
         {
@@ -64,7 +69,12 @@ namespace Neck
             get { return Adapters.Any(item => item.DriverBacked && !string.IsNullOrWhiteSpace(item.DriverVersion)); }
         }
 
-        public bool IsHealthy
+        public bool HasRecentDriverFailure
+        {
+            get { return RecentDriverUnloads > 0 || RecentTransportTimeouts >= 2; }
+        }
+
+        public bool IsCoreHealthy
         {
             get
             {
@@ -73,6 +83,11 @@ namespace Neck
                 return adapter != null && adapter.IsReady && HasDriver && service != null && service.IsRunning &&
                        PowerState == BluetoothPowerState.On;
             }
+        }
+
+        public bool IsHealthy
+        {
+            get { return IsCoreHealthy && !HasRecentDriverFailure; }
         }
     }
 
@@ -165,6 +180,8 @@ namespace Neck
             }
             catch (Exception ex) { failures.Add("serviços: " + ex.Message); }
 
+            ReadTransportFailures(snapshot, failures);
+
             snapshot.Adapters = adapters.Values
                 .Where(item => !string.IsNullOrWhiteSpace(item.DeviceId))
                 .OrderByDescending(item => item.IsReady)
@@ -174,6 +191,41 @@ namespace Neck
             snapshot.PowerState = BluetoothRadioController.ReadState();
             snapshot.ReadError = string.Join("; ", failures.ToArray());
             return snapshot;
+        }
+
+        private static void ReadTransportFailures(BluetoothSnapshot snapshot, List<string> failures)
+        {
+            try
+            {
+                DateTime cutoff = DateTime.Now.Subtract(BluetoothRepairGuard.EventLookback);
+                using (EventLog log = new EventLog("System"))
+                {
+                    EventLogEntryCollection entries = log.Entries;
+                    int scanned = 0;
+                    for (int index = entries.Count - 1; index >= 0 && scanned < 5000; index--, scanned++)
+                    {
+                        EventLogEntry entry = entries[index];
+                        if (entry.TimeGenerated < cutoff) break;
+                        if (string.IsNullOrWhiteSpace(entry.Source) ||
+                            entry.Source.IndexOf("BTHUSB", StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                        int eventId = unchecked((int)(entry.InstanceId & 0xFFFFL));
+                        if (eventId != 3 && eventId != 17) continue;
+
+                        if (eventId == 3) snapshot.RecentTransportTimeouts++;
+                        else snapshot.RecentDriverUnloads++;
+
+                        DateTime eventUtc = entry.TimeGenerated.ToUniversalTime();
+                        if (!snapshot.LastTransportFailureUtc.HasValue || eventUtc > snapshot.LastTransportFailureUtc.Value)
+                            snapshot.LastTransportFailureUtc = eventUtc;
+                    }
+                }
+                snapshot.EventHistoryAvailable = true;
+            }
+            catch (Exception ex)
+            {
+                failures.Add("histórico BTHUSB: " + ex.Message);
+            }
         }
 
         internal static string ExplainErrorCode(int code)
@@ -236,6 +288,114 @@ namespace Neck
         public string Output = "";
     }
 
+    internal sealed class BluetoothRepairBlock
+    {
+        public bool IsBlocked;
+        public DateTime? UntilUtc;
+        public string Reason = "";
+
+        public int RemainingMinutes(DateTime nowUtc)
+        {
+            if (!IsBlocked || !UntilUtc.HasValue) return 0;
+            return Math.Max(1, (int)Math.Ceiling((UntilUtc.Value - nowUtc).TotalMinutes));
+        }
+    }
+
+    internal static class BluetoothRepairGuard
+    {
+        internal static readonly TimeSpan EventLookback = TimeSpan.FromMinutes(15);
+        private static readonly TimeSpan RapidRepeatCooldown = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan FailureCooldown = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan RepeatedFailureCooldown = TimeSpan.FromMinutes(15);
+
+        private static string StatePath
+        {
+            get
+            {
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Neck", "bluetooth-repair.state");
+            }
+        }
+
+        public static BluetoothRepairBlock Current(BluetoothSnapshot snapshot)
+        {
+            return Evaluate(snapshot, DateTime.UtcNow, ReadLastAttemptUtc());
+        }
+
+        internal static BluetoothRepairBlock Evaluate(BluetoothSnapshot snapshot, DateTime nowUtc, DateTime? lastAttemptUtc)
+        {
+            BluetoothRepairBlock block = new BluetoothRepairBlock();
+            DateTime until = DateTime.MinValue;
+            string reason = "";
+
+            if (snapshot != null && snapshot.LastTransportFailureUtc.HasValue &&
+                (snapshot.RecentDriverUnloads >= 2 || snapshot.RecentTransportTimeouts >= 4))
+            {
+                DateTime repeatedUntil = snapshot.LastTransportFailureUtc.Value.Add(RepeatedFailureCooldown);
+                if (repeatedUntil > until)
+                {
+                    until = repeatedUntil;
+                    reason = "O Windows registrou várias quedas recentes do driver Bluetooth.";
+                }
+            }
+
+            if (lastAttemptUtc.HasValue)
+            {
+                DateTime rapidUntil = lastAttemptUtc.Value.Add(RapidRepeatCooldown);
+                if (rapidUntil > until)
+                {
+                    until = rapidUntil;
+                    reason = "Uma correção Bluetooth acabou de ser executada.";
+                }
+
+                if (snapshot != null && snapshot.HasRecentDriverFailure && snapshot.LastTransportFailureUtc.HasValue &&
+                    snapshot.LastTransportFailureUtc.Value >= lastAttemptUtc.Value.Subtract(TimeSpan.FromSeconds(30)))
+                {
+                    DateTime failureUntil = snapshot.LastTransportFailureUtc.Value.Add(FailureCooldown);
+                    if (failureUntil > until)
+                    {
+                        until = failureUntil;
+                        reason = "O driver voltou a cair depois da última correção.";
+                    }
+                }
+            }
+
+            if (until > nowUtc)
+            {
+                block.IsBlocked = true;
+                block.UntilUtc = until;
+                block.Reason = reason;
+            }
+            return block;
+        }
+
+        public static void RecordAttempt(DateTime attemptedUtc)
+        {
+            try
+            {
+                string path = StatePath;
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, attemptedUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                    new UTF8Encoding(false));
+            }
+            catch { }
+        }
+
+        private static DateTime? ReadLastAttemptUtc()
+        {
+            try
+            {
+                string path = StatePath;
+                if (!File.Exists(path)) return null;
+                DateTime value;
+                if (!DateTime.TryParse(File.ReadAllText(path).Trim(), CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind, out value)) return null;
+                return value.ToUniversalTime();
+            }
+            catch { return null; }
+        }
+    }
+
     internal static class BluetoothRepairEngine
     {
         public static BluetoothRepairResult Repair()
@@ -248,7 +408,19 @@ namespace Neck
                 "Adaptador — " + initial.Name + " — " + BluetoothDoctor.ExplainErrorCode(initial.ErrorCode));
             report.AppendLine("Serviço de suporte — " + ServiceState(before.SupportService));
             report.AppendLine("Chave do Bluetooth — " + PowerState(before.PowerState));
+            AppendFailureEvidence(report, before);
             report.AppendLine();
+
+            BluetoothRepairBlock block = BluetoothRepairGuard.Current(before);
+            if (block.IsBlocked)
+            {
+                report.AppendLine("PROTEÇÃO ANTI-LOOP");
+                report.AppendLine(block.Reason);
+                report.AppendLine("Nova tentativa pausada por aproximadamente " +
+                    block.RemainingMinutes(DateTime.UtcNow).ToString(CultureInfo.InvariantCulture) + " minuto(s).");
+                report.AppendLine("Repetir a reinicialização agora apenas faria o adaptador reaparecer e cair novamente.");
+                return new BluetoothRepairResult { ExitCode = 3, Output = report.ToString() };
+            }
 
             string pnputil = PnpUtilPath();
             if (!File.Exists(pnputil))
@@ -256,6 +428,8 @@ namespace Neck
                 report.AppendLine("O PnPUtil oficial do Windows não foi encontrado.");
                 return new BluetoothRepairResult { ExitCode = 2, Output = report.ToString() };
             }
+
+            BluetoothRepairGuard.RecordAttempt(DateTime.UtcNow);
 
             StopSupportService(report);
 
@@ -280,9 +454,9 @@ namespace Neck
             AppendProcess(report, "Redetectar hardware", ProcessRunner.Run(pnputil, "/scan-devices", 90000));
             EnsureServiceRunning("DeviceAssociationService", report, "Associação de dispositivos");
             EnsureServiceRunning("bthserv", report, "Suporte a Bluetooth");
-            Thread.Sleep(1400);
+            Thread.Sleep(1500);
 
-            BluetoothSnapshot after = BluetoothDoctor.Read();
+            BluetoothSnapshot after = ReadStableResult(report);
             BluetoothAdapterInfo finalAdapter = after.PrimaryAdapter;
             report.AppendLine();
             report.AppendLine("RESULTADO");
@@ -290,16 +464,56 @@ namespace Neck
                 "Adaptador — " + finalAdapter.Name + " — " + BluetoothDoctor.ExplainErrorCode(finalAdapter.ErrorCode));
             report.AppendLine("Serviço de suporte — " + ServiceState(after.SupportService));
             report.AppendLine("Chave do Bluetooth — " + PowerState(after.PowerState));
+            AppendFailureEvidence(report, after);
             if (after.IsHealthy)
             {
                 report.AppendLine("Bluetooth pronto. Os pareamentos foram preservados.");
                 return new BluetoothRepairResult { ExitCode = 0, Output = report.ToString() };
             }
 
-            report.AppendLine(after.PowerState == BluetoothPowerState.Off
-                ? "O adaptador voltou, mas a chave do Bluetooth continua desligada. Abra as configurações para ligá-la."
-                : "O Bluetooth ainda precisa de atenção. Verifique as atualizações opcionais de driver do Windows.");
+            report.AppendLine(after.HasRecentDriverFailure
+                ? "O adaptador reapareceu, mas o Windows registrou uma queda recente do driver. A correção não será repetida em ciclo."
+                : after.PowerState == BluetoothPowerState.Off
+                    ? "O adaptador voltou, mas a chave do Bluetooth continua desligada. Abra as configurações para ligá-la."
+                    : "O Bluetooth ainda precisa de atenção. Verifique as atualizações opcionais de driver do Windows.");
             return new BluetoothRepairResult { ExitCode = 2, Output = report.ToString() };
+        }
+
+        private static BluetoothSnapshot ReadStableResult(StringBuilder report)
+        {
+            BluetoothSnapshot snapshot = BluetoothDoctor.Read();
+            if (!snapshot.IsCoreHealthy || snapshot.HasRecentDriverFailure) return snapshot;
+
+            const int confirmations = 3;
+            for (int confirmation = 1; confirmation <= confirmations; confirmation++)
+            {
+                Thread.Sleep(2500);
+                snapshot = BluetoothDoctor.Read();
+                if (!snapshot.IsCoreHealthy || snapshot.HasRecentDriverFailure)
+                {
+                    report.AppendLine("Validação de estabilidade — o adaptador falhou durante a observação.");
+                    return snapshot;
+                }
+            }
+            report.AppendLine("Validação de estabilidade — 4 leituras aprovadas em aproximadamente 8 segundos.");
+            return snapshot;
+        }
+
+        private static void AppendFailureEvidence(StringBuilder report, BluetoothSnapshot snapshot)
+        {
+            if (snapshot == null || !snapshot.EventHistoryAvailable) return;
+            if (!snapshot.HasRecentDriverFailure)
+            {
+                report.AppendLine("Falhas BTHUSB recentes — nenhuma falha persistente detectada");
+                return;
+            }
+
+            string last = snapshot.LastTransportFailureUtc.HasValue
+                ? snapshot.LastTransportFailureUtc.Value.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture)
+                : "horário não informado";
+            report.AppendLine("Falhas BTHUSB recentes — " +
+                snapshot.RecentTransportTimeouts.ToString(CultureInfo.InvariantCulture) + " timeout(s), " +
+                snapshot.RecentDriverUnloads.ToString(CultureInfo.InvariantCulture) + " descarga(s) do driver; última às " + last);
         }
 
         internal static bool IsSafeAdapterId(string value)

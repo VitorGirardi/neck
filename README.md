@@ -211,6 +211,8 @@ Somente quando existe falha real no adaptador ou nos serviços, **Tentar corrigi
 3. força uma nova detecção de hardware;
 4. restaura os serviços necessários e confirma o estado final.
 
+O Neck também consulta os eventos `BTHUSB` do Windows. Se o rádio reaparecer e o driver voltar a cair ao ser ligado, a interface não declara um falso sucesso: mostra a falha, interrompe novas reinicializações por alguns minutos e encaminha para os drivers oficiais. Essa proteção anti-loop evita repetir indefinidamente o ciclo “aparece, tenta ligar, desaparece”.
+
 O reparo usa o [`PnPUtil`](https://learn.microsoft.com/windows-hardware/drivers/devtest/pnputil-command-syntax), ferramenta nativa recomendada pela Microsoft para reiniciar dispositivos e examinar alterações de hardware. O Neck não remove acessórios pareados, não apaga entradas do Registro, não desinstala drivers e não reinicia o computador. Fones, mouse ou teclado Bluetooth podem se desconectar por alguns segundos durante a cura.
 
 Se o rádio continuar indisponível, a central apresenta o ponto em que o reparo parou e oferece acesso às atualizações opcionais de driver do Windows.
