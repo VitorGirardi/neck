@@ -47,6 +47,7 @@ A página inicial foi organizada para qualquer pessoa entender por onde começar
 
 - **Acelerar um aplicativo** é a ação principal quando algo importante está travando.
 - **Índice de Fluxo** aprende o padrão saudável deste computador e mostra quando ele está diferente do próprio normal.
+- **Neck Autopilot** pode antecipar pressão de RAM ou CPU e proteger temporariamente o aplicativo importante.
 - **Limpar arquivos** remove somente temporários conhecidos e mostra antes quanto pode ser liberado.
 - **Revisar o computador** reúne os cuidados mensais do Windows em uma etapa separada.
 - **Mais ferramentas** guarda recursos ocasionais como Neck Replay, Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
@@ -73,6 +74,7 @@ A animação ocorre por um intervalo curto após cada diagnóstico e não perman
 
 | Recurso | O que faz | Proteção principal |
 | --- | --- | --- |
+| **Neck Autopilot** | Projeta a tendência do próximo minuto e alivia concorrentes seguros antes do gargalo. | Desativado por padrão, exige duas previsões e restaura tudo automaticamente. |
 | **Neck Baseline** | Aprende as faixas habituais deste computador e transforma desvios no Índice de Fluxo. | Salva somente agregados locais e não aprende leituras de incidente. |
 | **Neck Replay** | Preserva os últimos cinco minutos em memória e explica por que o computador acabou de travar. | Só confirma pressão persistente, não grava conteúdo de janelas e não executa ações sozinho. |
 | **Gargalo Guiado** | Distingue pressão de memória, CPU e armazenamento e recomenda a ação mais útil naquele momento. | Explica o motivo e mantém a confirmação com o usuário. |
@@ -120,6 +122,24 @@ Antes de atualizar o padrão, o Neck verifica a leitura. Travamentos, pressão a
 No disco são salvos apenas contagem, média, variação e faixas numéricas em `%LOCALAPPDATA%\Neck\baseline-v1.txt`. Nomes de aplicativos, amostras individuais, títulos de janelas e uma linha do tempo de uso não fazem parte desse arquivo.
 
 ![Neck Baseline com Índice de Fluxo e faixas locais](assets/screenshots/neck-baseline.png)
+
+## Neck Autopilot: proteção antes do gargalo
+
+O **Neck Autopilot** usa o padrão local do Baseline e uma sequência curta mantida somente na memória para projetar a direção dos próximos 60 segundos. Ele só começa depois das 30 leituras válidas do primeiro padrão e permanece desativado até a pessoa escolher ativá-lo.
+
+Uma intervenção automática exige duas previsões consecutivas de pressão real de RAM ou CPU. Nesse caso, o Neck pode aplicar EcoQoS, prioridade de memória reduzida e RAM Park em **no máximo dois aplicativos seguros em segundo plano**. Aplicativos de comunicação, áudio, apresentação, transmissão, processos do Windows, o aplicativo em primeiro plano e o próprio Neck ficam protegidos pela lista de exclusão.
+
+As mudanças são temporárias: o aplicativo volta a responder normalmente ao receber foco, e todas as alterações são restauradas depois de três leituras estáveis, ao desativar o Autopilot, ao iniciar uma aceleração manual, ao encerrar o Neck ou após o limite de dez minutos. Tendências de disco ou temperatura são apenas explicadas; o Autopilot não aplica uma intervenção automática quando não há uma ação genérica segura.
+
+![Neck Autopilot acompanhando o fluxo e validando uma simulação](assets/screenshots/neck-autopilot.png)
+
+### Teste seguro do Autopilot
+
+1. Na tela principal, clique em **Índice de Fluxo ›** e depois em **Conhecer Autopilot**.
+2. Clique em **Executar simulação**. O Neck reproduz seis leituras virtuais de RAM; nenhum aplicativo real é alterado.
+3. O resultado esperado é **Previsão reconhecida: tendência de memória** e **Proteção simulada para 2 aplicativos**.
+4. Para testar o acompanhamento real, ative o Autopilot e mantenha o Neck aberto ou na bandeja. O Índice de Fluxo personalizado precisa já estar disponível.
+5. Você pode desativá-lo na mesma tela ou em **Preferências**; qualquer proteção real é restaurada imediatamente.
 
 ## Neck Replay: a caixa-preta do gargalo
 
@@ -261,11 +281,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.14.0.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.15.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.14.0.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.15.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -275,7 +295,7 @@ Get-FileHash .\Neck-Setup-1.14.0.exe -Algorithm SHA256
 Baixe `Neck.exe` na mesma release e execute-o diretamente. Nenhuma instalação é necessária. As preferências e o histórico continuam armazenados no perfil local do Windows.
 
 > [!IMPORTANT]
-> Os binários da versão 1.14.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+> Os binários da versão 1.15.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
 
 ## Assinatura digital
 
@@ -355,6 +375,8 @@ NeckReplay.cs              Caixa-preta, PDH, classificação causal e incidentes
 ReplayForm.cs              Explicação visual e linha do tempo dos últimos cinco minutos
 NeckBaseline.cs            Aprendizado estatístico local, contextos e Índice de Fluxo
 BaselineForm.cs            Faixas habituais e progresso do padrão personalizado
+Autopilot.cs               Previsão de tendência, limites e proteção preventiva reversível
+AutopilotForm.cs           Consentimento, estado e simulação segura do Autopilot
 SosMode.cs                 Alívio seguro de sobrecarga
 EfficiencyMode.cs          Otimização adaptativa de CPU, memória e EcoQoS
 TurboMode.cs               Prioridade de foco temporária e reversível
@@ -399,6 +421,8 @@ As causas mostradas pelo Replay são inferências locais baseadas na coincidênc
 
 O Índice de Fluxo é uma comparação estatística, não um benchmark universal. Nos primeiros minutos ele ainda está aprendendo; mudanças grandes de hardware ou de rotina levam algum tempo para se refletir nas faixas.
 
+O Autopilot faz uma projeção estatística de curto prazo, não uma promessa de que todo gargalo será evitado. Ele pode preferir não agir quando não existe um concorrente seguro ou quando a causa é disco, temperatura, hardware ou um aplicativo já em primeiro plano.
+
 Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware. Leia cada recomendação e mantenha backup dos arquivos importantes antes de qualquer manutenção do sistema.
 
 ## Roadmap
@@ -422,6 +446,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Cura Bluetooth com diagnóstico, reinício seletivo e nova detecção
 - [x] Neck Replay com caixa-preta local, classificação causal e linha do tempo
 - [x] Neck Baseline com padrão local, Índice de Fluxo e contexto de reunião
+- [x] Neck Autopilot com previsão de curto prazo, consentimento e restauração automática
 - [x] Políticas, validação e pipeline de assinatura em duas fases
 - [ ] Aprovação SignPath e primeira release com Authenticode válido
 - [ ] Aprimorar classificações de aplicativos com contribuições da comunidade

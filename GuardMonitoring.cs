@@ -243,6 +243,7 @@ namespace Neck
         public bool Notifications = true;
         public bool SilenceFullscreen = true;
         public bool ReduceMotion;
+        public bool AutopilotEnabled;
         public bool OnboardingCompleted;
         public DateTime SilentUntilUtc = DateTime.MinValue;
 
@@ -262,6 +263,7 @@ namespace Neck
                     else if (key == "Notifications") bool.TryParse(value, out settings.Notifications);
                     else if (key == "SilenceFullscreen") bool.TryParse(value, out settings.SilenceFullscreen);
                     else if (key == "ReduceMotion") bool.TryParse(value, out settings.ReduceMotion);
+                    else if (key == "AutopilotEnabled") bool.TryParse(value, out settings.AutopilotEnabled);
                     else if (key == "OnboardingCompleted") bool.TryParse(value, out settings.OnboardingCompleted);
                     else if (key == "SilentUntilUtc") DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out settings.SilentUntilUtc);
                 }
@@ -282,6 +284,7 @@ namespace Neck
                     "Notifications=" + Notifications,
                     "SilenceFullscreen=" + SilenceFullscreen,
                     "ReduceMotion=" + ReduceMotion,
+                    "AutopilotEnabled=" + AutopilotEnabled,
                     "OnboardingCompleted=" + OnboardingCompleted,
                     "SilentUntilUtc=" + SilentUntilUtc.ToString("O", CultureInfo.InvariantCulture)
                 }, new UTF8Encoding(false));

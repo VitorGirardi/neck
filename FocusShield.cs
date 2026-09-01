@@ -79,10 +79,15 @@ namespace Neck
                 .Where(item => item != null && item.VisibleWindows > 0 &&
                     ((memory.PercentUsed >= 70 && item.MemoryBytes >= minimumBytes) || item.CpuPercent >= 12d))
                 .Where(item => !string.Equals(item.ProcessName, targetProcessName, StringComparison.OrdinalIgnoreCase))
-                .Where(item => EfficiencyModeManager.CanTarget(item.ProcessName) && !SensitiveApplications.Contains(item.ProcessName))
+                .Where(item => CanShield(item.ProcessName))
                 .OrderByDescending(item => item.CpuPercent >= 12d ? 100000d + item.CpuPercent : item.MemoryBytes / (double)Megabyte)
                 .Take(3)
                 .ToList();
+        }
+
+        internal static bool CanShield(string processName)
+        {
+            return EfficiencyModeManager.CanTarget(processName) && !SensitiveApplications.Contains(processName);
         }
 
         public static FocusShieldResult Stop()

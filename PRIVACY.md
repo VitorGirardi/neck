@@ -37,6 +37,12 @@ O Neck Baseline grava somente agregados numéricos locais: quantidade de leitura
 
 O arquivo do Baseline não contém nomes de aplicativos ou processos, títulos de janelas, horários de amostras individuais nem uma linha do tempo detalhada. Leituras reconhecidas como incidente ou desvio do padrão não são incorporadas às médias. Para apagar o aprendizado, encerre o Neck e remova `%LOCALAPPDATA%\Neck\baseline-v1.txt`.
 
+## Neck Autopilot
+
+O Neck Autopilot vem desativado e sua escolha de ativação é guardada junto das preferências locais. Para prever tendências, ele mantém somente na memória uma sequência curta das mesmas métricas locais usadas pelo Replay e pelo Baseline. Essa sequência desaparece ao encerrar o Neck e não cria um novo histórico no disco.
+
+Quando ativado, o Autopilot pode guardar em memória o nome de até dois aplicativos temporariamente protegidos para conseguir restaurá-los. Esses nomes não são enviados nem persistidos. A simulação interna utiliza nomes e leituras artificiais e não examina ou altera aplicativos reais.
+
 ## Operações administrativas
 
 Quando o usuário confirma uma manutenção que exige administrador, o Neck inicia uma segunda instância local com uma lista fechada de tarefas permitidas. Nenhuma credencial é lida ou armazenada, e nenhum resultado administrativo é enviado pela internet.

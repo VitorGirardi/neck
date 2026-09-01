@@ -633,6 +633,66 @@ namespace Neck
                     }
                     baseline.Close();
                 }
+                AutopilotDecision simulatedAutopilot = AutopilotSimulation.Run();
+                if (simulatedAutopilot.State != AutopilotState.Protecting ||
+                    simulatedAutopilot.Cause != AutopilotCause.Memory ||
+                    simulatedAutopilot.ProtectedApplications != 2 || !simulatedAutopilot.Simulated)
+                    throw new InvalidOperationException("A simulação do Autopilot não antecipou a pressão de memória.");
+                AutopilotEngine cautiousAutopilot = new AutopilotEngine();
+                DateTime cautiousStart = DateTime.UtcNow.AddMinutes(-2);
+                AutopilotDecision singlePrediction = null;
+                double[] cautiousMemory = { 70, 70, 70, 82 };
+                double[] cautiousAvailable = { 4096, 4096, 4096, 1800 };
+                for (int i = 0; i < cautiousMemory.Length; i++)
+                {
+                    singlePrediction = cautiousAutopilot.Evaluate(new ReplaySample
+                    {
+                        TimestampUtc = cautiousStart.AddSeconds(i * 10),
+                        MemoryPercent = cautiousMemory[i],
+                        AvailableBytes = (long)(cautiousAvailable[i] * 1024d * 1024d),
+                        CommitPercent = i == 3 ? 86 : 72,
+                        PageReadsPerSecond = 3,
+                        CpuPercent = 22,
+                        DiskLatencyMilliseconds = 2,
+                        ForegroundProcess = "AplicativoImportante",
+                        ForegroundResponsive = true
+                    }, baselineView, true, false, false);
+                }
+                if (singlePrediction == null || singlePrediction.State != AutopilotState.Watching || singlePrediction.ShouldProtect)
+                    throw new InvalidOperationException("O Autopilot agiu depois de uma única previsão isolada.");
+                using (AutopilotForm autopilot = new AutopilotForm(
+                    new GuardSettings { AutopilotEnabled = true }, new AutopilotEngine(),
+                    new AutopilotDecision
+                    {
+                        State = AutopilotState.Flowing,
+                        Title = "Autopilot acompanhando",
+                        Explanation = "Nenhuma tendência de gargalo foi confirmada."
+                    }, baselineView))
+                {
+                    autopilot.ShowInTaskbar = false;
+                    autopilot.StartPosition = FormStartPosition.Manual;
+                    autopilot.Location = new System.Drawing.Point(-32000, -32000);
+                    autopilot.Show();
+                    autopilot.ShowSimulationForTesting();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(autopilot.Width, autopilot.Height))
+                    {
+                        autopilot.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, autopilot.Width, autopilot.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Autopilot.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("AutopilotPreview=" + previewPath);
+                    }
+                    autopilot.Size = autopilot.MinimumSize;
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(autopilot.Width, autopilot.Height))
+                    {
+                        autopilot.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, autopilot.Width, autopilot.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Autopilot.Minimum.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("AutopilotMinimumPreview=" + previewPath);
+                    }
+                    autopilot.Close();
+                }
                 using (ReplayForm replay = new ReplayForm(replayEngine.GetLatestIncident(), replayEngine.GetSamples()))
                 {
                     replay.ShowInTaskbar = false;
@@ -688,6 +748,7 @@ namespace Neck
                 TestTurboModeRoundTrip();
                 TestFocusModeRoundTrip();
                 TestFocusShieldRoundTrip();
+                TestAutopilotProtectionRoundTrip();
                 string guidedProcess = sosCandidates.Count == 0 ? null : sosCandidates[0].ProcessName;
                 using (SosForm sos = new SosForm(guidedProcess))
                 {
@@ -754,6 +815,59 @@ namespace Neck
                 Console.Error.WriteLine("SELF_TEST_FAILED");
                 Console.Error.WriteLine(ex);
                 return 1;
+            }
+        }
+
+        private static void TestAutopilotProtectionRoundTrip()
+        {
+            string probePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NeckAutopilotProbe.exe");
+            System.Diagnostics.Process probe = null;
+            try
+            {
+                System.IO.File.Copy(Application.ExecutablePath, probePath, true);
+                probe = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = probePath,
+                    Arguments = "--efficiency-helper",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                Thread.Sleep(500);
+                AutopilotProtectionResult applied = AutopilotProtectionManager.StartForTesting(
+                    "NeckImportantForeground",
+                    new[]
+                    {
+                        new SosCandidate
+                        {
+                            ProcessName = "NeckAutopilotProbe",
+                            DisplayName = "Aplicativo opcional de teste",
+                            ProcessCount = 1,
+                            VisibleWindows = 1,
+                            MemoryBytes = 512L * 1024 * 1024,
+                            CpuPercent = 0
+                        }
+                    },
+                    new MemoryStatus { PercentUsed = 50 }, DateTime.UtcNow,
+                    AutopilotCause.Cpu, "NeckAutopilotProbe");
+                if (applied.ApplicationsProtected != 1 || !EfficiencyModeManager.IsActive("NeckAutopilotProbe"))
+                    throw new InvalidOperationException("O Autopilot não aplicou a proteção reversível ao processo de teste.");
+                AutopilotProtectionResult restored = AutopilotProtectionManager.Stop();
+                if (AutopilotProtectionManager.ActiveCount != 0 || EfficiencyModeManager.IsActive("NeckAutopilotProbe"))
+                    throw new InvalidOperationException("O Autopilot não restaurou o processo protegido.");
+                Console.WriteLine("AutopilotRoundTrip=" + applied.ProcessesChanged + "/" + restored.ProcessesChanged);
+            }
+            finally
+            {
+                AutopilotProtectionManager.Stop();
+                EfficiencyModeManager.Restore("NeckAutopilotProbe");
+                if (probe != null)
+                {
+                    try { if (!probe.HasExited) probe.Kill(); }
+                    catch { }
+                    probe.Dispose();
+                }
+                try { if (System.IO.File.Exists(probePath)) System.IO.File.Delete(probePath); }
+                catch { }
             }
         }
 

@@ -1,6 +1,6 @@
 param(
     [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist'),
-    [string]$ExpectedVersion = '1.14.0.0',
+    [string]$ExpectedVersion = '1.15.0.0',
     [switch]$AllowUnsigned,
     [string]$ExpectedSigner = '',
     [switch]$RequireTimestamp
@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 
 $artifacts = @(
     (Join-Path $OutputDirectory 'Neck.exe'),
-    (Join-Path $OutputDirectory 'Neck-Setup-1.14.0.exe')
+    (Join-Path $OutputDirectory 'Neck-Setup-1.15.0.exe')
 )
 
 foreach ($artifact in $artifacts) {

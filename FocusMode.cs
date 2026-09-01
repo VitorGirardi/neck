@@ -55,6 +55,7 @@ namespace Neck
         {
             FocusModeResult result = NewResult(processName);
             if (!EfficiencyModeManager.CanTarget(processName)) return result;
+            AutopilotProtectionManager.Stop();
             lock (SyncRoot)
             {
                 StopCore(result);

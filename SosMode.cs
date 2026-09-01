@@ -571,6 +571,7 @@ namespace Neck
             {
                 await Task.Run(delegate
                 {
+                    AutopilotProtectionManager.ReleaseForManualControl(_candidate.ProcessName);
                     if (active) EfficiencyModeManager.Restore(_candidate.ProcessName);
                     else EfficiencyModeManager.Apply(_candidate.ProcessName);
                 });

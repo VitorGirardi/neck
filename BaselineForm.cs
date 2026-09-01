@@ -8,6 +8,7 @@ namespace Neck
     internal sealed class BaselineForm : Form
     {
         private readonly BaselineView _view;
+        public bool AutopilotRequested { get; private set; }
 
         public BaselineForm(BaselineView view)
         {
@@ -222,7 +223,7 @@ namespace Neck
             Panel footer = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background, Margin = new Padding(0) };
             Label privacy = new Label
             {
-                Text = "Somente médias e faixas são salvas. Aplicativos e amostras individuais não entram no padrão.",
+                Text = "Agregados locais, sem nomes de aplicativos.",
                 AutoSize = true,
                 Font = Theme.Small,
                 ForeColor = Theme.Muted,
@@ -242,8 +243,27 @@ namespace Neck
             };
             close.FlatAppearance.BorderSize = 0;
             close.Click += delegate { Close(); };
-            footer.Resize += delegate { close.Left = footer.ClientSize.Width - close.Width; };
+            Button autopilot = new AnimatedButton
+            {
+                Text = "Conhecer Autopilot",
+                Size = new Size(174, 46),
+                BackColor = Theme.NavySoft,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Location = new Point(footer.Width - 312, 10)
+            };
+            autopilot.FlatAppearance.BorderSize = 0;
+            autopilot.Click += delegate { AutopilotRequested = true; Close(); };
+            footer.Resize += delegate
+            {
+                close.Left = footer.ClientSize.Width - close.Width;
+                autopilot.Left = close.Left - autopilot.Width - 10;
+            };
             footer.Controls.Add(privacy);
+            footer.Controls.Add(autopilot);
             footer.Controls.Add(close);
             AcceptButton = close;
             CancelButton = close;

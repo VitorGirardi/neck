@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.14.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.14.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.15.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.15.0.0")]
 
 namespace Neck
 {
@@ -494,6 +494,8 @@ namespace Neck
         private readonly ReplayProbe _replayProbe = new ReplayProbe();
         private readonly BaselineEngine _baselineEngine = new BaselineEngine();
         private BaselineEvaluation _baselineEvaluation = new BaselineEvaluation();
+        private readonly AutopilotEngine _autopilotEngine = new AutopilotEngine();
+        private AutopilotDecision _autopilotDecision = new AutopilotDecision();
         private GuardSettings _guardSettings;
         private ToolStripMenuItem _startupMenuItem;
         private ToolStripMenuItem _notificationsMenuItem;
@@ -517,6 +519,7 @@ namespace Neck
         private bool _hardwareRefreshing;
         private bool _replayCapturing;
         private bool _showReplayAsPrimary;
+        private bool _showAutopilotAsPrimary;
         private DateTime _lastReplayCaptureUtc = DateTime.MinValue;
 
         private static readonly string DataDirectory = Path.Combine(
@@ -618,6 +621,7 @@ namespace Neck
                 _replayTimer.Stop();
                 _replayProbe.Dispose();
                 _baselineEngine.Dispose();
+                AutopilotProtectionManager.Stop();
                 FocusModeManager.Stop();
                 EfficiencyModeManager.RestoreAll();
                 _trayIcon.Visible = false;
@@ -884,6 +888,11 @@ namespace Neck
                     await ShowReplayAsync();
                     return;
                 }
+                if (_showAutopilotAsPrimary)
+                {
+                    ShowAutopilot();
+                    return;
+                }
                 if (_currentAdvice != null && _currentAdvice.Kind == BottleneckKind.Disk)
                 {
                     _tempCheck.Checked = true;
@@ -1057,6 +1066,7 @@ namespace Neck
             menu.Items.Add("Abrir Neck", null, delegate { ShowFromTray(); });
             menu.Items.Add("Acelerar aplicativo", null, delegate { ShowFromTray(); OpenSos(); });
             menu.Items.Add("Meu padrão Neck", null, delegate { ShowFromTray(); ShowBaseline(); });
+            menu.Items.Add("Neck Autopilot", null, delegate { ShowFromTray(); ShowAutopilot(); });
             menu.Items.Add("Neck Replay", null, async delegate { ShowFromTray(); await ShowReplayAsync(); });
             menu.Items.Add("Parar aceleração", null, delegate
             {
@@ -1163,6 +1173,12 @@ namespace Neck
             if (_notificationsMenuItem != null) _notificationsMenuItem.Checked = _guardSettings.Notifications;
             if (_fullscreenMenuItem != null) _fullscreenMenuItem.Checked = _guardSettings.SilenceFullscreen;
             VisualEffects.ReduceMotion = _guardSettings.ReduceMotion;
+            if (!_guardSettings.AutopilotEnabled)
+            {
+                AutopilotProtectionManager.Stop();
+                _autopilotDecision = _autopilotEngine.DisableNow();
+                UpdateGuardView(_healthSnapshot);
+            }
         }
 
         private async Task ShowPersonalPlanAsync()
@@ -1305,7 +1321,26 @@ namespace Neck
         private void ShowBaseline()
         {
             if (_closing || IsDisposed) return;
-            using (BaselineForm form = new BaselineForm(_baselineEngine.GetView())) form.ShowDialog(this);
+            bool showAutopilot;
+            using (BaselineForm form = new BaselineForm(_baselineEngine.GetView()))
+            {
+                form.ShowDialog(this);
+                showAutopilot = form.AutopilotRequested;
+            }
+            if (showAutopilot) ShowAutopilot();
+        }
+
+        private void ShowAutopilot()
+        {
+            if (_closing || IsDisposed) return;
+            using (AutopilotForm form = new AutopilotForm(_guardSettings, _autopilotEngine,
+                _autopilotDecision, _baselineEngine.GetView())) form.ShowDialog(this);
+            if (!_guardSettings.AutopilotEnabled)
+            {
+                AutopilotProtectionManager.Stop();
+                _autopilotDecision = _autopilotEngine.DisableNow();
+            }
+            UpdateGuardView(_healthSnapshot);
         }
 
         private async Task RefreshHardwareAsync(bool fullInventory)
@@ -1489,6 +1524,43 @@ namespace Neck
                 _lastReplayCaptureUtc = capture.Sample.TimestampUtc;
                 ReplayDecision decision = _replayEngine.Record(capture.Sample);
                 _baselineEvaluation = _baselineEngine.Observe(capture.Sample, _meetingActive);
+                bool neckForeground = string.Equals(capture.Sample.ForegroundProcess,
+                    Process.GetCurrentProcess().ProcessName, StringComparison.OrdinalIgnoreCase);
+                AutopilotDecision autopilot = _autopilotEngine.Evaluate(capture.Sample, _baselineEngine.GetView(),
+                    _guardSettings.AutopilotEnabled, _meetingActive, FocusModeManager.IsActive || neckForeground);
+                bool protectionStarted = autopilot.ShouldProtect;
+                if (autopilot.ShouldRestore)
+                {
+                    AutopilotProtectionResult restored = await Task.Run(delegate { return AutopilotProtectionManager.Stop(); });
+                    _autopilotDecision = _autopilotEngine.ReportRestored();
+                    if (restored.ApplicationsChanged > 0)
+                        _activityStatus.Text = "Autopilot restaurou todos os aplicativos após a normalização do fluxo.";
+                }
+                else if (autopilot.ShouldProtect || autopilot.State == AutopilotState.Protecting)
+                {
+                    AutopilotProtectionResult protection = await Task.Run(delegate
+                    {
+                        string preferred = autopilot.Cause == AutopilotCause.Cpu
+                            ? capture.Sample.TopCpuProcess : capture.Sample.TopMemoryProcess;
+                        return autopilot.ShouldProtect
+                            ? AutopilotProtectionManager.Start(capture.Sample.ForegroundProcess, autopilot.Cause, preferred)
+                            : AutopilotProtectionManager.Refresh(capture.Sample.ForegroundProcess, autopilot.Cause, preferred);
+                    });
+                    _autopilotDecision = _autopilotEngine.ReportProtection(protection.ApplicationsProtected,
+                        protection.Summary, capture.Sample.TimestampUtc);
+                    if (protectionStarted)
+                    {
+                        _activityStatus.Text = protection.ApplicationsProtected > 0
+                            ? "Autopilot protegeu o fluxo reduzindo temporariamente " + protection.ApplicationsProtected + " aplicativo(s)."
+                            : "Autopilot previu pressão, mas não encontrou aplicativo seguro para reduzir.";
+                        if (protection.ApplicationsProtected > 0 && _guardSettings.Notifications && !_meetingActive &&
+                            _guardSettings.SilentUntilUtc <= DateTime.UtcNow &&
+                            !(_guardSettings.SilenceFullscreen && SystemInfo.IsForegroundWindowFullScreen()))
+                            _trayIcon.ShowBalloonTip(4500, "Neck Autopilot protegeu o fluxo",
+                                protection.ApplicationsProtected + " aplicativo(s) em segundo plano usam temporariamente menos recursos.", ToolTipIcon.Info);
+                    }
+                }
+                else _autopilotDecision = autopilot;
                 UpdateGuardView(capture.Health);
                 UpdateTrayState(capture.Health);
                 if (decision.IncidentConfirmed && decision.Incident != null)
@@ -1519,6 +1591,8 @@ namespace Neck
                 return;
             }
             string state = snapshot.Level == HealthLevel.Critical ? "Gargalo" : snapshot.Level == HealthLevel.Warning ? "Atenção" : "Fluindo bem";
+            if (_autopilotDecision != null && _autopilotDecision.State == AutopilotState.Protecting)
+                state = "Autopilot protegendo";
             _trayIcon.Icon = snapshot.Level == HealthLevel.Critical ? SystemIcons.Error :
                              snapshot.Level == HealthLevel.Warning ? SystemIcons.Warning :
                              _trayStableIcon;
@@ -1792,11 +1866,27 @@ namespace Neck
             ReplayIncident replay = _replayEngine.GetLatestIncident();
             _showReplayAsPrimary = replay != null && !replay.Ongoing && replay.EndedUtc != DateTime.MinValue &&
                 DateTime.UtcNow - replay.EndedUtc <= TimeSpan.FromMinutes(30) && snapshot.Level == HealthLevel.Stable;
+            _showAutopilotAsPrimary = !_showReplayAsPrimary && _guardSettings.AutopilotEnabled && _autopilotDecision != null &&
+                (_autopilotDecision.State == AutopilotState.Protecting ||
+                 (_autopilotDecision.State == AutopilotState.Watching && _currentAdvice.Kind == BottleneckKind.None));
             if (_showReplayAsPrimary)
             {
                 _actionTitle.Text = "O fluxo voltou ao normal";
                 _actionHelp.Text = "O Replay registrou a causa provável às " + replay.PeakUtc.ToLocalTime().ToString("HH:mm") + ".";
                 _guardButton.Text = "Ver o que aconteceu";
+            }
+            else if (_showAutopilotAsPrimary)
+            {
+                _actionTitle.Text = _autopilotDecision.Title;
+                _actionHelp.Text = _autopilotDecision.Explanation;
+                _guardButton.Text = _autopilotDecision.State == AutopilotState.Protecting ? "Ver proteção" : "Ver previsão";
+                if (_autopilotDecision.State == AutopilotState.Protecting && snapshot.Level != HealthLevel.Critical)
+                {
+                    _guardBadge.Text = "AUTOPILOT ATIVO";
+                    _guardBadge.Width = 132;
+                    _guardBadge.BackColor = Theme.FlowSoft;
+                    _guardBadge.ForeColor = Theme.Green;
+                }
             }
             else
             {

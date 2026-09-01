@@ -121,6 +121,7 @@ namespace Neck
         private readonly CheckBox _notifications = new CheckBox();
         private readonly CheckBox _fullscreen = new CheckBox();
         private readonly CheckBox _reduceMotion = new CheckBox();
+        private readonly CheckBox _autopilot = new CheckBox();
         private readonly Label _updateStatus = new Label();
         private readonly Button _checkUpdates = new AnimatedButton();
         private readonly Button _openRelease = new AnimatedButton();
@@ -201,7 +202,7 @@ namespace Neck
         {
             RoundedPanel card = new RoundedPanel
             {
-                Size = new Size(642, 288),
+                Size = new Size(642, 312),
                 BackColor = Color.White,
                 OutlineColor = Theme.Border,
                 CornerRadius = 16,
@@ -209,17 +210,19 @@ namespace Neck
             };
             card.Controls.Add(new Label { Text = "Como o Neck funciona", AutoSize = true, Font = Theme.Heading, ForeColor = Theme.Text, Location = new Point(22, 18) });
 
-            ConfigureChoice(_startup, "Iniciar com o Windows", "Abre oculto, sem pedir administrador, para o Guard acompanhar o computador.", 58);
-            ConfigureChoice(_tray, "Continuar na bandeja ao fechar", "Mantém o monitoramento ativo quando a janela principal é fechada.", 104);
-            ConfigureChoice(_notifications, "Avisar sobre sobrecarga persistente", "Exibe alerta somente após vários sinais consecutivos — não por um pico isolado.", 150);
-            ConfigureChoice(_fullscreen, "Silenciar alertas em tela cheia", "Evita interromper apresentações, vídeos e jogos.", 196);
-            ConfigureChoice(_reduceMotion, "Reduzir animações", "Mantém os realces visuais, mas desativa transições, pulsos e movimentos.", 242);
+            ConfigureChoice(_startup, "Iniciar com o Windows", "Abre oculto, sem pedir administrador, para o Guard acompanhar o computador.", 55);
+            ConfigureChoice(_tray, "Continuar na bandeja ao fechar", "Mantém o monitoramento ativo quando a janela principal é fechada.", 97);
+            ConfigureChoice(_notifications, "Avisar sobre sobrecarga persistente", "Exibe alerta somente após vários sinais consecutivos — não por um pico isolado.", 139);
+            ConfigureChoice(_fullscreen, "Silenciar alertas em tela cheia", "Evita interromper apresentações, vídeos e jogos.", 181);
+            ConfigureChoice(_reduceMotion, "Reduzir animações", "Mantém os realces visuais, mas desativa transições, pulsos e movimentos.", 223);
+            ConfigureChoice(_autopilot, "Ativar Neck Autopilot", "Prevê pressão de RAM ou CPU e protege temporariamente até dois apps em segundo plano.", 265);
 
             _startup.Checked = StartupManager.IsEnabled();
             _tray.Checked = _settings.ContinueInTray || _startup.Checked;
             _notifications.Checked = _settings.Notifications;
             _fullscreen.Checked = _settings.SilenceFullscreen;
             _reduceMotion.Checked = _settings.ReduceMotion;
+            _autopilot.Checked = _settings.AutopilotEnabled;
             _startup.CheckedChanged += delegate { if (_startup.Checked) _tray.Checked = true; };
 
             card.Controls.Add(_startup);
@@ -227,6 +230,7 @@ namespace Neck
             card.Controls.Add(_notifications);
             card.Controls.Add(_fullscreen);
             card.Controls.Add(_reduceMotion);
+            card.Controls.Add(_autopilot);
             return card;
         }
 
@@ -300,6 +304,7 @@ namespace Neck
                 _settings.Notifications = _notifications.Checked;
                 _settings.SilenceFullscreen = _fullscreen.Checked;
                 _settings.ReduceMotion = _reduceMotion.Checked;
+                _settings.AutopilotEnabled = _autopilot.Checked;
                 VisualEffects.ReduceMotion = _settings.ReduceMotion;
                 _settings.OnboardingCompleted = true;
                 _settings.Save();
@@ -316,7 +321,7 @@ namespace Neck
         {
             checkBox.Text = title + Environment.NewLine + description;
             checkBox.AutoSize = false;
-            checkBox.Size = new Size(590, 44);
+            checkBox.Size = new Size(590, 40);
             checkBox.Location = new Point(23, top);
             checkBox.Font = Theme.Small;
             checkBox.ForeColor = Theme.Text;
