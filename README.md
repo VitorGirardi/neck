@@ -33,7 +33,7 @@
 </p>
 
 > [!NOTE]
-> O Neck 1.18.1 é uma **beta pública**. A suíte automatizada, o build público, os checksums e a análise do Microsoft Defender são exigidos antes de cada release, mas os binários ainda não possuem assinatura digital e a matriz em instalações limpas do Windows continua em andamento. Consulte o [estado dos testes](TESTING.md) antes de usar em um computador crítico.
+> O Neck 1.19.0 é uma **beta pública**. A suíte automatizada, o build público, os checksums e a análise do Microsoft Defender são exigidos antes de cada release, mas os binários ainda não possuem assinatura digital e a matriz em instalações limpas do Windows continua em andamento. Consulte o [estado dos testes](TESTING.md) antes de usar em um computador crítico.
 
 ![Tela principal do Neck](assets/screenshots/neck-dashboard.png)
 
@@ -57,6 +57,7 @@ A página inicial foi organizada para qualquer pessoa entender por onde começar
 - **Liberar espaço** remove somente temporários conhecidos e mostra antes quanto pode ser liberado.
 - **Cuidado completo** reúne os cuidados mensais do Windows em uma etapa separada.
 - **Ferramentas** guarda recursos ocasionais como Neck Replay, Suporte, Drivers, Histórico, Modo Reunião, Inicialização e Preferências.
+- **Menu da bandeja** mostra somente as ações essenciais e revela comandos de restauração apenas quando existe uma otimização ativa.
 
 Assim, nenhuma ferramenta foi removida: as ações mais importantes aparecem primeiro e os controles ocasionais ficam em uma segunda camada.
 
@@ -307,11 +308,11 @@ O Neck normalmente é executado como usuário comum. A janela do UAC aparece som
 ### Instalador recomendado
 
 1. Abra a página de [releases](https://github.com/VitorGirardi/neck/releases/latest).
-2. Baixe `Neck-Setup-1.18.1.exe` e o arquivo correspondente `.sha256`.
+2. Baixe `Neck-Setup-1.19.0.exe` e o arquivo correspondente `.sha256`.
 3. Opcionalmente, confira a integridade no PowerShell:
 
 ```powershell
-Get-FileHash .\Neck-Setup-1.18.1.exe -Algorithm SHA256
+Get-FileHash .\Neck-Setup-1.19.0.exe -Algorithm SHA256
 ```
 
 4. Execute o instalador e siga as instruções. O Neck será adicionado ao menu Iniciar e poderá ser removido normalmente pelas configurações de Aplicativos do Windows.
@@ -321,7 +322,7 @@ Get-FileHash .\Neck-Setup-1.18.1.exe -Algorithm SHA256
 Baixe `Neck.exe` na mesma release e execute-o diretamente. Nenhuma instalação é necessária. As preferências e o histórico continuam armazenados no perfil local do Windows.
 
 > [!IMPORTANT]
-> Os binários da versão 1.18.1 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
+> Os binários da versão 1.19.0 ainda não possuem assinatura digital. Até que a aprovação da SignPath Foundation seja concluída e uma release mostre `Status: Valid`, o Windows pode exibir “Editor desconhecido” ou uma proteção do SmartScreen. Sempre baixe o Neck desta página de releases e compare o SHA-256 publicado.
 
 ## Assinatura digital
 
@@ -461,6 +462,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 
 - [x] Diagnóstico inteligente e histórico local
 - [x] Modo Reunião e monitoramento na bandeja
+- [x] Menu da bandeja simplificado com ações contextuais sob demanda
 - [x] Aceleração com um botão e opções técnicas separadas
 - [x] Tela inicial guiada e central separada para ferramentas ocasionais
 - [x] Animações leves, estados interativos e opção de redução de movimento

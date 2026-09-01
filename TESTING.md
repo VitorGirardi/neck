@@ -2,13 +2,14 @@
 
 Este documento separa o que foi comprovado automaticamente do que ainda exige validação manual. O objetivo é impedir que uma build seja chamada de estável apenas porque compilou.
 
-## Estado da versão 1.18.1
+## Estado da versão 1.19.0
 
 | Verificação | Estado | Evidência |
 | --- | --- | --- |
 | Compilação no Windows | Aprovada | Workflow público `build` no GitHub Actions |
 | Suíte funcional local | Aprovada | `SELF_TEST_OK` em 1 de setembro de 2026 |
 | Interface normal, mínima e 1052 × 759 | Aprovada | Capturas geradas pelo self-test |
+| Menu simplificado da bandeja | Aprovada | Teste fixa as sete linhas essenciais e oculta ações inativas |
 | Adaptive, Turbo, Escudo de Foco e Autopilot | Aprovada | Testes com processos descartáveis e restauração do estado original |
 | Recuperação após interrupção | Aprovada | Diário transacional testado com PID, nome e horário de início |
 | Privacidade do relatório de suporte | Aprovada | Usuário, computador e caminhos pessoais removidos no teste |
@@ -49,7 +50,7 @@ Execute esta lista em uma VM ou computador secundário, nunca em uma máquina cr
 
 ### Instalação e ciclo de vida
 
-- [ ] Instalar pelo `Neck-Setup-1.18.1.exe`.
+- [ ] Instalar pelo `Neck-Setup-1.19.0.exe`.
 - [ ] Confirmar atalho no menu Iniciar e ícone opcional na Área de Trabalho.
 - [ ] Abrir uma segunda instância e confirmar que a primeira recebe o foco.
 - [ ] Ativar a inicialização com o Windows, reiniciar a sessão e confirmar a bandeja.
