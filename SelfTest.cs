@@ -38,6 +38,7 @@ namespace Neck
                 if (BluetoothRepairEngine.IsSafeAdapterId(@"BTHENUM\DEV_TESTE") || BluetoothRepairEngine.IsSafeAdapterId("USB\\TESTE\" MALICIOSO"))
                     throw new InvalidOperationException("Um identificador Bluetooth não confiável foi aceito para reparo.");
                 TestBluetoothLoopProtection();
+                TestBluetoothPowerResetPlan();
                 System.Diagnostics.Stopwatch healthTimer = System.Diagnostics.Stopwatch.StartNew();
                 HealthSnapshot health = SystemInfo.GetHealthSnapshot();
                 healthTimer.Stop();
@@ -285,6 +286,31 @@ namespace Neck
                         Console.WriteLine("BluetoothLoopGuardPreview=" + previewPath);
                     }
                     loopGuardForm.Close();
+                }
+                using (BluetoothPowerResetForm powerResetForm = new BluetoothPowerResetForm())
+                {
+                    powerResetForm.ShowInTaskbar = false;
+                    powerResetForm.StartPosition = FormStartPosition.Manual;
+                    powerResetForm.Location = new System.Drawing.Point(-32000, -32000);
+                    powerResetForm.Show();
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(powerResetForm.Width, powerResetForm.Height))
+                    {
+                        powerResetForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, powerResetForm.Width, powerResetForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Bluetooth.PowerReset.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BluetoothPowerResetPreview=" + previewPath);
+                    }
+                    powerResetForm.Size = powerResetForm.MinimumSize;
+                    Application.DoEvents();
+                    using (System.Drawing.Bitmap preview = new System.Drawing.Bitmap(powerResetForm.Width, powerResetForm.Height))
+                    {
+                        powerResetForm.DrawToBitmap(preview, new System.Drawing.Rectangle(0, 0, powerResetForm.Width, powerResetForm.Height));
+                        string previewPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Neck.Bluetooth.PowerReset.Minimum.png");
+                        preview.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("BluetoothPowerResetMinimumPreview=" + previewPath);
+                    }
+                    powerResetForm.Close();
                 }
                 System.Collections.Generic.List<StartupEntry> startupEntries = StartupAnalyzer.Analyze();
                 using (StartupAppsForm startup = new StartupAppsForm(startupEntries))
@@ -933,6 +959,17 @@ namespace Neck
             BluetoothRepairBlock failedAttempt = BluetoothRepairGuard.Evaluate(unstable, nowUtc, nowUtc.AddSeconds(-30));
             if (!failedAttempt.IsBlocked)
                 throw new InvalidOperationException("A queda posterior à correção não ativou o bloqueio temporário.");
+        }
+
+        private static void TestBluetoothPowerResetPlan()
+        {
+            string plan = BluetoothPowerResetCoordinator.BuildShutdownArguments();
+            if (!BluetoothPowerResetCoordinator.IsSafeFullShutdownPlan(plan))
+                throw new InvalidOperationException("O desligamento completo do reset elétrico foi recusado pela validação.");
+            if (BluetoothPowerResetCoordinator.IsSafeFullShutdownPlan("/s /t 0 /f") ||
+                BluetoothPowerResetCoordinator.IsSafeFullShutdownPlan("/s /t 0 /hybrid") ||
+                BluetoothPowerResetCoordinator.IsSafeFullShutdownPlan("/r /t 0"))
+                throw new InvalidOperationException("Um desligamento forçado, híbrido ou uma reinicialização foi aceito no reset elétrico.");
         }
 
         private static void TestSupportReportPrivacy(HardwareSnapshot hardware)

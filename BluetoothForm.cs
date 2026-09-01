@@ -136,7 +136,7 @@ namespace Neck
         private bool _closing;
         private bool _initialized;
         private bool _repairBlocked;
-        private bool _settingsOpenDriverUpdates;
+        private bool _settingsOpenPowerReset;
 
         public BluetoothDoctorForm() : this(null) { }
 
@@ -426,7 +426,7 @@ namespace Neck
             BluetoothServiceInfo support = _snapshot.SupportService;
             BluetoothRepairBlock repairBlock = BluetoothRepairGuard.Current(_snapshot);
             _repairBlocked = repairBlock.IsBlocked;
-            _settingsOpenDriverUpdates = false;
+            _settingsOpenPowerReset = false;
 
             if (_snapshot.HasRecentDriverFailure)
             {
@@ -441,10 +441,10 @@ namespace Neck
                     ? "Pausa de segurança · " + repairBlock.RemainingMinutes(DateTime.UtcNow).ToString(CultureInfo.CurrentCulture) + " min"
                     : "Tentar correção uma vez";
                 _repairButton.Width = 285;
-                _settingsButton.Text = "Ver drivers oficiais";
-                _settingsButton.Width = 205;
+                _settingsButton.Text = "Reset elétrico guiado";
+                _settingsButton.Width = 215;
                 _settingsButton.Visible = true;
-                _settingsOpenDriverUpdates = true;
+                _settingsOpenPowerReset = true;
                 _actionDetail.Text = repairBlock.IsBlocked
                     ? "Repetir agora recriaria o ciclo. O Neck pausou a correção; faça um desligamento completo antes de tentar novamente."
                     : "O driver falhou recentemente. O Neck permitirá somente uma tentativa e bloqueará repetições se ele cair outra vez.";
@@ -543,10 +543,10 @@ namespace Neck
 
         private void OpenSecondaryAction()
         {
-            if (_settingsOpenDriverUpdates)
+            if (_settingsOpenPowerReset)
             {
-                MainForm.OpenTarget("ms-settings:windowsupdate-optionalupdates");
-                _activity.Text = "Procure apenas atualizações oficiais de Bluetooth ou MediaTek oferecidas pelo Windows.";
+                using (BluetoothPowerResetForm form = new BluetoothPowerResetForm()) form.ShowDialog(this);
+                _activity.Text = "O reset elétrico só começa quando você confirma o desligamento dentro do guia.";
                 return;
             }
             OpenBluetoothSettings();
