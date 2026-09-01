@@ -2,7 +2,7 @@
 
 Este documento separa o que foi comprovado automaticamente do que ainda exige validação manual. O objetivo é impedir que uma build seja chamada de estável apenas porque compilou.
 
-## Estado da versão 1.18.0
+## Estado da versão 1.18.1
 
 | Verificação | Estado | Evidência |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Execute esta lista em uma VM ou computador secundário, nunca em uma máquina cr
 
 ### Instalação e ciclo de vida
 
-- [ ] Instalar pelo `Neck-Setup-1.18.0.exe`.
+- [ ] Instalar pelo `Neck-Setup-1.18.1.exe`.
 - [ ] Confirmar atalho no menu Iniciar e ícone opcional na Área de Trabalho.
 - [ ] Abrir uma segunda instância e confirmar que a primeira recebe o foco.
 - [ ] Ativar a inicialização com o Windows, reiniciar a sessão e confirmar a bandeja.
