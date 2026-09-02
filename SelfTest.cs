@@ -557,13 +557,20 @@ namespace Neck
                         State = BaselineState.Personalized,
                         Score = 64,
                         Title = "Mais lento que o habitual",
-                        Explanation = "Mais trabalhos estão esperando pela CPU que no uso normal."
+                        Explanation = "Mais trabalhos estão esperando pela CPU que no uso normal.",
+                        PrimaryMetric = "CPU"
                     });
                 if (baselineShift.State != FlowConsensusState.BaselineShift ||
                     baselineShift.EffectiveLevel != HealthLevel.Stable ||
                     baselineShift.HeroTitle.IndexOf("Sem gargalo", StringComparison.OrdinalIgnoreCase) < 0 ||
                     baselineShift.Summary.IndexOf("Nenhum gargalo absoluto", StringComparison.OrdinalIgnoreCase) < 0)
                     throw new InvalidOperationException("O consenso de fluxo voltou a contradizer o padrão pessoal na tela principal.");
+                FlowContextMetric baselineCpuMetric = FlowContextMetricSelector.Select(baselineShift,
+                    new BaselineEvaluation { State = BaselineState.Personalized, Score = 64, PrimaryMetric = "CPU" },
+                    healthyHighRam, healthyMemory);
+                if (baselineCpuMetric.Caption != "CPU agora" || !baselineCpuMetric.Value.EndsWith("%", StringComparison.Ordinal) ||
+                    baselineCpuMetric.Severity != FlowMetricSeverity.Attention)
+                    throw new InvalidOperationException("A métrica contextual não expôs a CPU que causou o desvio pessoal.");
 
                 FlowConsensusEngine pressureConsensus = new FlowConsensusEngine();
                 HealthSnapshot pressureHealth = new HealthSnapshot
@@ -604,6 +611,10 @@ namespace Neck
                     confirmedConsensus.State != FlowConsensusState.Confirmed || !confirmedConsensus.CanAct ||
                     confirmedConsensus.EvidenceText.IndexOf("3/3 leituras", StringComparison.OrdinalIgnoreCase) < 0)
                     throw new InvalidOperationException("O consenso de fluxo não exigiu três evidências independentes antes de agir.");
+                FlowContextMetric pressureMetric = FlowContextMetricSelector.Select(confirmedConsensus,
+                    new BaselineEvaluation(), pressureHealth, pressureSample(consensusNow.AddSeconds(-3)));
+                if (pressureMetric.Caption != "RAM disponível" || pressureMetric.Severity != FlowMetricSeverity.Critical)
+                    throw new InvalidOperationException("A métrica contextual não mostrou a folga de RAM durante pressão real.");
 
                 ReplaySample firstStableConsensus = new ReplaySample
                 {
@@ -624,7 +635,11 @@ namespace Neck
                 if (recoveringConsensus.State != FlowConsensusState.Recovering || recoveringConsensus.CanAct ||
                     recoveredConsensus.State != FlowConsensusState.Stable)
                     throw new InvalidOperationException("O consenso de fluxo anunciou recuperação antes de duas leituras estáveis.");
-                Console.WriteLine("FlowConsensus=BaselineUnified/3Pressure/2Recovery");
+                FlowContextMetric stableMetric = FlowContextMetricSelector.Select(recoveredConsensus,
+                    new BaselineEvaluation { State = BaselineState.Personalized, Score = 95 }, healthyHighRam, secondStableConsensus);
+                if (stableMetric.Caption != "Espaço livre")
+                    throw new InvalidOperationException("A métrica contextual não voltou ao espaço livre após a recuperação.");
+                Console.WriteLine("FlowConsensus=BaselineUnified/3Pressure/2Recovery/ContextMetric");
                 ReplaySample measuredDiskStall = new ReplaySample
                 {
                     TimestampUtc = DateTime.UtcNow,
