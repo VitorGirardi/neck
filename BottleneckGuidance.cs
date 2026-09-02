@@ -5,6 +5,18 @@ namespace Neck
 {
     internal enum BottleneckKind { None, Memory, Cpu, Disk }
     internal enum BottleneckActionKind { Accelerate, Cleanup, Diagnostic, Hardware }
+    internal enum BottleneckSignalKind
+    {
+        None,
+        MemoryPressure,
+        CpuContention,
+        DiskLatency,
+        DiskSpace,
+        ForegroundFreeze,
+        ThermalPressure,
+        MemoryObservation,
+        CpuObservation
+    }
 
     internal sealed class BottleneckAdvice
     {
@@ -16,6 +28,7 @@ namespace Neck
         public string ProcessName;
         public string DisplayName;
         public BottleneckActionKind ActionKind = BottleneckActionKind.Accelerate;
+        public BottleneckSignalKind SignalKind;
         public int Confidence;
     }
 
@@ -39,6 +52,7 @@ namespace Neck
             if (diskCritical)
             {
                 advice.Kind = BottleneckKind.Disk;
+                advice.SignalKind = BottleneckSignalKind.DiskSpace;
                 advice.Title = "O armazenamento está bloqueando o fluxo";
                 advice.Explanation = "Restam " + MainForm.FormatBytes(snapshot.DiskFreeBytes) + " no disco do Windows. Comece pela limpeza segura.";
                 advice.ActionText = "Liberar espaço com segurança";
@@ -51,6 +65,7 @@ namespace Neck
             if (measured.Cause == ReplayCause.MemoryPressure)
             {
                 advice.Kind = BottleneckKind.Memory;
+                advice.SignalKind = BottleneckSignalKind.MemoryPressure;
                 ResourceProcess measuredTop = FindTarget(snapshot, measured.ProcessName) ?? top;
                 advice.ProcessName = measuredTop == null ? null : measuredTop.ProcessName;
                 advice.DisplayName = measuredTop == null ? null : measuredTop.DisplayName;
@@ -66,6 +81,7 @@ namespace Neck
             if (measured.Cause == ReplayCause.CpuContention)
             {
                 advice.Kind = BottleneckKind.Cpu;
+                advice.SignalKind = BottleneckSignalKind.CpuContention;
                 advice.ProcessName = EfficiencyModeManager.CanTarget(measured.ProcessName) ? measured.ProcessName : null;
                 advice.DisplayName = string.IsNullOrWhiteSpace(advice.ProcessName) ? null : SystemInfo.FriendlyProcessName(advice.ProcessName);
                 advice.Title = "A CPU está limitando a resposta";
@@ -80,6 +96,7 @@ namespace Neck
             if (measured.Cause == ReplayCause.DiskStall)
             {
                 advice.Kind = BottleneckKind.Disk;
+                advice.SignalKind = BottleneckSignalKind.DiskLatency;
                 advice.Title = "O armazenamento está demorando para responder";
                 advice.Explanation = "Latência de " + signals.DiskLatencyMilliseconds.ToString("0") + " ms e fila de " +
                     signals.DiskQueueLength.ToString("0.0") + " indicam espera real; apagar arquivos não resolveria esse pico.";
@@ -92,6 +109,7 @@ namespace Neck
             if (measured.Cause == ReplayCause.ForegroundFreeze)
             {
                 advice.Kind = BottleneckKind.Cpu;
+                advice.SignalKind = BottleneckSignalKind.ForegroundFreeze;
                 advice.ProcessName = EfficiencyModeManager.CanTarget(measured.ProcessName) ? measured.ProcessName : null;
                 advice.DisplayName = string.IsNullOrWhiteSpace(advice.ProcessName) ? null : SystemInfo.FriendlyProcessName(advice.ProcessName);
                 advice.Title = string.IsNullOrWhiteSpace(advice.DisplayName)
@@ -105,6 +123,7 @@ namespace Neck
             if (measured.Cause == ReplayCause.ThermalPressure)
             {
                 advice.Kind = BottleneckKind.Cpu;
+                advice.SignalKind = BottleneckSignalKind.ThermalPressure;
                 advice.Title = "A temperatura pode estar reduzindo o desempenho";
                 advice.Explanation = "Um sensor confiável chegou a " + signals.TemperatureCelsius.ToString("0") + " °C; aumentar prioridade poderia piorar o aquecimento.";
                 advice.ActionText = "Ver temperaturas e hardware";
@@ -116,6 +135,7 @@ namespace Neck
             if (diskWarning)
             {
                 advice.Kind = BottleneckKind.Disk;
+                advice.SignalKind = BottleneckSignalKind.DiskSpace;
                 advice.Title = "O armazenamento precisa de espaço";
                 advice.Explanation = "Restam " + MainForm.FormatBytes(snapshot.DiskFreeBytes) + " no disco do Windows. Comece pela limpeza segura.";
                 advice.ActionText = "Liberar espaço com segurança";
@@ -127,6 +147,7 @@ namespace Neck
             if (!IsFresh(signals) && snapshot.Memory.PercentUsed >= 75)
             {
                 advice.Kind = BottleneckKind.Memory;
+                advice.SignalKind = BottleneckSignalKind.MemoryObservation;
                 advice.ProcessName = top == null ? null : top.ProcessName;
                 advice.DisplayName = top == null ? null : top.DisplayName;
                 advice.Title = top == null ? "A memória merece observação" : top.DisplayName + " concentra o maior uso";
@@ -140,6 +161,7 @@ namespace Neck
             if (!IsFresh(signals) && snapshot.CpuPercent >= 80)
             {
                 advice.Kind = BottleneckKind.Cpu;
+                advice.SignalKind = BottleneckSignalKind.CpuObservation;
                 advice.Title = "A CPU merece observação";
                 advice.Explanation = "A CPU chegou a " + snapshot.CpuPercent.ToString("0") + "%; o Neck está verificando se existe fila persistente.";
                 advice.ActionText = "Escolher aplicativo importante";

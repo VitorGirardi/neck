@@ -538,6 +538,7 @@ namespace Neck
         private readonly ReplayEngine _replayEngine = new ReplayEngine();
         private readonly ReplayProbe _replayProbe = new ReplayProbe();
         private readonly BaselineEngine _baselineEngine = new BaselineEngine();
+        private readonly FlowConsensusEngine _flowConsensusEngine = new FlowConsensusEngine();
         private BaselineEvaluation _baselineEvaluation = new BaselineEvaluation();
         private readonly AutopilotEngine _autopilotEngine = new AutopilotEngine();
         private AutopilotDecision _autopilotDecision = new AutopilotDecision();
@@ -557,6 +558,7 @@ namespace Neck
         private DateTime _lastAlertUtc = DateTime.MinValue;
         private GuardAlertKind _lastAlertKind = GuardAlertKind.None;
         private BottleneckAdvice _currentAdvice;
+        private FlowConsensusDecision _flowDecision;
         private DateTime _lastOutcomeShownUtc = DateTime.MinValue;
         private HardwareSnapshot _hardwareSnapshot;
         private bool _hardwareRefreshing;
@@ -1767,11 +1769,16 @@ namespace Neck
                 if (protectedStatus != null) protectedStatus.Text = "Modo Reunião • protegido até " + _meetingEndsAt.ToString("HH:mm");
                 return;
             }
-            string state = snapshot.Level == HealthLevel.Critical ? "Gargalo" : snapshot.Level == HealthLevel.Warning ? "Atenção" : "Fluindo bem";
+            HealthLevel effectiveLevel = _flowDecision == null ? snapshot.Level : _flowDecision.EffectiveLevel;
+            string state = _flowDecision != null && _flowDecision.State == FlowConsensusState.Observing ? "Confirmando sinal" :
+                           _flowDecision != null && _flowDecision.State == FlowConsensusState.Recovering ? "Confirmando melhora" :
+                           _flowDecision != null && _flowDecision.State == FlowConsensusState.BaselineShift ? "Ritmo diferente" :
+                           effectiveLevel == HealthLevel.Critical ? "Gargalo" :
+                           effectiveLevel == HealthLevel.Warning ? "Atenção" : "Fluindo bem";
             if (_autopilotDecision != null && _autopilotDecision.State == AutopilotState.Protecting)
                 state = "Autopilot protegendo";
-            _trayIcon.Icon = snapshot.Level == HealthLevel.Critical ? SystemIcons.Error :
-                             snapshot.Level == HealthLevel.Warning ? SystemIcons.Warning :
+            _trayIcon.Icon = effectiveLevel == HealthLevel.Critical ? SystemIcons.Error :
+                             effectiveLevel == HealthLevel.Warning ? SystemIcons.Warning :
                              _trayStableIcon;
             string text = "Neck — " + state + " — RAM " + snapshot.Memory.PercentUsed.ToString("0", CultureInfo.CurrentCulture) + "% • CPU " + snapshot.CpuPercent.ToString("0", CultureInfo.CurrentCulture) + "%";
             _trayIcon.Text = text.Length > 63 ? text.Substring(0, 63) : text;
@@ -1998,40 +2005,30 @@ namespace Neck
                 UpdateMeetingDisplay();
                 return;
             }
-            if (snapshot.Level == HealthLevel.Critical)
-            {
-                _guardBadge.Text = "●  Gargalo agora";
-                _guardBadge.ForeColor = Theme.Coral;
-                _heroTitle.Text = "Tem um gargalo pedindo espaço";
-                _guardButton.Text = "Destravar agora";
-            }
-            else if (snapshot.Level == HealthLevel.Warning)
-            {
-                _guardBadge.Text = "●  Fluxo sob pressão";
-                _guardBadge.ForeColor = Theme.Amber;
-                _heroTitle.Text = "O fluxo está mais apertado";
-                _guardButton.Text = "Dar prioridade a um app";
-            }
-            else
-            {
-                _guardBadge.Text = "●  Fluxo livre";
-                _guardBadge.ForeColor = Theme.Green;
-                _heroTitle.Text = "Tudo está passando bem";
-                _guardButton.Text = "Dar prioridade a um app";
-            }
+            _flowDecision = _flowConsensusEngine.Evaluate(snapshot, _latestReplaySample, _baselineEvaluation);
+            _currentAdvice = _flowDecision.Advice;
+            _guardBadge.Text = _flowDecision.Badge;
+            _guardBadge.ForeColor = _flowDecision.State == FlowConsensusState.Confirmed &&
+                _flowDecision.EffectiveLevel == HealthLevel.Critical ? Theme.Coral :
+                _flowDecision.State == FlowConsensusState.Observing ||
+                _flowDecision.State == FlowConsensusState.Recovering ||
+                _flowDecision.State == FlowConsensusState.BaselineShift ? Theme.Amber :
+                _flowDecision.State == FlowConsensusState.Learning ? Theme.Blue : Theme.Green;
+            _heroTitle.Text = _flowDecision.HeroTitle;
+            _guardButton.Text = _flowDecision.PrimaryActionText;
             _guardBadge.Width = 220;
             _guardBadge.BackColor = Color.Transparent;
-            _guardButton.SetPalette(Theme.Lime);
-            _guardButton.ForeColor = Theme.Ink;
-            _flowIndicator.SetLevel(snapshot.Level);
-            _guardButton.AttentionPulse = snapshot.Level == HealthLevel.Critical && !FocusModeManager.IsActive && Visible && WindowState != FormWindowState.Minimized;
+            _flowIndicator.SetLevel(_flowDecision.EffectiveLevel);
+            _guardButton.AttentionPulse = _flowDecision.State == FlowConsensusState.Confirmed &&
+                _flowDecision.EffectiveLevel == HealthLevel.Critical && !FocusModeManager.IsActive && Visible &&
+                WindowState != FormWindowState.Minimized;
 
             string turbo = FocusModeManager.IsActive
                 ? " Acelerando " + FocusModeManager.ActiveDisplayName + " por mais " + Math.Max(1, (int)Math.Ceiling(FocusModeManager.Remaining.TotalMinutes)) + " min."
                 : string.Empty;
             if (FocusShieldManager.ActiveCount > 0)
                 turbo += " Escudo de Foco ativo contra " + FocusShieldManager.ActiveCount + " concorrente(s).";
-            _guardMessage.Text = snapshot.Summary + turbo;
+            _guardMessage.Text = _flowDecision.Summary + turbo;
             ResourceProcess top = snapshot.TopProcesses.FirstOrDefault();
             string adaptive = EfficiencyModeManager.ActiveCount > 0
                 ? "  •  Economizando: " + EfficiencyModeManager.ActiveCount + " app(s)"
@@ -2040,13 +2037,14 @@ namespace Neck
                 ? "Nenhum processo pôde ser analisado."
                 : "Maior uso: " + top.DisplayName + "  •  " + FormatBytes(top.MemoryBytes)) + adaptive;
 
-            _currentAdvice = BottleneckAdvisor.Analyze(snapshot, _latestReplaySample);
             ReplayIncident replay = _replayEngine.GetLatestIncident();
             _showReplayAsPrimary = replay != null && !replay.Ongoing && replay.EndedUtc != DateTime.MinValue &&
-                DateTime.UtcNow - replay.EndedUtc <= TimeSpan.FromMinutes(30) && snapshot.Level == HealthLevel.Stable;
+                DateTime.UtcNow - replay.EndedUtc <= TimeSpan.FromMinutes(30) &&
+                (_flowDecision.State == FlowConsensusState.Stable || _flowDecision.State == FlowConsensusState.BaselineShift);
             _showAutopilotAsPrimary = !_showReplayAsPrimary && _guardSettings.AutopilotEnabled && _autopilotDecision != null &&
                 (_autopilotDecision.State == AutopilotState.Protecting ||
                  (_autopilotDecision.State == AutopilotState.Watching && _currentAdvice.Kind == BottleneckKind.None));
+            bool primaryCanAct = true;
             if (_showReplayAsPrimary)
             {
                 _actionTitle.Text = "O fluxo voltou ao normal";
@@ -2058,7 +2056,7 @@ namespace Neck
                 _actionTitle.Text = _autopilotDecision.Title;
                 _actionHelp.Text = _autopilotDecision.Explanation;
                 _guardButton.Text = _autopilotDecision.State == AutopilotState.Protecting ? "Ver proteção" : "Ver previsão";
-                if (_autopilotDecision.State == AutopilotState.Protecting && snapshot.Level != HealthLevel.Critical)
+                if (_autopilotDecision.State == AutopilotState.Protecting && _flowDecision.EffectiveLevel != HealthLevel.Critical)
                 {
                     _guardBadge.Text = "●  Autopilot cuidando";
                     _guardBadge.Width = 220;
@@ -2069,12 +2067,14 @@ namespace Neck
             }
             else
             {
-                bool showPersonalizedInsight = _currentAdvice.Kind == BottleneckKind.None &&
-                    _baselineEvaluation != null && _baselineEvaluation.State == BaselineState.Personalized;
-                _actionTitle.Text = showPersonalizedInsight ? _baselineEvaluation.Title : _currentAdvice.Title;
-                _actionHelp.Text = showPersonalizedInsight ? _baselineEvaluation.Explanation : _currentAdvice.Explanation;
-                _guardButton.Text = _currentAdvice.ActionText;
+                _actionTitle.Text = _flowDecision.InsightTitle;
+                _actionHelp.Text = _flowDecision.InsightExplanation + Environment.NewLine + _flowDecision.EvidenceText;
+                _guardButton.Text = _flowDecision.PrimaryActionText;
+                primaryCanAct = _flowDecision.CanAct;
             }
+            _guardButton.Enabled = primaryCanAct && !_maintenanceRunning && !_busy;
+            _guardButton.SetPalette(primaryCanAct ? Theme.Lime : Theme.Border);
+            _guardButton.ForeColor = primaryCanAct ? Theme.Ink : Theme.Muted;
         }
 
         private void UpdateFlowScore()
@@ -2379,7 +2379,8 @@ namespace Neck
             _driversButton.Enabled = !busy;
             _settingsButton.Enabled = !busy;
             _planButton.Enabled = !busy;
-            _guardButton.Enabled = !busy;
+            _guardButton.Enabled = !busy && (_flowDecision == null || _flowDecision.CanAct ||
+                _showReplayAsPrimary || _showAutopilotAsPrimary);
             _meetingButton.Enabled = !busy;
             _toolsButton.Enabled = !busy;
             _progress.Running = busy;
