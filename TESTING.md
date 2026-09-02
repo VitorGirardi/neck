@@ -83,7 +83,10 @@ Execute esta lista em uma VM ou computador secundário, nunca em uma máquina cr
 
 ### Operações reversíveis
 
-- [ ] Acelerar um aplicativo descartável e confirmar a restauração ao perder foco, parar e fechar o Neck.
+- [ ] Executar **Comprovar e acelerar** em um aplicativo descartável, mantê-lo em uso por cerca de 25 segundos e conferir as duas etapas.
+- [ ] Confirmar que ganho observado mantém a aceleração e que resultado neutro, pior ou inconclusivo restaura tudo automaticamente.
+- [ ] Durante a medição, trocar de janela e confirmar que a contagem pausa até retornar ao aplicativo.
+- [ ] Confirmar a restauração ao clicar em Parar e ao fechar o Neck.
 - [ ] Encerrar o Neck durante uma otimização de teste e confirmar a recuperação na próxima abertura.
 - [ ] Ativar Modo Reunião e confirmar a restauração da política de suspensão ao sair.
 - [ ] Testar Autopilot somente com aplicativos descartáveis e conferir o diário de recuperação vazio ao final.

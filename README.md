@@ -92,7 +92,7 @@ A animação ocorre por um intervalo curto após cada diagnóstico e não perman
 | **Hardware local** | Mostra CPU, GPU, RAM, discos, placa-mãe, drivers e temperaturas realmente disponíveis. | Não envia inventário e nunca estima sensores ausentes. |
 | **Meu Plano Neck** | Cruza RAM, disco, temporários, inicialização e Windows Update para escolher três prioridades. | Não executa nenhuma ação automaticamente. |
 | **Neck Guard** | Mostra a saúde do computador, CPU, RAM e os maiores consumidores de memória. | Diagnóstico somente leitura. |
-| **Acelerar aplicativo** | Alterna automaticamente entre mais desempenho em uso e menor consumo em segundo plano. | Um único botão, duração de uma hora e restauração automática. |
+| **Prova de Ganho** | Mede o aplicativo no modo normal, testa a aceleração e compara o resultado durante o uso real. | Só mantém a mudança quando observa melhora; resultado neutro, pior ou inconclusivo é restaurado. |
 | **Neck Boot** | Explica o que inicia com o Windows e quais itens opcionais merecem revisão. | Encaminha mudanças para a tela oficial do Windows. |
 | **Modo Reunião** | Verifica o computador e impede suspensão durante uma apresentação. | Temporário, reversível e sem manutenção concorrente. |
 | **Limpeza segura** | Remove temporários antigos e relatórios de erro conhecidos. | Preserva arquivos recentes, documentos, downloads e navegadores. |
@@ -230,10 +230,17 @@ Essa é a função principal do Neck. Ela foi desenhada para funcionar sem exigi
 
 1. Clique em **Acelerar app**.
 2. Selecione o aplicativo importante.
-3. Clique em **Acelerar por 1 hora**.
-4. Volte ao aplicativo e use-o normalmente.
+3. Clique em **Comprovar e acelerar**.
+4. Volte ao aplicativo e use-o normalmente por cerca de 25 segundos.
 
-O Neck cuida das mudanças sozinho:
+O Neck faz um pequeno teste A/B sem fechar a janela:
+
+- **Primeiro:** coleta quatro leituras do aplicativo funcionando normalmente.
+- **Depois:** aplica a aceleração reversível, aguarda a estabilização e coleta quatro leituras equivalentes.
+- **Se observar melhora:** mantém a aceleração por até uma hora.
+- **Se o resultado for neutro, pior ou insuficiente:** restaura as configurações anteriores automaticamente.
+
+Quando a aceleração é mantida:
 
 - **Enquanto você usa o aplicativo:** ele recebe prioridade para responder melhor.
 - **Se outros aplicativos estiverem disputando recursos:** o Escudo de Foco reduz temporariamente até três concorrentes pesados em segundo plano.
@@ -243,7 +250,7 @@ O Neck cuida das mudanças sozinho:
 
 O Escudo de Foco considera memória e atividade recente de CPU. Ele só seleciona aplicativos com janela própria, nunca o aplicativo escolhido, e mantém uma lista conservadora de exceções para aplicativos dedicados conhecidos de comunicação, áudio, vídeo, transmissão e ferramentas do Windows. O Escudo fica suspenso durante o Modo Reunião. Ao trocar de janela, os concorrentes recuperam imediatamente suas configurações anteriores.
 
-Após a ativação, o Neck compara a memória disponível e o uso físico da família do aplicativo durante 18 segundos de uso real em primeiro plano. A contagem só começa quando você volta ao aplicativo e pausa se trocar de janela. O resultado informa o que realmente foi observado — inclusive quando o uso permaneceu semelhante — e quantos processos receberam a configuração. Ele não transforma essa leitura em uma promessa artificial de velocidade.
+A Prova de Ganho compara tempo de resposta da janela, fila da CPU, latência do armazenamento e RAM disponível. A contagem só começa quando você volta ao aplicativo e pausa se trocar de janela. Limites mínimos evitam transformar oscilações pequenas em uma promessa artificial de velocidade; o texto sempre descreve o que foi observado apenas naquela sessão.
 
 A tela principal mostra apenas o nome, o uso de memória e uma situação compreensível, como **Disponível**, **Mais rápido agora** ou **Economizando memória**. Fechamento do aplicativo, Gerenciador de Tarefas e controle manual de segundo plano ficam em **Mais opções**.
 
@@ -267,8 +274,9 @@ As tarefas de manutenção aparecem em linhas inteiras clicáveis, com checkbox 
 
 ## Como funciona por dentro
 
-O botão Acelerar combina três motores que continuam separados no código:
+O botão Acelerar combina quatro motores que continuam separados no código:
 
+- **Prova de Ganho:** executa a medição normal/otimizada e decide entre manter ou restaurar.
 - **Turbo:** enquanto uma janela da família está em primeiro plano, usa `ABOVE_NORMAL_PRIORITY_CLASS` para melhorar a resposta durante disputa por CPU.
 - **Adaptive:** em segundo plano, usa prioridade abaixo do normal, EcoQoS, baixa prioridade de memória e RAM Park.
 - **Escudo de Foco:** enquanto o alvo está em primeiro plano e existe pressão de RAM ou CPU, aplica o Adaptive somente a até três concorrentes elegíveis e restaura tudo ao perder o foco.
@@ -398,6 +406,7 @@ Program.cs                 Interface principal e manutenção segura
 SystemMonitoring.cs        Diagnóstico de CPU, memória, disco e reunião
 GuardMonitoring.cs         Monitoramento contínuo, histórico e bandeja
 BottleneckGuidance.cs      Gargalo Guiado, monitor adaptativo e medição de resultado
+OptimizationProof.cs       Prova A/B, resposta da janela e decisão de manter ou restaurar
 NeckReplay.cs              Caixa-preta, PDH, classificação causal e incidentes em memória
 ReplayForm.cs              Explicação visual e linha do tempo dos últimos cinco minutos
 NeckBaseline.cs            Aprendizado estatístico local, contextos e Índice de Fluxo
@@ -474,7 +483,7 @@ Resultados dependem do estado do Windows, dos aplicativos abertos e do hardware.
 - [x] Neck Turbo e detecção de pressão persistente de CPU
 - [x] Gargalo Guiado com recomendação única e aplicativo destacado
 - [x] Monitor Inteligente adaptativo com confirmação de pressão e recuperação
-- [x] Medição honesta do resultado antes/depois da aceleração
+- [x] Prova de Ganho A/B com manutenção seletiva e reversão automática
 - [x] Escudo de Foco sensível a RAM e CPU, com restauração imediata
 - [x] Inventário de hardware e temperaturas locais com fontes explícitas
 - [x] Cura Bluetooth com diagnóstico, reinício seletivo e nova detecção
