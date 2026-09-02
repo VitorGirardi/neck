@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 
 $artifacts = @(
     (Join-Path $OutputDirectory 'Neck.exe'),
-    (Join-Path $OutputDirectory 'Neck-Setup-1.19.0.exe')
+    (Join-Path $OutputDirectory 'Neck-Setup-1.20.0.exe')
 )
 
 foreach ($artifact in $artifacts) {
