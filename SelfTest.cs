@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -514,15 +515,69 @@ namespace Neck
                 SmartMonitorDecision recoveredFlow = smartMonitor.Evaluate(new HealthSnapshot { Level = HealthLevel.Stable });
                 if (!recoveredFlow.RecoveryConfirmed || recoveredFlow.NextIntervalMilliseconds != 60000)
                     throw new InvalidOperationException("O monitor inteligente não confirmou a recuperação do fluxo.");
+                List<OptimizationMeasurement> proofBaseline = Enumerable.Range(0, 4).Select(index => new OptimizationMeasurement
+                {
+                    ResponseAvailable = true,
+                    Responsive = true,
+                    ResponseMilliseconds = 8,
+                    ProcessorQueueLength = 3,
+                    DiskLatencyMilliseconds = 12,
+                    AvailableBytes = 2L * 1024 * 1024 * 1024
+                }).ToList();
+                List<OptimizationMeasurement> proofOptimized = Enumerable.Range(0, 4).Select(index => new OptimizationMeasurement
+                {
+                    ResponseAvailable = true,
+                    Responsive = true,
+                    ResponseMilliseconds = 3,
+                    ProcessorQueueLength = 1,
+                    DiskLatencyMilliseconds = 5,
+                    AvailableBytes = 2304L * 1024 * 1024
+                }).ToList();
+                OptimizationEvaluation proofGain = OptimizationGainEvaluator.Evaluate(proofBaseline, proofOptimized);
+                if (proofGain.Verdict != OptimizationVerdict.Improved || proofGain.Score < 15 ||
+                    !OptimizationGainEvaluator.ShouldKeep(proofGain))
+                    throw new InvalidOperationException("A Prova de Ganho não manteve uma melhora mensurável.");
+
+                List<OptimizationMeasurement> proofNeutralBefore = Enumerable.Range(0, 4).Select(index => new OptimizationMeasurement
+                {
+                    ResponseAvailable = true,
+                    Responsive = true,
+                    ResponseMilliseconds = 0.5,
+                    ProcessorQueueLength = 1.2,
+                    DiskLatencyMilliseconds = 6,
+                    AvailableBytes = 3L * 1024 * 1024 * 1024
+                }).ToList();
+                List<OptimizationMeasurement> proofNeutralAfter = Enumerable.Range(0, 4).Select(index => new OptimizationMeasurement
+                {
+                    ResponseAvailable = true,
+                    Responsive = true,
+                    ResponseMilliseconds = 0.6,
+                    ProcessorQueueLength = 1.1,
+                    DiskLatencyMilliseconds = 6.2,
+                    AvailableBytes = 3L * 1024 * 1024 * 1024
+                }).ToList();
+                OptimizationEvaluation proofNeutral = OptimizationGainEvaluator.Evaluate(proofNeutralBefore, proofNeutralAfter);
+                if (proofNeutral.Verdict != OptimizationVerdict.Neutral || OptimizationGainEvaluator.ShouldKeep(proofNeutral))
+                    throw new InvalidOperationException("A Prova de Ganho manteve uma mudança sem benefício relevante.");
+
+                OptimizationEvaluation proofWorse = OptimizationGainEvaluator.Evaluate(proofOptimized, proofBaseline);
+                if (proofWorse.Verdict != OptimizationVerdict.Worse || OptimizationGainEvaluator.ShouldKeep(proofWorse))
+                    throw new InvalidOperationException("A Prova de Ganho não reverteu uma piora mensurável.");
+                OptimizationEvaluation proofInconclusive = OptimizationGainEvaluator.Evaluate(
+                    proofNeutralBefore.Take(2).ToList(), proofNeutralAfter.Take(2).ToList());
+                if (proofInconclusive.Verdict != OptimizationVerdict.Inconclusive ||
+                    OptimizationGainEvaluator.ShouldKeep(proofInconclusive))
+                    throw new InvalidOperationException("A Prova de Ganho manteve uma mudança sem amostras suficientes.");
+
                 OptimizationOutcome syntheticOutcome = new OptimizationOutcome
                 {
                     Complete = true,
-                    AvailableBefore = 2L * 1024 * 1024 * 1024,
-                    AvailableAfter = 3L * 1024 * 1024 * 1024,
-                    ProcessesChanged = 2
+                    Evaluation = proofGain,
+                    DisplayName = "Aplicativo de teste"
                 };
-                if (!syntheticOutcome.Summary.StartsWith("Resultado observado:", StringComparison.Ordinal))
-                    throw new InvalidOperationException("A medição de resultado não produziu um resumo verificável.");
+                if (!syntheticOutcome.Summary.StartsWith("Ganho observado", StringComparison.Ordinal))
+                    throw new InvalidOperationException("A Prova de Ganho não produziu um resumo verificável.");
+                Console.WriteLine("OptimizationProof=GainKept/NeutralWorseInconclusiveRolledBack");
                 ReplaySample healthyMemory = new ReplaySample
                 {
                     TimestampUtc = DateTime.UtcNow,
