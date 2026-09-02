@@ -16,8 +16,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Diagnóstico inteligente e manutenção segura para Windows")]
 [assembly: System.Reflection.AssemblyCompany("Neck")]
 [assembly: System.Reflection.AssemblyProduct("Neck")]
-[assembly: System.Reflection.AssemblyVersion("1.19.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.19.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.20.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.20.0.0")]
 
 namespace Neck
 {

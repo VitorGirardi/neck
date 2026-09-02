@@ -1,6 +1,6 @@
 param(
     [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist'),
-    [string]$ExpectedVersion = '1.19.0.0',
+    [string]$ExpectedVersion = '1.20.0.0',
     [switch]$AllowUnsigned,
     [string]$ExpectedSigner = '',
     [switch]$RequireTimestamp
