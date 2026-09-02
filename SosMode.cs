@@ -147,7 +147,14 @@ namespace Neck
                 OptimizationOutcome outcome = OptimizationOutcomeMonitor.Refresh();
                 if (outcome == null) return;
                 _result.Text = outcome.Summary;
-                if (outcome.Complete) _outcomeTimer.Stop();
+                if (outcome.Complete)
+                {
+                    string summary = outcome.Summary;
+                    _outcomeTimer.Stop();
+                    RefreshSnapshot();
+                    _result.Text = summary;
+                }
+                else UpdateSelectionState();
             };
             FormClosing += delegate(object sender, FormClosingEventArgs e)
             {
@@ -308,6 +315,7 @@ namespace Neck
                 item.SubItems.Add(MainForm.FormatBytes(candidate.MemoryBytes));
                 string state = FocusModeManager.IsTarget(candidate.ProcessName)
                     ? FocusModeManager.GetStateLabel(candidate.ProcessName)
+                    : OptimizationOutcomeMonitor.IsPending(candidate.ProcessName) ? "Comprovando ganho"
                     : EfficiencyModeManager.IsActive(candidate.ProcessName) ? "Usando menos recursos"
                     : string.Equals(candidate.ProcessName, _recommendedProcessName, StringComparison.OrdinalIgnoreCase)
                         ? "Recomendado pelo Neck" : "Disponível";
@@ -387,28 +395,27 @@ namespace Neck
             string replacing = FocusModeManager.IsActive
                 ? " A aceleração atual de " + FocusModeManager.ActiveDisplayName + " será substituída."
                 : string.Empty;
-            string explanation = candidate.DisplayName + " ficará mais rápido quando você estiver usando a janela." + replacing + "\n\n" +
-                                 "Se houver pressão, o Escudo de Foco poderá reduzir temporariamente até três aplicativos pesados que estejam em segundo plano. Aplicativos dedicados conhecidos de comunicação, áudio e vídeo ficam protegidos.\n\n" +
-                                 "Ao trocar de janela, o Escudo restaura os concorrentes e reduz o consumo de " + candidate.DisplayName + ". Depois de uma hora, tudo volta ao normal automaticamente.\n\n" +
+            string explanation = "O Neck fará uma prova rápida com " + candidate.DisplayName + "." + replacing + "\n\n" +
+                                 "Primeiro ele mede o aplicativo no modo normal. Depois aplica uma otimização reversível e mede novamente durante o uso real.\n\n" +
+                                 "A mudança só será mantida se houver melhora observável. Se não ajudar, piorar ou faltar evidência, o Neck restaura tudo automaticamente.\n\n" +
+                                 "Depois de confirmar, volte ao aplicativo e use-o normalmente por cerca de 25 segundos. " +
                                  "Nenhuma janela, documento ou arquivo será fechado.";
-            if (MessageBox.Show(explanation, "Acelerar " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
+            if (MessageBox.Show(explanation, "Comprovar ganho em " + candidate.DisplayName + "?", MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Information) != DialogResult.OK) return;
 
-            SetBusy(true, "Preparando " + candidate.DisplayName + "...");
+            SetBusy(true, "Preparando a prova de ganho em " + candidate.DisplayName + "...");
             try
             {
-                MemoryStatus memoryBefore = SystemInfo.GetMemoryStatus();
-                long appMemoryBefore = ProcessFamilyInspector.GetMetrics(candidate.ProcessName).WorkingSetBytes;
-                FocusModeResult modeResult = null;
-                await Task.Run(delegate { modeResult = FocusModeManager.Start(candidate.ProcessName, candidate.DisplayName, 60); });
-                if (_closing || IsDisposed) return;
-                if (FocusModeManager.IsTarget(candidate.ProcessName))
+                if (FocusModeManager.IsActive)
                 {
-                    OptimizationOutcomeMonitor.Begin(candidate.ProcessName, candidate.DisplayName, modeResult, memoryBefore, appMemoryBefore);
-                    _result.Text = "Aceleração ativa. O Neck está medindo o resultado observado por alguns segundos...";
-                    _outcomeTimer.Start();
+                    string activeProcess = FocusModeManager.ActiveProcessName;
+                    await Task.Run(delegate { FocusModeManager.Stop(); });
+                    OptimizationOutcomeMonitor.Cancel(activeProcess);
                 }
-                else _result.Text = "O Windows não permitiu preparar esse aplicativo agora.";
+                if (_closing || IsDisposed) return;
+                OptimizationOutcomeMonitor.Begin(candidate.ProcessName, candidate.DisplayName);
+                _result.Text = "Prova pronta. Volte ao " + candidate.DisplayName + " e use-o normalmente por cerca de 25 segundos.";
+                _outcomeTimer.Start();
             }
             catch (Exception ex)
             {
@@ -447,11 +454,12 @@ namespace Neck
         private void UpdateSelectionState()
         {
             bool selected = !_busy && _applications.SelectedItems.Count == 1;
-            _focus.Enabled = selected;
-            _advanced.Enabled = selected;
             SosCandidate candidate = selected ? _applications.SelectedItems[0].Tag as SosCandidate : null;
             bool active = candidate != null && FocusModeManager.IsTarget(candidate.ProcessName);
-            _focus.Text = active ? "Parar aceleração" : "Acelerar por 1 hora";
+            bool pending = candidate != null && OptimizationOutcomeMonitor.IsPending(candidate.ProcessName);
+            _focus.Enabled = selected && !pending;
+            _advanced.Enabled = selected && !pending;
+            _focus.Text = pending ? "Comprovando ganho..." : active ? "Parar aceleração" : "Comprovar e acelerar";
             _focus.BackColor = active ? Theme.Amber : Theme.Lime;
             _focus.ForeColor = Theme.Ink;
         }

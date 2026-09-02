@@ -111,6 +111,15 @@ namespace Neck
             RefreshCore(foregroundProcessName, foregroundProcessId, DateTime.UtcNow);
         }
 
+        public static bool IsProcessForeground(string processName)
+        {
+            if (string.IsNullOrWhiteSpace(processName)) return false;
+            int foregroundProcessId;
+            string foregroundProcessName = GetForegroundProcess(out foregroundProcessId);
+            return string.Equals(processName, foregroundProcessName, StringComparison.OrdinalIgnoreCase) ||
+                   (foregroundProcessId > 0 && ProcessFamilyInspector.IsProcessInFamily(processName, foregroundProcessId));
+        }
+
         internal static void RefreshForTesting(string foregroundProcessName, DateTime utcNow)
         {
             RefreshCore(foregroundProcessName, 0, utcNow);
