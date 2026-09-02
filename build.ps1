@@ -35,7 +35,7 @@ $arguments = @(
     '/reference:System.Windows.Forms.dll'
 )
 $sourceFiles = Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.cs' |
-    Where-Object { $_.Name -ne 'SelfTest.cs' } |
+    Where-Object { $_.Name -ne 'SelfTest.cs' -and $_.Name -ne 'SoakTest.cs' } |
     Sort-Object Name |
     ForEach-Object { $_.FullName }
 $arguments += $sourceFiles

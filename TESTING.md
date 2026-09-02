@@ -44,6 +44,22 @@ Para validar o pacote já montado:
 
 O parâmetro `-AllowUnsigned` é temporário e deve ser removido da validação da release assim que a assinatura oficial estiver ativa.
 
+## Teste de resistência do motor
+
+O teste de resistência executa capturas reais do Replay, aprendizado do Baseline e decisões do Flow Consensus em ciclo. Ele não limpa arquivos, não altera prioridades e não reinicia dispositivos. O padrão dura 10 minutos:
+
+```powershell
+.\soak-test.ps1
+```
+
+Para uma verificação rápida durante o desenvolvimento:
+
+```powershell
+.\soak-test.ps1 -DurationSeconds 60 -SampleIntervalSeconds 2
+```
+
+O resultado aprovado termina com `SOAK_TEST_OK` e informa deriva de memória privada, handles, threads, pico de memória e CPU média do processo. Antes de uma release, use pelo menos os 10 minutos padrão; execuções curtas servem apenas como detector inicial de regressão.
+
 ## Checklist em Windows limpo
 
 Execute esta lista em uma VM ou computador secundário, nunca em uma máquina crítica sem backup.
