@@ -1112,6 +1112,13 @@ namespace Neck
 
         private static void TestSupportReportPrivacy(HardwareSnapshot hardware)
         {
+            DiagnosticThrottle throttle = new DiagnosticThrottle();
+            DateTime throttleStart = DateTime.UtcNow;
+            if (!throttle.ShouldRecord("Replay|IOException", throttleStart, TimeSpan.FromMinutes(10)) ||
+                throttle.ShouldRecord("Replay|IOException", throttleStart.AddMinutes(1), TimeSpan.FromMinutes(10)) ||
+                !throttle.ShouldRecord("Replay|IOException", throttleStart.AddMinutes(11), TimeSpan.FromMinutes(10)) ||
+                !throttle.ShouldRecord("Baseline|IOException", throttleStart.AddMinutes(1), TimeSpan.FromMinutes(10)))
+                throw new InvalidOperationException("O limitador de diagnóstico perdeu falhas ou permitiu repetição excessiva.");
             string sensitive = @"C:\Users\" + Environment.UserName + @"\Documents\arquivo-pessoal.txt " + Environment.MachineName;
             string sanitized = SupportDiagnostics.Sanitize(sensitive);
             if (Environment.UserName.Length >= 3 && sanitized.IndexOf(Environment.UserName, StringComparison.OrdinalIgnoreCase) >= 0)
