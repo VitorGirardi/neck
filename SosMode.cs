@@ -56,7 +56,7 @@ namespace Neck
         private static List<SosCandidate> InspectCandidates()
         {
             Dictionary<string, SosCandidate> grouped = new Dictionary<string, SosCandidate>(StringComparer.OrdinalIgnoreCase);
-            string current = Process.GetCurrentProcess().ProcessName;
+            string current = SystemInfo.CurrentProcessName;
             foreach (Process process in Process.GetProcesses())
             {
                 using (process)
@@ -98,7 +98,7 @@ namespace Neck
         {
             SosCloseResult result = new SosCloseResult();
             if (IsProtectedProcessName(processName) ||
-                string.Equals(processName, Process.GetCurrentProcess().ProcessName, StringComparison.OrdinalIgnoreCase)) return result;
+                string.Equals(processName, SystemInfo.CurrentProcessName, StringComparison.OrdinalIgnoreCase)) return result;
             foreach (Process process in Process.GetProcessesByName(processName))
             {
                 using (process)

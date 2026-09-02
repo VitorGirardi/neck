@@ -56,6 +56,9 @@ namespace Neck
 
     internal static class SystemInfo
     {
+        internal static readonly string CurrentProcessName = ReadCurrentProcessName();
+        internal static readonly int CurrentProcessId = ReadCurrentProcessId();
+
         public static MemoryStatus GetMemoryStatus()
         {
             NativeMethods.MEMORYSTATUSEX data = new NativeMethods.MEMORYSTATUSEX();
@@ -79,7 +82,7 @@ namespace Neck
             catch { }
 
             Dictionary<string, ResourceProcess> grouped = new Dictionary<string, ResourceProcess>(StringComparer.OrdinalIgnoreCase);
-            string currentName = Process.GetCurrentProcess().ProcessName;
+            string currentName = CurrentProcessName;
             foreach (Process process in Process.GetProcesses())
             {
                 using (process)
@@ -257,6 +260,16 @@ namespace Neck
             if (string.Equals(name, "Teams", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "ms-teams", StringComparison.OrdinalIgnoreCase)) return "Microsoft Teams";
             if (string.Equals(name, "Code", StringComparison.OrdinalIgnoreCase)) return "Visual Studio Code";
             return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(name.Replace('_', ' '));
+        }
+
+        private static string ReadCurrentProcessName()
+        {
+            using (Process process = Process.GetCurrentProcess()) return process.ProcessName;
+        }
+
+        private static int ReadCurrentProcessId()
+        {
+            using (Process process = Process.GetCurrentProcess()) return process.Id;
         }
     }
 

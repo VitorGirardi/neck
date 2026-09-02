@@ -1705,7 +1705,7 @@ namespace Neck
                 ReplayDecision decision = _replayEngine.Record(capture.Sample);
                 _baselineEvaluation = _baselineEngine.Observe(capture.Sample, _meetingActive);
                 bool neckForeground = string.Equals(capture.Sample.ForegroundProcess,
-                    Process.GetCurrentProcess().ProcessName, StringComparison.OrdinalIgnoreCase);
+                    SystemInfo.CurrentProcessName, StringComparison.OrdinalIgnoreCase);
                 AutopilotDecision autopilot = _autopilotEngine.Evaluate(capture.Sample, _baselineEngine.GetView(),
                     _guardSettings.AutopilotEnabled, _meetingActive, FocusModeManager.IsActive || neckForeground);
                 bool protectionStarted = autopilot.ShouldProtect;

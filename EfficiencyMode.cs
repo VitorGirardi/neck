@@ -103,7 +103,7 @@ namespace Neck
         {
             return !string.IsNullOrWhiteSpace(processName) &&
                    !SosInspector.IsProtectedProcessName(processName) &&
-                   !string.Equals(processName, Process.GetCurrentProcess().ProcessName, StringComparison.OrdinalIgnoreCase);
+                   !string.Equals(processName, SystemInfo.CurrentProcessName, StringComparison.OrdinalIgnoreCase);
         }
 
         public static EfficiencyModeResult Apply(string processName)

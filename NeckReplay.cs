@@ -431,7 +431,7 @@ namespace Neck
             DateTime now = DateTime.UtcNow;
             Dictionary<int, Point> current = new Dictionary<int, Point>();
             Dictionary<string, double> usage = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-            int ownId = Process.GetCurrentProcess().Id;
+            int ownId = SystemInfo.CurrentProcessId;
             foreach (Process process in Process.GetProcesses())
             {
                 using (process)
