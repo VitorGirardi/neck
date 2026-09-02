@@ -550,6 +550,81 @@ namespace Neck
                 if (healthyHighRam.Level != HealthLevel.Stable || healthyHighRamAdvice.Kind != BottleneckKind.None ||
                     healthyHighRamAdvice.Confidence < 80)
                     throw new InvalidOperationException("O Flow Engine confundiu RAM ocupada com pressão real.");
+                FlowConsensusEngine baselineConsensus = new FlowConsensusEngine();
+                FlowConsensusDecision baselineShift = baselineConsensus.Evaluate(healthyHighRam, healthyMemory,
+                    new BaselineEvaluation
+                    {
+                        State = BaselineState.Personalized,
+                        Score = 64,
+                        Title = "Mais lento que o habitual",
+                        Explanation = "Mais trabalhos estão esperando pela CPU que no uso normal."
+                    });
+                if (baselineShift.State != FlowConsensusState.BaselineShift ||
+                    baselineShift.EffectiveLevel != HealthLevel.Stable ||
+                    baselineShift.HeroTitle.IndexOf("Sem gargalo", StringComparison.OrdinalIgnoreCase) < 0 ||
+                    baselineShift.Summary.IndexOf("Nenhum gargalo absoluto", StringComparison.OrdinalIgnoreCase) < 0)
+                    throw new InvalidOperationException("O consenso de fluxo voltou a contradizer o padrão pessoal na tela principal.");
+
+                FlowConsensusEngine pressureConsensus = new FlowConsensusEngine();
+                HealthSnapshot pressureHealth = new HealthSnapshot
+                {
+                    Score = 35,
+                    Level = HealthLevel.Critical,
+                    CpuPercent = 42,
+                    Memory = new MemoryStatus { PercentUsed = 93, AvailableBytes = 620UL * 1024 * 1024 },
+                    DiskFreeBytes = 100L * 1024 * 1024 * 1024,
+                    DiskTotalBytes = 256L * 1024 * 1024 * 1024,
+                    TopProcesses = new System.Collections.Generic.List<ResourceProcess>
+                    {
+                        new ResourceProcess { ProcessName = "Claude", DisplayName = "Claude", MemoryBytes = 3L * 1024 * 1024 * 1024 }
+                    }
+                };
+                DateTime consensusNow = DateTime.UtcNow;
+                Func<DateTime, ReplaySample> pressureSample = timestamp => new ReplaySample
+                {
+                    TimestampUtc = timestamp,
+                    MemoryPercent = 93,
+                    AvailableBytes = 620L * 1024 * 1024,
+                    CommitPercent = 96,
+                    PageReadsPerSecond = 140,
+                    CpuPercent = 42,
+                    TopMemoryProcess = "Claude",
+                    ForegroundResponsive = true
+                };
+                FlowConsensusDecision firstPressure = pressureConsensus.Evaluate(pressureHealth,
+                    pressureSample(consensusNow.AddSeconds(-20)), new BaselineEvaluation());
+                FlowConsensusDecision duplicatePressure = pressureConsensus.Evaluate(pressureHealth,
+                    pressureSample(consensusNow.AddSeconds(-20)), new BaselineEvaluation());
+                FlowConsensusDecision secondPressure = pressureConsensus.Evaluate(pressureHealth,
+                    pressureSample(consensusNow.AddSeconds(-10)), new BaselineEvaluation());
+                FlowConsensusDecision confirmedConsensus = pressureConsensus.Evaluate(pressureHealth,
+                    pressureSample(consensusNow.AddSeconds(-3)), new BaselineEvaluation());
+                if (firstPressure.State != FlowConsensusState.Observing || firstPressure.CanAct ||
+                    duplicatePressure.ConsecutiveReadings != 1 || secondPressure.ConsecutiveReadings != 2 ||
+                    confirmedConsensus.State != FlowConsensusState.Confirmed || !confirmedConsensus.CanAct ||
+                    confirmedConsensus.EvidenceText.IndexOf("3/3 leituras", StringComparison.OrdinalIgnoreCase) < 0)
+                    throw new InvalidOperationException("O consenso de fluxo não exigiu três evidências independentes antes de agir.");
+
+                ReplaySample firstStableConsensus = new ReplaySample
+                {
+                    TimestampUtc = consensusNow.AddSeconds(-2), MemoryPercent = 58,
+                    AvailableBytes = 6L * 1024 * 1024 * 1024, CommitPercent = 65,
+                    CpuPercent = 25, ForegroundResponsive = true
+                };
+                ReplaySample secondStableConsensus = new ReplaySample
+                {
+                    TimestampUtc = consensusNow.AddSeconds(-1), MemoryPercent = 56,
+                    AvailableBytes = 7L * 1024 * 1024 * 1024, CommitPercent = 62,
+                    CpuPercent = 22, ForegroundResponsive = true
+                };
+                FlowConsensusDecision recoveringConsensus = pressureConsensus.Evaluate(healthyHighRam,
+                    firstStableConsensus, new BaselineEvaluation { State = BaselineState.Personalized, Score = 95 });
+                FlowConsensusDecision recoveredConsensus = pressureConsensus.Evaluate(healthyHighRam,
+                    secondStableConsensus, new BaselineEvaluation { State = BaselineState.Personalized, Score = 95 });
+                if (recoveringConsensus.State != FlowConsensusState.Recovering || recoveringConsensus.CanAct ||
+                    recoveredConsensus.State != FlowConsensusState.Stable)
+                    throw new InvalidOperationException("O consenso de fluxo anunciou recuperação antes de duas leituras estáveis.");
+                Console.WriteLine("FlowConsensus=BaselineUnified/3Pressure/2Recovery");
                 ReplaySample measuredDiskStall = new ReplaySample
                 {
                     TimestampUtc = DateTime.UtcNow,
