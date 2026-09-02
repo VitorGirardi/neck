@@ -490,7 +490,8 @@ namespace Neck
     internal sealed class MainForm : Form
     {
         private readonly Label _memoryValue = new Label();
-        private readonly Label _diskValue = new Label();
+        private readonly Label _contextMetricCaption = new Label();
+        private readonly Label _contextMetricValue = new Label();
         private readonly Label _flowScoreValue = new Label();
         private readonly Label _lastRunValue = new Label();
         private readonly Label _recommendation = new Label();
@@ -1066,7 +1067,7 @@ namespace Neck
             metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
             metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.334f));
             metrics.Controls.Add(BuildInlineMetric("Memória em uso", _memoryValue), 0, 0);
-            metrics.Controls.Add(BuildInlineMetric("Espaço livre", _diskValue), 1, 0);
+            metrics.Controls.Add(BuildInlineMetric("Espaço livre", _contextMetricValue, _contextMetricCaption), 1, 0);
             Control flowMetric = BuildInlineMetric("Índice de fluxo  ›", _flowScoreValue);
             MakeFlowMetricInteractive(flowMetric);
             metrics.Controls.Add(flowMetric, 2, 0);
@@ -1082,20 +1083,18 @@ namespace Neck
             return card;
         }
 
-        private static Control BuildInlineMetric(string caption, Label value)
+        private static Control BuildInlineMetric(string caption, Label value, Label captionLabel = null)
         {
             Panel panel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.FlowSoft, Margin = Padding.Empty };
-            Label name = new Label
-            {
-                Text = caption,
-                AutoSize = false,
-                Location = new Point(0, 2),
-                Size = new Size(100, 19),
-                Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold),
-                ForeColor = Theme.Muted,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Margin = Padding.Empty
-            };
+            Label name = captionLabel ?? new Label();
+            name.Text = caption;
+            name.AutoSize = false;
+            name.Location = new Point(0, 2);
+            name.Size = new Size(100, 19);
+            name.Font = new Font("Segoe UI Semibold", 8f, FontStyle.Bold);
+            name.ForeColor = Theme.Muted;
+            name.TextAlign = ContentAlignment.MiddleCenter;
+            name.Margin = Padding.Empty;
             value.AutoSize = false;
             value.Location = new Point(0, 22);
             value.Size = new Size(100, 27);
@@ -1979,15 +1978,6 @@ namespace Neck
             _memoryValue.Text = status.PercentUsed.ToString("0.0", CultureInfo.CurrentCulture) + "%";
             _memoryValue.ForeColor = status.PercentUsed >= 85 ? Color.Firebrick : status.PercentUsed >= 70 ? Theme.Amber : Theme.Green;
 
-            try
-            {
-                string root = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
-                DriveInfo drive = new DriveInfo(root);
-                _diskValue.Text = FormatBytes(drive.AvailableFreeSpace);
-                _diskValue.ForeColor = drive.AvailableFreeSpace < 15L * 1024 * 1024 * 1024 ? Theme.Amber : Theme.Text;
-            }
-            catch { _diskValue.Text = "—"; }
-
             if ((_healthSnapshot == null || (!_replayCapturing && DateTime.UtcNow - _lastReplayCaptureUtc >= TimeSpan.FromSeconds(30))) &&
                 (DateTime.Now - _lastHealthScan).TotalSeconds >= 10)
             {
@@ -2076,6 +2066,17 @@ namespace Neck
             _guardButton.Enabled = primaryCanAct && !_maintenanceRunning && !_busy;
             _guardButton.SetPalette(primaryCanAct ? Theme.Lime : Theme.Border);
             _guardButton.ForeColor = primaryCanAct ? Theme.Ink : Theme.Muted;
+            UpdateContextMetric(snapshot);
+        }
+
+        private void UpdateContextMetric(HealthSnapshot snapshot)
+        {
+            FlowContextMetric metric = FlowContextMetricSelector.Select(_flowDecision, _baselineEvaluation,
+                snapshot, _latestReplaySample);
+            _contextMetricCaption.Text = metric.Caption;
+            _contextMetricValue.Text = metric.Value;
+            _contextMetricValue.ForeColor = metric.Severity == FlowMetricSeverity.Critical ? Color.Firebrick :
+                metric.Severity == FlowMetricSeverity.Attention ? Theme.Amber : Theme.Text;
         }
 
         private void UpdateFlowScore()

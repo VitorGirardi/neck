@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Neck
 {
@@ -29,6 +30,124 @@ namespace Neck
         public int ConsecutiveReadings;
         public int RequiredReadings;
         public DateTime EvidenceUtc;
+    }
+
+    internal enum FlowMetricSeverity { Normal, Attention, Critical }
+
+    internal sealed class FlowContextMetric
+    {
+        public string Caption = "Espaço livre";
+        public string Value = "—";
+        public FlowMetricSeverity Severity;
+    }
+
+    internal static class FlowContextMetricSelector
+    {
+        public static FlowContextMetric Select(FlowConsensusDecision decision, BaselineEvaluation baseline,
+            HealthSnapshot snapshot, ReplaySample sample)
+        {
+            if (decision != null && decision.State == FlowConsensusState.BaselineShift && baseline != null)
+                return FromBaseline(baseline.PrimaryMetric, snapshot, sample);
+
+            BottleneckSignalKind signal = decision == null || decision.Advice == null
+                ? BottleneckSignalKind.None : decision.Advice.SignalKind;
+            if (signal == BottleneckSignalKind.MemoryPressure || signal == BottleneckSignalKind.MemoryObservation)
+                return AvailableMemory(snapshot, sample);
+            if (signal == BottleneckSignalKind.CpuContention || signal == BottleneckSignalKind.CpuObservation ||
+                signal == BottleneckSignalKind.ForegroundFreeze)
+                return Cpu(snapshot, sample);
+            if (signal == BottleneckSignalKind.DiskLatency) return DiskLatency(sample);
+            if (signal == BottleneckSignalKind.ThermalPressure) return Temperature(sample);
+            return DiskSpace(snapshot);
+        }
+
+        private static FlowContextMetric FromBaseline(string primaryMetric, HealthSnapshot snapshot, ReplaySample sample)
+        {
+            FlowContextMetric metric;
+            if (string.Equals(primaryMetric, "CPU", StringComparison.OrdinalIgnoreCase)) metric = Cpu(snapshot, sample);
+            else if (string.Equals(primaryMetric, "Fila da CPU", StringComparison.OrdinalIgnoreCase)) metric = CpuQueue(sample);
+            else if (string.Equals(primaryMetric, "Memória", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(primaryMetric, "Folga de memória", StringComparison.OrdinalIgnoreCase)) metric = AvailableMemory(snapshot, sample);
+            else if (string.Equals(primaryMetric, "Paginação", StringComparison.OrdinalIgnoreCase)) metric = PageReads(sample);
+            else if (string.Equals(primaryMetric, "Latência do armazenamento", StringComparison.OrdinalIgnoreCase)) metric = DiskLatency(sample);
+            else if (string.Equals(primaryMetric, "Fila do armazenamento", StringComparison.OrdinalIgnoreCase)) metric = DiskQueue(sample);
+            else if (string.Equals(primaryMetric, "Temperatura", StringComparison.OrdinalIgnoreCase)) metric = Temperature(sample);
+            else metric = DiskSpace(snapshot);
+            if (metric.Severity == FlowMetricSeverity.Normal) metric.Severity = FlowMetricSeverity.Attention;
+            return metric;
+        }
+
+        private static FlowContextMetric Cpu(HealthSnapshot snapshot, ReplaySample sample)
+        {
+            double value = sample == null ? snapshot == null ? 0 : snapshot.CpuPercent : sample.CpuPercent;
+            return Metric("CPU agora", value.ToString("0", CultureInfo.CurrentCulture) + "%",
+                value >= 92 ? FlowMetricSeverity.Critical : value >= 75 ? FlowMetricSeverity.Attention : FlowMetricSeverity.Normal);
+        }
+
+        private static FlowContextMetric AvailableMemory(HealthSnapshot snapshot, ReplaySample sample)
+        {
+            long value = sample != null && sample.AvailableBytes > 0 ? sample.AvailableBytes :
+                snapshot == null ? 0 : (long)snapshot.Memory.AvailableBytes;
+            return Metric("RAM disponível", value > 0 ? MainForm.FormatBytes(value) : "—",
+                value > 0 && value < 1024L * 1024 * 1024 ? FlowMetricSeverity.Critical :
+                value > 0 && value < 2L * 1024 * 1024 * 1024 ? FlowMetricSeverity.Attention : FlowMetricSeverity.Normal);
+        }
+
+        private static FlowContextMetric PageReads(ReplaySample sample)
+        {
+            if (sample == null) return Metric("Paginação", "—", FlowMetricSeverity.Attention);
+            double value = sample.PageReadsPerSecond;
+            return Metric("Paginação", value.ToString("0", CultureInfo.CurrentCulture) + "/s",
+                value >= 100 ? FlowMetricSeverity.Critical : value >= 30 ? FlowMetricSeverity.Attention : FlowMetricSeverity.Normal);
+        }
+
+        private static FlowContextMetric CpuQueue(ReplaySample sample)
+        {
+            if (sample == null) return Metric("Fila da CPU", "—", FlowMetricSeverity.Attention);
+            double value = sample.ProcessorQueueLength;
+            return Metric("Fila da CPU", value.ToString("0.0", CultureInfo.CurrentCulture),
+                value >= Math.Max(4, Environment.ProcessorCount) ? FlowMetricSeverity.Critical :
+                value >= 2 ? FlowMetricSeverity.Attention : FlowMetricSeverity.Normal);
+        }
+
+        private static FlowContextMetric DiskLatency(ReplaySample sample)
+        {
+            if (sample == null) return Metric("Latência do disco", "—", FlowMetricSeverity.Attention);
+            double value = sample.DiskLatencyMilliseconds;
+            return Metric("Latência do disco", value.ToString("0", CultureInfo.CurrentCulture) + " ms",
+                value >= 100 ? FlowMetricSeverity.Critical : value >= 25 ? FlowMetricSeverity.Attention : FlowMetricSeverity.Normal);
+        }
+
+        private static FlowContextMetric DiskQueue(ReplaySample sample)
+        {
+            if (sample == null) return Metric("Fila do disco", "—", FlowMetricSeverity.Attention);
+            double value = sample.DiskQueueLength;
+            return Metric("Fila do disco", value.ToString("0.0", CultureInfo.CurrentCulture),
+                value >= 4 ? FlowMetricSeverity.Critical : value >= 1.5d ? FlowMetricSeverity.Attention : FlowMetricSeverity.Normal);
+        }
+
+        private static FlowContextMetric Temperature(ReplaySample sample)
+        {
+            if (sample == null || sample.TemperatureCelsius <= 0) return Metric("Temperatura", "—", FlowMetricSeverity.Attention);
+            double value = sample.TemperatureCelsius;
+            return Metric("Temperatura", value.ToString("0", CultureInfo.CurrentCulture) + " °C",
+                value >= 95 ? FlowMetricSeverity.Critical : value >= 85 ? FlowMetricSeverity.Attention : FlowMetricSeverity.Normal);
+        }
+
+        private static FlowContextMetric DiskSpace(HealthSnapshot snapshot)
+        {
+            long value = snapshot == null ? 0 : snapshot.DiskFreeBytes;
+            bool critical = snapshot != null && snapshot.DiskTotalBytes > 0 &&
+                (value < 2L * 1024 * 1024 * 1024 || value * 100 / snapshot.DiskTotalBytes < 5);
+            return Metric("Espaço livre", value > 0 ? MainForm.FormatBytes(value) : "—",
+                critical ? FlowMetricSeverity.Critical : value > 0 && value < 15L * 1024 * 1024 * 1024
+                    ? FlowMetricSeverity.Attention : FlowMetricSeverity.Normal);
+        }
+
+        private static FlowContextMetric Metric(string caption, string value, FlowMetricSeverity severity)
+        {
+            return new FlowContextMetric { Caption = caption, Value = value, Severity = severity };
+        }
     }
 
     internal sealed class FlowConsensusEngine
