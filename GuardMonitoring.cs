@@ -171,7 +171,7 @@ namespace Neck
                     if (sample != null && sample.TimestampUtc >= cutoff) samples.Add(sample);
                 }
             }
-            catch { }
+            catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Leitura do histórico Guard", ex); }
             return samples.OrderBy(item => item.TimestampUtc).ToList();
         }
 
@@ -182,7 +182,7 @@ namespace Neck
                 Directory.CreateDirectory(_directory);
                 File.AppendAllText(_historyPath, Serialize(sample) + Environment.NewLine, new UTF8Encoding(false));
             }
-            catch { }
+            catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Gravação do histórico Guard", ex); }
         }
 
         public void Compact(IList<GuardSample> samples)
@@ -195,7 +195,7 @@ namespace Neck
                 if (File.Exists(_historyPath)) File.Replace(temporary, _historyPath, null);
                 else File.Move(temporary, _historyPath);
             }
-            catch { }
+            catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Compactação do histórico Guard", ex); }
         }
 
         private static string Serialize(GuardSample sample)
@@ -268,7 +268,7 @@ namespace Neck
                     else if (key == "SilentUntilUtc") DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out settings.SilentUntilUtc);
                 }
             }
-            catch { }
+            catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Leitura das preferências", ex); }
             return settings;
         }
 
@@ -289,7 +289,7 @@ namespace Neck
                     "SilentUntilUtc=" + SilentUntilUtc.ToString("O", CultureInfo.InvariantCulture)
                 }, new UTF8Encoding(false));
             }
-            catch { }
+            catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Gravação das preferências", ex); }
         }
     }
 

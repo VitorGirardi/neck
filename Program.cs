@@ -622,7 +622,7 @@ namespace Neck
                     if (!string.IsNullOrWhiteSpace(focusBefore) && string.IsNullOrWhiteSpace(FocusModeManager.ActiveDisplayName))
                         _trayIcon.ShowBalloonTip(3000, "Aceleração concluída", "O tempo terminou e o aplicativo voltou ao funcionamento normal.", ToolTipIcon.Info);
                 }
-                catch { }
+                catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Atualização adaptativa", ex); }
             };
             _adaptiveTimer.Start();
             _hardwareTimer.Interval = 30000;
@@ -1362,6 +1362,7 @@ namespace Neck
             }
             catch (Exception ex)
             {
+                SupportDiagnostics.RecordThrottledException("Plano personalizado", ex);
                 if (!_closing && !IsDisposed)
                     MessageBox.Show("Não foi possível montar o plano agora.\n\n" + ex.Message, "Meu Plano Neck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -1684,7 +1685,7 @@ namespace Neck
                     ShowGuardAlertIfNeeded(_guardDetector.Evaluate(_guardSamples));
                 if (monitoring.RecoveryConfirmed) ShowRecoveryNotification();
             }
-            catch { }
+            catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Monitor Guard", ex); }
         }
 
         private async Task CaptureReplayAsync()
@@ -1754,7 +1755,7 @@ namespace Neck
                     _activityStatus.Text = "O fluxo voltou. O Replay preservou a causa provável para você revisar.";
                 }
             }
-            catch { }
+            catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Captura Replay", ex); }
             finally { _replayCapturing = false; }
         }
 

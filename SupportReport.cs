@@ -19,9 +19,34 @@ namespace Neck
         public string Detail = string.Empty;
     }
 
+    internal sealed class DiagnosticThrottle
+    {
+        private readonly object _syncRoot = new object();
+        private readonly Dictionary<string, DateTime> _lastRecorded = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+
+        public bool ShouldRecord(string key, DateTime nowUtc, TimeSpan interval)
+        {
+            key = key ?? string.Empty;
+            lock (_syncRoot)
+            {
+                DateTime previous;
+                if (_lastRecorded.TryGetValue(key, out previous) && nowUtc - previous < interval) return false;
+                _lastRecorded[key] = nowUtc;
+                if (_lastRecorded.Count > 256)
+                {
+                    DateTime cutoff = nowUtc.AddHours(-24);
+                    foreach (string expired in _lastRecorded.Where(item => item.Value < cutoff).Select(item => item.Key).ToList())
+                        _lastRecorded.Remove(expired);
+                }
+                return true;
+            }
+        }
+    }
+
     internal static class SupportDiagnostics
     {
         private static readonly object SyncRoot = new object();
+        private static readonly DiagnosticThrottle ExceptionThrottle = new DiagnosticThrottle();
         private static readonly string DirectoryPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neck", "Diagnostics");
         private static readonly string EventsPath = Path.Combine(DirectoryPath, "events.log");
@@ -48,6 +73,14 @@ namespace Neck
                 Message = Sanitize(type + ": " + message),
                 Detail = Sanitize(detail)
             });
+        }
+
+        public static void RecordThrottledException(string scope, Exception exception)
+        {
+            string type = exception == null ? "Erro desconhecido" : exception.GetType().FullName;
+            string key = Sanitize(scope) + "|" + Sanitize(type);
+            if (ExceptionThrottle.ShouldRecord(key, DateTime.UtcNow, TimeSpan.FromMinutes(10)))
+                RecordException(scope, exception);
         }
 
         public static List<SupportEvent> LoadRecent(int maximum)

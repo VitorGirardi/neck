@@ -356,7 +356,7 @@ namespace Neck
                 else File.Move(temporary, _path);
                 _acceptedSinceSave = 0;
             }
-            catch { }
+            catch (Exception ex) { SupportDiagnostics.RecordThrottledException("Gravação do Baseline", ex); }
         }
 
         private static string[] Serialize(BaselineProfile profile)
@@ -404,7 +404,11 @@ namespace Neck
                     else if (key.StartsWith("Meeting.", StringComparison.Ordinal)) ReadMetric(profile.Meeting, key.Substring(8), value);
                 }
             }
-            catch { return new BaselineProfile(); }
+            catch (Exception ex)
+            {
+                SupportDiagnostics.RecordThrottledException("Leitura do Baseline", ex);
+                return new BaselineProfile();
+            }
             return profile;
         }
 
